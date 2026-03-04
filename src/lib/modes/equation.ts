@@ -5,6 +5,8 @@ import {
 } from '../format';
 import { runExpressionAction } from '../math-engine';
 import { analyzeLatex, isRelationalOperator } from '../math-analysis';
+import { runSharedEquationSolve } from '../equation/shared-solve';
+import { planMathExecution } from '../semantic-planner';
 import { solveLinearSystem } from '../matrix';
 import { solvePolynomialRoots } from '../polynomial-roots';
 import type {
@@ -12,6 +14,7 @@ import type {
   DisplayOutcome,
   EquationScreen,
   OutputStyle,
+  PlannerBadge,
   PolynomialEquationView,
   ResultOrigin,
 } from '../../types/calculator';
@@ -90,6 +93,28 @@ function toOutcome(
   };
 }
 
+function withPlannerMetadata(
+  outcome: DisplayOutcome,
+  originalLatex: string,
+  resolvedLatex: string,
+  plannerBadges: PlannerBadge[] | undefined,
+): DisplayOutcome {
+  if (outcome.kind === 'prompt') {
+    return outcome;
+  }
+
+  const mergedPlannerBadges = [
+    ...(plannerBadges ?? []),
+    ...((outcome.plannerBadges ?? []).filter((badge) => !(plannerBadges ?? []).includes(badge))),
+  ];
+
+  return {
+    ...outcome,
+    resolvedInputLatex: resolvedLatex !== originalLatex.trim() ? resolvedLatex : undefined,
+    plannerBadges: mergedPlannerBadges.length > 0 ? mergedPlannerBadges : undefined,
+  };
+}
+
 function solveSystem(source: number[][], size: 2 | 3): DisplayOutcome {
   const coefficients = source.map((row) => row.slice(0, size));
   const constants = source.map((row) => row[size]);
@@ -125,6 +150,10 @@ function normalizedCoefficients(coefficients: number[], expectedLength: number) 
     const value = coefficients[index];
     return Number.isFinite(value) ? value : 0;
   });
+}
+
+function containsNonEqualityRelation(latex: string) {
+  return /\\(?:le|leq|ge|geq|ne|neq)(?![A-Za-z])|[<>]|[≤≥≠]/.test(latex);
 }
 
 function termLatex(coefficient: number, power: number) {
@@ -262,9 +291,7 @@ function solveSymbolicEquation(
   outputStyle: OutputStyle,
   ansLatex: string,
 ): DisplayOutcome {
-  const analysis = analyzeLatex(equationLatex);
-
-  if (isRelationalOperator(analysis.topLevelOperator)) {
+  if (containsNonEqualityRelation(equationLatex)) {
     return {
       kind: 'error',
       title: 'Solve',
@@ -273,42 +300,86 @@ function solveSymbolicEquation(
     };
   }
 
+  const planner = planMathExecution(equationLatex, {
+    mode: 'equation',
+    intent: 'equation-solve',
+    angleUnit,
+    screenHint: 'symbolic',
+  });
+
+  if (planner.kind === 'blocked') {
+    return withPlannerMetadata(
+      {
+        kind: 'error',
+        title: 'Solve',
+        error: planner.error,
+        warnings: [],
+      },
+      equationLatex,
+      planner.canonicalLatex,
+      planner.badges,
+    );
+  }
+
+  const analysis = analyzeLatex(planner.resolvedLatex);
+
+  if (
+    isRelationalOperator(analysis.topLevelOperator)
+    || containsNonEqualityRelation(equationLatex)
+    || containsNonEqualityRelation(planner.resolvedLatex)
+  ) {
+    return withPlannerMetadata(
+      {
+        kind: 'error',
+        title: 'Solve',
+        error: 'Equation mode currently solves only = equations. Inequalities and ≠ relations are planned for a later milestone.',
+        warnings: [],
+      },
+      equationLatex,
+      planner.resolvedLatex,
+      planner.badges,
+    );
+  }
+
   if (analysis.kind !== 'equation') {
-    return {
-      kind: 'error',
-      title: 'Solve',
-      error: 'Enter an equation containing x.',
-      warnings: [],
-    };
+    return withPlannerMetadata(
+      {
+        kind: 'error',
+        title: 'Solve',
+        error: 'Enter an equation containing x.',
+        warnings: [],
+      },
+      equationLatex,
+      planner.resolvedLatex,
+      planner.badges,
+    );
   }
 
   if (!analysis.containsSymbolX) {
-    return {
-      kind: 'error',
-      title: 'Solve',
-      error: 'Equation mode solves for x. Enter x in the equation.',
-      warnings: [],
-    };
+    return withPlannerMetadata(
+      {
+        kind: 'error',
+        title: 'Solve',
+        error: 'Equation mode solves for x. Enter x in the equation.',
+        warnings: [],
+      },
+      equationLatex,
+      planner.resolvedLatex,
+      planner.badges,
+    );
   }
 
-  const response = runExpressionAction(
-    {
-      mode: 'equation',
-      document: { latex: equationLatex },
+  return withPlannerMetadata(
+    runSharedEquationSolve({
+      originalLatex: equationLatex,
+      resolvedLatex: planner.resolvedLatex,
       angleUnit,
       outputStyle,
-      variables: { Ans: ansLatex },
-    },
-    'solve',
-  );
-
-  return toOutcome(
-    'Solve',
-    response.exactLatex,
-    response.approxText,
-    response.warnings,
-    response.error,
-    response.error ? undefined : 'symbolic',
+      ansLatex,
+    }),
+    equationLatex,
+    planner.resolvedLatex,
+    planner.badges,
   );
 }
 

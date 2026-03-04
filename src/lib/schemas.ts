@@ -156,6 +156,7 @@ export const historyEntrySchema = z.object({
   id: z.string(),
   mode: modeIdSchema,
   inputLatex: z.string(),
+  resolvedInputLatex: z.string().optional(),
   resultLatex: z.string().optional(),
   approxText: z.string().optional(),
   geometryScreen: geometryScreenSchema.optional(),

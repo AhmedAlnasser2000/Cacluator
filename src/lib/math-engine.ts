@@ -16,6 +16,7 @@ import {
   solutionsToLatex,
 } from './format';
 import { resolveCalculusEvaluation } from './calculus-eval';
+import { canonicalizeMathInput } from './input-canonicalization';
 import { rewriteDiscreteOperators } from './discrete-eval';
 import { getResultGuardError } from './result-guard';
 import { factorMathJson } from './symbolic-factor';
@@ -211,7 +212,11 @@ export function runExpressionAction(
   request: EvaluateRequest,
   action: SymbolicAction,
 ): EvaluateResponse {
-  const rawLatex = request.document.latex.trim();
+  const canonicalized = canonicalizeMathInput(request.document.latex, {
+    mode: request.mode,
+    screenHint: action === 'solve' ? 'symbolic' : 'standard',
+  });
+  const rawLatex = (canonicalized.ok ? canonicalized.canonicalLatex : request.document.latex).trim();
   if (!rawLatex) {
     return {
       warnings: [],
@@ -385,7 +390,24 @@ function evaluateAtPoint(latex: string, variable: string, value: number) {
 }
 
 export function buildTable(request: TableRequest): TableResponse {
-  if (!request.primaryExpression.latex.trim()) {
+  const primaryCanonical = canonicalizeMathInput(request.primaryExpression.latex, {
+    mode: 'table',
+    screenHint: 'table',
+  });
+  const secondaryCanonical = request.secondaryExpression?.latex
+    ? canonicalizeMathInput(request.secondaryExpression.latex, {
+        mode: 'table',
+        screenHint: 'table',
+      })
+    : null;
+  const primaryLatex = primaryCanonical.ok
+    ? primaryCanonical.canonicalLatex
+    : request.primaryExpression.latex;
+  const secondaryLatex = secondaryCanonical?.ok
+    ? secondaryCanonical.canonicalLatex
+    : request.secondaryExpression?.latex;
+
+  if (!primaryLatex.trim()) {
     return {
       headers: [],
       rows: [],
@@ -418,17 +440,17 @@ export function buildTable(request: TableRequest): TableResponse {
       const x = request.start + request.step * index;
       return {
         x: `${x}`,
-        primary: evaluateAtPoint(request.primaryExpression.latex, request.variable, x),
-        secondary: request.secondaryExpression?.latex
-          ? evaluateAtPoint(request.secondaryExpression.latex, request.variable, x)
+        primary: evaluateAtPoint(primaryLatex, request.variable, x),
+        secondary: secondaryLatex
+          ? evaluateAtPoint(secondaryLatex, request.variable, x)
           : undefined,
       };
     });
 
     const headers = [
       request.variable,
-      request.primaryExpression.latex,
-      ...(request.secondaryExpression?.latex ? [request.secondaryExpression.latex] : []),
+      primaryLatex,
+      ...(secondaryLatex ? [secondaryLatex] : []),
     ];
 
     return {

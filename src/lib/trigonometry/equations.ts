@@ -1,5 +1,6 @@
 import type { TrigEquationState } from '../../types/calculator';
 import type { TrigEvaluation } from './angles';
+import { matchBoundedTrigEquation } from './equation-match';
 import {
   convertAngle,
   formatDegreesAsUnitLatex,
@@ -10,47 +11,6 @@ import {
 const EPSILON = 1e-9;
 
 type TrigEquationKind = 'sin' | 'cos' | 'tan';
-
-function normalizeLatex(latex: string) {
-  return latex
-    .trim()
-    .replace(/\s+/g, '')
-    .replaceAll('\\left', '')
-    .replaceAll('\\right', '');
-}
-
-function parseCoefficient(argument: string) {
-  if (argument === 'x') {
-    return 1;
-  }
-
-  const match = argument.match(/^(\d+)x$/);
-  if (!match) {
-    return undefined;
-  }
-
-  return Number(match[1]);
-}
-
-function parseEquation(equationLatex: string) {
-  const normalized = normalizeLatex(equationLatex);
-  const match = normalized.match(/^(\\sin|\\cos|\\tan)\((.+)\)=([^=]+)$/);
-  if (!match) {
-    return undefined;
-  }
-
-  const kind = match[1] === '\\sin' ? 'sin' : match[1] === '\\cos' ? 'cos' : 'tan';
-  const coefficient = parseCoefficient(match[2]);
-  if (!coefficient) {
-    return undefined;
-  }
-
-  return {
-    kind: kind as TrigEquationKind,
-    coefficient,
-    rhsLatex: match[3],
-  };
-}
 
 function dedupe(values: number[]) {
   return values.filter((value, index, list) =>
@@ -136,7 +96,7 @@ function buildPeriodicFamily(kind: TrigEquationKind, solutionsDegrees: number[],
 }
 
 export function solveTrigEquation(state: TrigEquationState): TrigEvaluation {
-  const parsed = parseEquation(state.equationLatex);
+  const parsed = matchBoundedTrigEquation(state.equationLatex);
   if (!parsed) {
     return {
       error: 'Use a supported equation such as sin(x)=1/2, cos(x)=0, tan(x)=1, or sin(2x)=0.',

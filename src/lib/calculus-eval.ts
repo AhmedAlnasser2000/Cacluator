@@ -642,12 +642,33 @@ export function resolveCalculusEvaluation(
   }
 
   const derivative = extractDerivative(originalExpr.json);
-  if (derivative && evaluatedExpr.latex === originalExpr.latex) {
-    return {
-      kind: 'error',
-      error: 'This derivative could not be determined symbolically in this milestone.',
-      warnings: [],
-    };
+  if (derivative) {
+    try {
+      const exactDerivative = box(differentiateAst(derivative.body, derivative.variable));
+      return {
+        kind: 'handled',
+        exactLatex: exactDerivative.latex,
+        approxText: latexToApproxText((exactDerivative.N?.() ?? exactDerivative).latex),
+        warnings: [],
+        resultOrigin: 'symbolic-engine',
+      };
+    } catch {
+      if (evaluatedExpr.latex !== originalExpr.latex) {
+        return {
+          kind: 'handled',
+          exactLatex: evaluatedExpr.latex,
+          approxText: latexToApproxText((evaluatedExpr.N?.() ?? evaluatedExpr).latex),
+          warnings: [],
+          resultOrigin: 'compute-engine',
+        };
+      }
+
+      return {
+        kind: 'error',
+        error: 'This derivative could not be determined symbolically in this milestone.',
+        warnings: [],
+      };
+    }
   }
 
   return { kind: 'unhandled' };

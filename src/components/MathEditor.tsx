@@ -4,7 +4,13 @@ import {
   useImperativeHandle,
   useRef,
 } from 'react';
-import type { MathfieldElement, VirtualKeyboardLayout } from 'mathlive';
+import type {
+  InlineShortcutDefinitions,
+  MathfieldElement,
+  VirtualKeyboardLayout,
+} from 'mathlive';
+import { canonicalizeMathInput } from '../lib/input-canonicalization';
+import type { ModeId } from '../types/calculator';
 
 type MathEditorProps = {
   value: string;
@@ -14,6 +20,8 @@ type MathEditorProps = {
   readOnly?: boolean;
   placeholder?: string;
   keyboardLayouts?: readonly VirtualKeyboardLayout[];
+  modeId?: ModeId;
+  screenHint?: string;
 };
 
 function configureVirtualKeyboard(layouts: readonly VirtualKeyboardLayout[] | undefined) {
@@ -25,9 +33,38 @@ function configureVirtualKeyboard(layouts: readonly VirtualKeyboardLayout[] | un
   window.mathVirtualKeyboard.editToolbar = 'default';
 }
 
+function buildInlineShortcutOverrides(
+  existing: InlineShortcutDefinitions | undefined,
+): InlineShortcutDefinitions {
+  return {
+    ...(existing ?? {}),
+    sin: '\\sin',
+    cos: '\\cos',
+    tan: '\\tan',
+    asin: '\\arcsin',
+    acos: '\\arccos',
+    atan: '\\arctan',
+    ln: '\\ln',
+    log: '\\log',
+    sqrt: '\\sqrt{#?}',
+    abs: '\\left|#?\\right|',
+    pi: '\\pi',
+  };
+}
+
 export const MathEditor = forwardRef<MathfieldElement, MathEditorProps>(
   function MathEditor(
-    { value, onChange, onFocus, className, readOnly = false, placeholder, keyboardLayouts },
+    {
+      value,
+      onChange,
+      onFocus,
+      className,
+      readOnly = false,
+      placeholder,
+      keyboardLayouts,
+      modeId,
+      screenHint,
+    },
     forwardedRef,
   ) {
     const elementRef = useRef<MathfieldElement | null>(null);
@@ -42,12 +79,27 @@ export const MathEditor = forwardRef<MathfieldElement, MathEditorProps>(
 
       field.readOnly = readOnly;
       field.smartFence = true;
-      field.inlineShortcuts = {};
+      field.inlineShortcuts = buildInlineShortcutOverrides(field.inlineShortcuts);
       field.placeholder = placeholder ?? '';
       field.mathVirtualKeyboardPolicy = 'auto';
 
       const handleInput = () => {
-        onChange(field.getValue('latex'));
+        const rawLatex = field.getValue('latex');
+        const canonicalized = modeId
+          ? canonicalizeMathInput(rawLatex, {
+              mode: modeId,
+              screenHint,
+              liveAssist: true,
+            })
+          : {
+              ok: true as const,
+              canonicalLatex: rawLatex,
+            };
+        const nextLatex = canonicalized.ok ? canonicalized.canonicalLatex : rawLatex;
+        if (nextLatex !== rawLatex) {
+          field.setValue(nextLatex);
+        }
+        onChange(nextLatex);
       };
 
       const handleFocus = () => {
@@ -62,7 +114,7 @@ export const MathEditor = forwardRef<MathfieldElement, MathEditorProps>(
         field.removeEventListener('input', handleInput);
         field.removeEventListener('focus', handleFocus);
       };
-    }, [keyboardLayouts, onChange, onFocus, placeholder, readOnly]);
+    }, [keyboardLayouts, modeId, onChange, onFocus, placeholder, readOnly, screenHint]);
 
   useEffect(() => {
       const field = elementRef.current;

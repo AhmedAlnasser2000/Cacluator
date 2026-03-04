@@ -179,6 +179,16 @@ describe('runExpressionAction', () => {
     expect(result.exactLatex).toBe('1')
   })
 
+  it('canonicalizes typed trig tokens before Calculate evaluation', () => {
+    const result = runExpressionAction(
+      { ...request, mode: 'calculate', angleUnit: 'deg', document: { latex: 'sin(90)' } },
+      'evaluate',
+    )
+
+    expect(result.error).toBeUndefined()
+    expect(result.exactLatex).toBe('1')
+  })
+
   it('keeps explicit radian trig unchanged even when the global mode is degrees', () => {
     const result = runExpressionAction(
       { ...request, mode: 'calculate', angleUnit: 'deg', document: { latex: '\\sin\\left(\\frac{\\pi}{2}\\right)' } },
@@ -218,6 +228,18 @@ describe('runExpressionAction', () => {
 
     expect(result.error).toBeUndefined()
     expect(result.exactLatex).toBe('6')
+  })
+
+  it('uses the symbolic derivative engine for chain-rule derivatives', () => {
+    const result = runExpressionAction(
+      { ...request, document: { latex: '\\frac{d}{dx}\\sin\\left(x^2\\right)' } },
+      'evaluate',
+    )
+
+    expect(result.error).toBeUndefined()
+    expect(result.resultOrigin).toBe('symbolic-engine')
+    expect(result.exactLatex).toContain('2x')
+    expect(result.exactLatex).toContain('\\cos')
   })
 
   it('falls back numerically for supported definite integrals', () => {

@@ -197,4 +197,53 @@ describe('runEquationMode', () => {
     }
     expect(result.error).toContain('non-zero');
   });
+
+  it('reduces embedded derivatives before solving for x', () => {
+    const result = runEquationMode({
+      ...makeRequest(),
+      equationScreen: 'symbolic',
+      equationLatex: '12+\\frac{d}{dx}(5x)+6x=5',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.exactLatex).toContain('x=');
+    expect(result.exactLatex).toContain('-2');
+    const normalized = result.resolvedInputLatex?.replaceAll(' ', '') ?? '';
+    expect(normalized).toContain('6x');
+    expect(normalized).toContain('17');
+    expect(normalized).toContain('=5');
+    expect(result.plannerBadges).toContain('Reduced Derivative');
+  });
+
+  it('uses the shared bounded trig backend for symbolic trig equations', () => {
+    const result = runEquationMode({
+      ...makeRequest(),
+      equationScreen: 'symbolic',
+      equationLatex: '\\sin\\left(2x\\right)=0',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.plannerBadges).toContain('Trig Solve Backend');
+  });
+
+  it('blocks unsupported indefinite integrals before solve', () => {
+    const result = runEquationMode({
+      ...makeRequest(),
+      equationScreen: 'symbolic',
+      equationLatex: '\\int x\\,dx+x=3',
+    });
+
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') {
+      throw new Error('Expected an error outcome');
+    }
+    expect(result.error).toContain('indefinite integral');
+    expect(result.plannerBadges).toContain('Hard Stop');
+  });
 });

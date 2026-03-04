@@ -161,6 +161,7 @@ struct HistoryEntry {
   id: String,
   mode: ModeId,
   input_latex: String,
+  resolved_input_latex: Option<String>,
   result_latex: Option<String>,
   approx_text: Option<String>,
   geometry_screen: Option<String>,

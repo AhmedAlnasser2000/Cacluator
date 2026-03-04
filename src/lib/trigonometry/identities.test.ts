@@ -26,4 +26,12 @@ describe('trigonometry identities', () => {
     });
     expect(result.exactLatex).toBe('\\frac{1-\\cos\\left(2x\\right)}{2}');
   });
+
+  it('simplifies repeated trig products structurally after normalization', () => {
+    const result = evaluateTrigIdentity({
+      expressionLatex: '\\sin\\left(x\\right)\\sin\\left(x\\right)+\\cos\\left(x\\right)\\cos\\left(x\\right)',
+      targetForm: 'simplified',
+    });
+    expect(result.exactLatex).toBe('1');
+  });
 });

@@ -1,5 +1,6 @@
 import { runExpressionAction } from '../math-engine';
 import { analyzeLatex, isRelationalOperator } from '../math-analysis';
+import { planMathExecution } from '../semantic-planner';
 import type {
   AngleUnit,
   CalculateAction,
@@ -7,6 +8,7 @@ import type {
   LimitDirection,
   LimitTargetKind,
   OutputStyle,
+  PlannerBadge,
   ResultOrigin,
 } from '../../types/calculator';
 
@@ -64,6 +66,23 @@ function toOutcome(
   };
 }
 
+function withPlannerMetadata(
+  outcome: DisplayOutcome,
+  originalLatex: string,
+  resolvedLatex: string,
+  plannerBadges: PlannerBadge[] | undefined,
+): DisplayOutcome {
+  if (outcome.kind === 'prompt') {
+    return outcome;
+  }
+
+  return {
+    ...outcome,
+    resolvedInputLatex: resolvedLatex !== originalLatex.trim() ? resolvedLatex : undefined,
+    plannerBadges,
+  };
+}
+
 export function runCalculateMode({
   action,
   latex,
@@ -74,7 +93,35 @@ export function runCalculateMode({
   limitTargetKind,
 }: RunCalculateModeRequest): DisplayOutcome {
   const title = actionTitle(action);
-  const analysis = analyzeLatex(latex);
+  const planner = planMathExecution(latex, {
+    mode: 'calculate',
+    intent:
+      action === 'evaluate'
+        ? 'calculate-evaluate'
+        : action === 'simplify'
+          ? 'calculate-simplify'
+          : action === 'factor'
+            ? 'calculate-factor'
+            : 'calculate-expand',
+    angleUnit,
+    screenHint: 'standard',
+  });
+
+  if (planner.kind === 'blocked') {
+    return withPlannerMetadata(
+      {
+        kind: 'error',
+        title,
+        error: planner.error,
+        warnings: [],
+      },
+      latex,
+      planner.canonicalLatex,
+      planner.badges,
+    );
+  }
+
+  const analysis = analyzeLatex(planner.resolvedLatex);
 
   if (analysis.kind === 'equation') {
     return {
@@ -82,33 +129,43 @@ export function runCalculateMode({
       title,
       message: 'Use Equation mode to solve this expression.',
       targetMode: 'equation',
-      carryLatex: latex,
+      carryLatex: planner.resolvedLatex,
       warnings: [],
     };
   }
 
   if (isRelationalOperator(analysis.topLevelOperator)) {
-    return {
-      kind: 'error',
-      title,
-      error: 'Inequalities and ≠ notation are visible in Algebra, but this milestone only evaluates expressions and equations.',
-      warnings: [],
-    };
+    return withPlannerMetadata(
+      {
+        kind: 'error',
+        title,
+        error: 'Inequalities and ≠ notation are visible in Algebra, but this milestone only evaluates expressions and equations.',
+        warnings: [],
+      },
+      latex,
+      planner.resolvedLatex,
+      planner.badges,
+    );
   }
 
   if (analysis.kind === 'invalid') {
-    return {
-      kind: 'error',
-      title,
-      error: 'Expression could not be parsed or evaluated.',
-      warnings: [],
-    };
+    return withPlannerMetadata(
+      {
+        kind: 'error',
+        title,
+        error: 'Expression could not be parsed or evaluated.',
+        warnings: [],
+      },
+      latex,
+      planner.resolvedLatex,
+      planner.badges,
+    );
   }
 
   const response = runExpressionAction(
     {
       mode: 'calculate',
-      document: { latex },
+      document: { latex: planner.resolvedLatex },
       angleUnit,
       outputStyle,
       variables: { Ans: ansLatex },
@@ -120,12 +177,17 @@ export function runCalculateMode({
     action,
   );
 
-  return toOutcome(
-    title,
-    response.exactLatex,
-    response.approxText,
-    response.warnings,
-    response.error,
-    response.resultOrigin,
+  return withPlannerMetadata(
+    toOutcome(
+      title,
+      response.exactLatex,
+      response.approxText,
+      response.warnings,
+      response.error,
+      response.resultOrigin,
+    ),
+    latex,
+    planner.resolvedLatex,
+    planner.badges,
   );
 }

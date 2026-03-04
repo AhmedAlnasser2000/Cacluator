@@ -6,8 +6,10 @@ import type {
   TrigRequest,
   TrigScreen,
 } from '../../types/calculator';
+import { canonicalizeMathInput } from '../input-canonicalization';
+import { planMathExecution } from '../semantic-planner';
+import { runSharedEquationSolve } from '../equation/shared-solve';
 import { convertAngleState, type TrigEvaluation } from './angles';
-import { solveTrigEquation } from './equations';
 import { evaluateTrigFunction } from './functions';
 import { evaluateTrigIdentity } from './identities';
 import { parseTrigDraft } from './parser';
@@ -35,6 +37,22 @@ function toOutcome(
     approxText: evaluation.approxText,
     warnings: evaluation.warnings,
     resultOrigin: evaluation.resultOrigin,
+  };
+}
+
+function withCanonicalMetadata(
+  outcome: DisplayOutcome,
+  originalLatex: string,
+  resolvedLatex: string,
+): DisplayOutcome {
+  if (outcome.kind === 'prompt') {
+    return outcome;
+  }
+
+  return {
+    ...outcome,
+    resolvedInputLatex: resolvedLatex !== originalLatex.trim() ? resolvedLatex : undefined,
+    plannerBadges: resolvedLatex !== originalLatex.trim() ? ['Canonicalized'] : outcome.plannerBadges,
   };
 }
 
@@ -79,12 +97,49 @@ function runTrigRequest(
         expressionLatex: request.expressionLatex,
         targetForm: request.targetForm,
       }));
-    case 'equationSolve':
-      return toOutcome(title, solveTrigEquation({
-        equationLatex: request.equationLatex,
-        variable: request.variable,
+    case 'equationSolve': {
+      const planner = planMathExecution(request.equationLatex, {
+        mode: 'trigonometry',
+        intent: 'equation-solve',
         angleUnit,
-      }));
+        screenHint: 'equationSolve',
+      });
+
+      if (planner.kind === 'blocked') {
+        return {
+          kind: 'error',
+          title,
+          error: planner.error,
+          warnings: [],
+          resolvedInputLatex: planner.canonicalLatex,
+          plannerBadges: planner.badges,
+        };
+      }
+
+      const outcome = runSharedEquationSolve({
+        originalLatex: request.equationLatex,
+        resolvedLatex: planner.resolvedLatex,
+        angleUnit,
+        outputStyle: 'both',
+        ansLatex: '',
+      });
+
+      if (outcome.kind === 'prompt') {
+        return outcome;
+      }
+
+      return {
+        ...outcome,
+        title,
+        resolvedInputLatex: planner.resolvedLatex !== request.equationLatex.trim()
+          ? planner.resolvedLatex
+          : outcome.resolvedInputLatex,
+        plannerBadges: [
+          ...(planner.badges ?? []),
+          ...((outcome.plannerBadges ?? []).filter((badge) => !(planner.badges ?? []).includes(badge))),
+        ],
+      };
+    }
     case 'rightTriangle':
       return toOutcome(title, solveRightTriangle({
         knownSideA: request.knownSideA ?? '',
@@ -137,16 +192,21 @@ export function runTrigonometryCoreDraft(
     identityTargetForm?: TrigIdentityState['targetForm'];
   },
 ) {
-  const parsed = parseTrigDraft(rawLatex, options);
+  const canonicalized = canonicalizeMathInput(rawLatex, {
+    mode: 'trigonometry',
+    screenHint: options.screenHint,
+  });
+  const source = canonicalized.ok ? canonicalized.canonicalLatex : rawLatex;
+  const parsed = parseTrigDraft(source, options);
   if (!parsed.ok) {
     return {
-      outcome: parseFailureToOutcome(parsed),
+      outcome: withCanonicalMetadata(parseFailureToOutcome(parsed), rawLatex, source),
       parsed,
     };
   }
 
   return {
-    outcome: runTrigRequest(parsed.request, options.angleUnit, options.screenHint),
+    outcome: withCanonicalMetadata(runTrigRequest(parsed.request, options.angleUnit, options.screenHint), rawLatex, source),
     parsed,
   };
 }

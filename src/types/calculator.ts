@@ -137,6 +137,82 @@ export type ResultOrigin =
 export type CoreDraftStyle = 'structured' | 'shorthand';
 export type CoreDraftSource = 'manual' | 'guided' | 'legacy-preview';
 export type TransferTarget = 'calculate' | 'equation';
+export type ExecutionIntent =
+  | 'calculate-evaluate'
+  | 'calculate-simplify'
+  | 'calculate-factor'
+  | 'calculate-expand'
+  | 'equation-solve'
+  | 'table-build'
+  | 'trig-evaluate'
+  | 'geometry-evaluate'
+  | 'statistics-evaluate';
+export type CanonicalizationChangeKind =
+  | 'function-token'
+  | 'constant-token'
+  | 'derivative-token'
+  | 'delimiter-normalization';
+export type CanonicalizationChange = {
+  kind: CanonicalizationChangeKind;
+  before: string;
+  after: string;
+};
+export type CanonicalizationResult =
+  | {
+      ok: true;
+      originalLatex: string;
+      canonicalLatex: string;
+      changes: CanonicalizationChange[];
+    }
+  | {
+      ok: false;
+      originalLatex: string;
+      error: string;
+    };
+export type PlannerBadge =
+  | 'Canonicalized'
+  | 'Reduced Derivative'
+  | 'Reduced Partial'
+  | 'Reduced Numeric Operator'
+  | 'Compacted Repeated Factors'
+  | 'Trig Solve Backend'
+  | 'Hard Stop';
+export type PlannerStep =
+  | { kind: 'canonicalize-token'; before: string; after: string }
+  | { kind: 'reduce-derivative'; before: string; after: string }
+  | { kind: 'reduce-partial'; before: string; after: string }
+  | { kind: 'reduce-numeric-operator'; before: string; after: string }
+  | { kind: 'compact-identical-product'; before: string; after: string }
+  | { kind: 'normalize-equation'; before: string; after: string }
+  | { kind: 'unsupported-node'; nodeKind: string; message: string };
+export type PlannerOutcome =
+  | {
+      kind: 'ready';
+      originalLatex: string;
+      canonicalLatex: string;
+      resolvedLatex: string;
+      badges: PlannerBadge[];
+      steps: PlannerStep[];
+    }
+  | {
+      kind: 'blocked';
+      originalLatex: string;
+      canonicalLatex: string;
+      badges: ['Hard Stop'];
+      steps: PlannerStep[];
+      error: string;
+    };
+export type CanonicalizationContext = {
+  mode: ModeId;
+  screenHint?: string;
+  liveAssist?: boolean;
+};
+export type PlannerContext = {
+  mode: ModeId;
+  intent: ExecutionIntent;
+  angleUnit: AngleUnit;
+  screenHint?: string;
+};
 export type EquationMenuEntryId =
   | 'symbolic'
   | 'polynomial'
@@ -531,6 +607,8 @@ export type DisplayOutcome =
       warnings: string[];
       resultOrigin?: ResultOrigin;
       actions?: DisplayOutcomeAction[];
+      resolvedInputLatex?: string;
+      plannerBadges?: PlannerBadge[];
     }
   | {
       kind: 'prompt';
@@ -548,6 +626,8 @@ export type DisplayOutcome =
       exactLatex?: string;
       approxText?: string;
       actions?: DisplayOutcomeAction[];
+      resolvedInputLatex?: string;
+      plannerBadges?: PlannerBadge[];
     };
 
 export type DisplayOutcomeAction =
@@ -983,6 +1063,7 @@ export type HistoryEntry = {
   id: string;
   mode: ModeId;
   inputLatex: string;
+  resolvedInputLatex?: string;
   resultLatex?: string;
   approxText?: string;
   geometryScreen?: GeometryScreen;

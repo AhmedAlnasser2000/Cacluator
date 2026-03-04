@@ -3376,6 +3376,7 @@ export default function App() {
       id: createId(),
       mode,
       inputLatex,
+      resolvedInputLatex: outcome.resolvedInputLatex,
       resultLatex: outcome.exactLatex,
       approxText: outcome.approxText,
       ...(mode === 'geometry'
@@ -5702,6 +5703,10 @@ export default function App() {
           className: `advanced-calc-provenance-badge is-${advancedCalcProvenanceBadge.variant}`,
         }]
       : []),
+    ...(((displayOutcome && 'plannerBadges' in displayOutcome ? displayOutcome.plannerBadges : undefined) ?? []).map((badge) => ({
+      label: badge,
+      className: badge === 'Hard Stop' ? 'equation-origin-badge' : 'equation-badge',
+    }))),
   ];
   const calculateGuideArticleId = calculateRouteMeta?.guideArticleId;
   const calculateAdvancedGuideArticleId =
@@ -7754,6 +7759,8 @@ export default function App() {
                   ref={statisticsDraftFieldRef}
                   className="main-mathfield statistics-main-mathfield"
                   value={statisticsDraftLatex}
+                  modeId="statistics"
+                  screenHint={statisticsScreen}
                   onChange={(latex) => updateStatisticsDraft(latex, 'manual', true)}
                   keyboardLayouts={statisticsKeyboardLayouts}
                   onFocus={(field) => {
@@ -7776,6 +7783,8 @@ export default function App() {
                   ref={trigDraftFieldRef}
                   className="main-mathfield trig-main-mathfield"
                   value={trigDraftLatex}
+                  modeId="trigonometry"
+                  screenHint={trigScreen}
                   onChange={(latex) => updateTrigDraft(latex, 'manual', true)}
                   keyboardLayouts={trigonometryKeyboardLayouts}
                   onFocus={(field) => {
@@ -7798,6 +7807,8 @@ export default function App() {
                   ref={geometryDraftFieldRef}
                   className="main-mathfield geometry-main-mathfield"
                   value={geometryDraftLatex}
+                  modeId="geometry"
+                  screenHint={geometryScreen}
                   onChange={(latex) => updateGeometryDraft(latex, 'manual', true)}
                   keyboardLayouts={geometryKeyboardLayouts}
                   onFocus={(field) => {
@@ -7813,6 +7824,8 @@ export default function App() {
                 ref={mainFieldRef}
                 className="main-mathfield"
                 value={calculateLatex}
+                modeId="calculate"
+                screenHint={calculateScreen}
                 onChange={setCalculateLatex}
                 keyboardLayouts={calculateKeyboardLayouts}
                 onFocus={(field) => {
@@ -7826,6 +7839,8 @@ export default function App() {
                 ref={mainFieldRef}
                 className="main-mathfield"
                 value={equationLatex}
+                modeId="equation"
+                screenHint={equationScreen}
                 onChange={setEquationLatex}
                 keyboardLayouts={equationKeyboardLayouts}
                 onFocus={(field) => {
@@ -8030,6 +8045,24 @@ export default function App() {
             {currentMode === 'geometry' && !isGeometryMenuOpen && !displayOutcome ? (
               <div className="result-approx">{geometryRouteMeta?.helpText}</div>
             ) : null}
+            {!isLauncherOpen
+            && !isEquationMenuOpen
+            && !isAdvancedCalcMenuOpen
+            && !isTrigMenuOpen
+            && !isStatisticsMenuOpen
+            && (!isGeometryMenuOpen || currentMode === 'geometry')
+            && currentMode !== 'guide'
+            && (displayOutcome?.kind === 'success' || displayOutcome?.kind === 'error')
+            && displayOutcome.resolvedInputLatex
+            && displayOutcome.resolvedInputLatex.trim() !== activeExpressionLatex().trim() ? (
+              <>
+                <div className="result-approx">Resolved form</div>
+                <MathStatic
+                  className="preview-math resolved-preview-math"
+                  latex={displayOutcome.resolvedInputLatex}
+                />
+              </>
+            ) : null}
             {!isLauncherOpen && !isEquationMenuOpen && !isAdvancedCalcMenuOpen && !isTrigMenuOpen && !isStatisticsMenuOpen && (!isGeometryMenuOpen || currentMode === 'geometry') && currentMode !== 'guide' && (displayOutcome?.kind === 'success' || displayOutcome?.kind === 'error') ? (
               <div className="display-card-actions">
                 <button onClick={() => void copyText(activeResultLatex(), 'Result copied')}>
@@ -8223,6 +8256,8 @@ export default function App() {
                           ref={derivativeFieldRef}
                           className="secondary-mathfield"
                           value={derivativeWorkbench.bodyLatex}
+                          modeId="calculate"
+                          screenHint={calculateScreen}
                           onChange={(bodyLatex) =>
                             setDerivativeWorkbench((currentState) => ({ ...currentState, bodyLatex }))
                           }
@@ -8254,6 +8289,8 @@ export default function App() {
                           ref={derivativePointFieldRef}
                           className="secondary-mathfield"
                           value={derivativePointWorkbench.bodyLatex}
+                          modeId="calculate"
+                          screenHint={calculateScreen}
                           onChange={(bodyLatex) =>
                             setDerivativePointWorkbench((currentState) => ({ ...currentState, bodyLatex }))
                           }
@@ -8318,6 +8355,8 @@ export default function App() {
                           ref={integralFieldRef}
                           className="secondary-mathfield"
                           value={integralWorkbench.bodyLatex}
+                          modeId="calculate"
+                          screenHint={calculateScreen}
                           onChange={(bodyLatex) =>
                             setIntegralWorkbench((currentState) => ({ ...currentState, bodyLatex }))
                           }
@@ -8429,6 +8468,8 @@ export default function App() {
                           ref={limitFieldRef}
                           className="secondary-mathfield"
                           value={limitWorkbench.bodyLatex}
+                          modeId="calculate"
+                          screenHint={calculateScreen}
                           onChange={(bodyLatex) =>
                             setLimitWorkbench((currentState) => ({ ...currentState, bodyLatex }))
                           }
@@ -8549,6 +8590,8 @@ export default function App() {
                         ref={advancedIndefiniteFieldRef}
                         className="secondary-mathfield"
                         value={advancedIndefiniteIntegral.bodyLatex}
+                        modeId="advancedCalculus"
+                        screenHint={advancedCalcScreen}
                         onChange={(bodyLatex) => setAdvancedIndefiniteIntegral({ bodyLatex })}
                         keyboardLayouts={advancedCalcKeyboardLayouts}
                         onFocus={(field) => {
@@ -8578,6 +8621,8 @@ export default function App() {
                         ref={advancedDefiniteFieldRef}
                         className="secondary-mathfield"
                         value={advancedDefiniteIntegral.bodyLatex}
+                        modeId="advancedCalculus"
+                        screenHint={advancedCalcScreen}
                         onChange={(bodyLatex) =>
                           setAdvancedDefiniteIntegral((currentState) => ({ ...currentState, bodyLatex }))
                         }
@@ -8630,6 +8675,8 @@ export default function App() {
                         ref={advancedImproperFieldRef}
                         className="secondary-mathfield"
                         value={advancedImproperIntegral.bodyLatex}
+                        modeId="advancedCalculus"
+                        screenHint={advancedCalcScreen}
                         onChange={(bodyLatex) =>
                           setAdvancedImproperIntegral((currentState) => ({ ...currentState, bodyLatex }))
                         }
@@ -8725,6 +8772,8 @@ export default function App() {
                         ref={advancedFiniteLimitFieldRef}
                         className="secondary-mathfield"
                         value={advancedFiniteLimit.bodyLatex}
+                        modeId="advancedCalculus"
+                        screenHint={advancedCalcScreen}
                         onChange={(bodyLatex) =>
                           setAdvancedFiniteLimit((currentState) => ({ ...currentState, bodyLatex }))
                         }
@@ -8779,6 +8828,8 @@ export default function App() {
                         ref={advancedInfiniteLimitFieldRef}
                         className="secondary-mathfield"
                         value={advancedInfiniteLimit.bodyLatex}
+                        modeId="advancedCalculus"
+                        screenHint={advancedCalcScreen}
                         onChange={(bodyLatex) =>
                           setAdvancedInfiniteLimit((currentState) => ({ ...currentState, bodyLatex }))
                         }
@@ -8810,6 +8861,8 @@ export default function App() {
                         ref={advancedCalcScreen === 'maclaurin' ? maclaurinFieldRef : taylorFieldRef}
                         className="secondary-mathfield"
                         value={advancedCalcScreen === 'maclaurin' ? maclaurinState.bodyLatex : taylorState.bodyLatex}
+                        modeId="advancedCalculus"
+                        screenHint={advancedCalcScreen}
                         onChange={(bodyLatex) => {
                           if (advancedCalcScreen === 'maclaurin') {
                             setMaclaurinState((currentState) => ({ ...currentState, bodyLatex }));
@@ -8889,6 +8942,8 @@ export default function App() {
                         ref={partialDerivativeFieldRef}
                         className="secondary-mathfield"
                         value={partialDerivativeState.bodyLatex}
+                        modeId="advancedCalculus"
+                        screenHint={advancedCalcScreen}
                         onChange={(bodyLatex) =>
                           setPartialDerivativeState((currentState) => ({ ...currentState, bodyLatex }))
                         }
@@ -8934,6 +8989,8 @@ export default function App() {
                         ref={firstOrderOdeLhsFieldRef}
                         className="secondary-mathfield"
                         value={firstOrderOdeState.lhsLatex}
+                        modeId="advancedCalculus"
+                        screenHint={advancedCalcScreen}
                         onChange={(lhsLatex) =>
                           setFirstOrderOdeState((currentState) => ({ ...currentState, lhsLatex }))
                         }
@@ -8947,6 +9004,8 @@ export default function App() {
                         ref={firstOrderOdeRhsFieldRef}
                         className="secondary-mathfield"
                         value={firstOrderOdeState.rhsLatex}
+                        modeId="advancedCalculus"
+                        screenHint={advancedCalcScreen}
                         onChange={(rhsLatex) =>
                           setFirstOrderOdeState((currentState) => ({ ...currentState, rhsLatex }))
                         }
@@ -9008,6 +9067,8 @@ export default function App() {
                         ref={secondOrderOdeForcingFieldRef}
                         className="secondary-mathfield"
                         value={secondOrderOdeState.forcingLatex}
+                        modeId="advancedCalculus"
+                        screenHint={advancedCalcScreen}
                         onChange={(forcingLatex) =>
                           setSecondOrderOdeState((currentState) => ({ ...currentState, forcingLatex }))
                         }
@@ -9052,6 +9113,8 @@ export default function App() {
                         ref={numericIvpFieldRef}
                         className="secondary-mathfield"
                         value={numericIvpState.bodyLatex}
+                        modeId="advancedCalculus"
+                        screenHint={advancedCalcScreen}
                         onChange={(bodyLatex) =>
                           setNumericIvpState((currentState) => ({ ...currentState, bodyLatex }))
                         }
@@ -9627,6 +9690,8 @@ export default function App() {
                     className="secondary-mathfield"
                     value={matrixNotationLatex}
                     onChange={setMatrixNotationLatex}
+                    modeId="matrix"
+                    screenHint="matrix"
                     keyboardLayouts={matrixKeyboardLayouts}
                     onFocus={(field) => {
                       activeFieldRef.current = field;
@@ -9720,6 +9785,8 @@ export default function App() {
                     className="secondary-mathfield"
                     value={vectorNotationLatex}
                     onChange={setVectorNotationLatex}
+                    modeId="vector"
+                    screenHint="vector"
                     keyboardLayouts={vectorKeyboardLayouts}
                     onFocus={(field) => {
                       activeFieldRef.current = field;
@@ -9747,6 +9814,8 @@ export default function App() {
                       className="secondary-mathfield"
                       value={tablePrimaryLatex}
                       onChange={setTablePrimaryLatex}
+                      modeId="table"
+                      screenHint="table"
                       keyboardLayouts={tableKeyboardLayouts}
                       onFocus={(field) => {
                         activeFieldRef.current = field;
@@ -9761,6 +9830,8 @@ export default function App() {
                         className="secondary-mathfield"
                         value={tableSecondaryLatex}
                         onChange={setTableSecondaryLatex}
+                        modeId="table"
+                        screenHint="table"
                         keyboardLayouts={tableKeyboardLayouts}
                         onFocus={(field) => {
                           activeFieldRef.current = field;
