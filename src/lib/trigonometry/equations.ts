@@ -21,6 +21,26 @@ function dedupe(values: number[]) {
   );
 }
 
+function toInlineSummaryMath(latex: string) {
+  return latex
+    .replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, '($1)/($2)')
+    .replace(/\\left/g, '')
+    .replace(/\\right/g, '')
+    .replace(/\\ln\b/g, 'ln')
+    .replace(/\\log\b/g, 'log')
+    .replace(/\\sin\b/g, 'sin')
+    .replace(/\\cos\b/g, 'cos')
+    .replace(/\\tan\b/g, 'tan')
+    .replace(/\\pi\b/g, 'pi')
+    .replace(/\\cdot/g, '*')
+    .replace(/\\times/g, '*')
+    .replace(/\^\{([^{}]+)\}/g, '^($1)')
+    .replace(/\{([^{}]+)\}/g, '($1)')
+    .replace(/\\/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function normalizeDegrees(value: number) {
   const normalized = ((value % 360) + 360) % 360;
   return Math.abs(normalized - 360) < EPSILON ? 0 : normalized;
@@ -148,6 +168,7 @@ function solveMixedLinearTrigEquation(state: TrigEquationState): TrigEvaluation 
   );
   const shiftedOffset = offsetDegrees + phaseDegrees;
   const syntheticEquation = `\\sin\\left(${parsed.argument.argumentLatex}\\right)=${normalizedRhs}`;
+  const syntheticEquationText = toInlineSummaryMath(syntheticEquation);
   const cycleSolutions = exactCycleSolutions('sin', normalizedRhs)
     ?? numericCycleSolutions('sin', normalizedRhs);
   const normalizedCycle = dedupe(cycleSolutions).map(normalizeDegrees);
@@ -168,9 +189,9 @@ function solveMixedLinearTrigEquation(state: TrigEquationState): TrigEvaluation 
     exactLatex: buildExactLatex(xSolutions, state.angleUnit),
     approxText: buildApproxText(xSolutions, state.angleUnit),
     warnings: [
-      `Reduced ${parsed.sinCoefficient}sin(A)+${parsed.cosCoefficient}cos(A)=c to Rsin(A+φ)=c with A=${parsed.argument.argumentLatex}.`,
+      `Reduced ${parsed.sinCoefficient}sin(A)+${parsed.cosCoefficient}cos(A)=c to Rsin(A+phi)=c with A=${parsed.argument.argumentLatex}.`,
       buildPeriodicFamily('sin', xSolutions, parsed.argument.coefficient, state.angleUnit),
-      `Reference normalized equation: ${syntheticEquation}.`,
+      `Reference normalized equation: ${syntheticEquationText}.`,
     ],
     resultOrigin: exactCycleSolutions('sin', normalizedRhs) ? 'exact-special-angle' : 'numeric',
   };

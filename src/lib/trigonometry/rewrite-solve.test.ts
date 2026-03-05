@@ -85,6 +85,48 @@ describe('matchTrigEquationRewriteForSolve', () => {
     expect(result.candidate.branchLatex[1].replaceAll(' ', '')).toContain('\\sin\\left(x\\right)=-\\frac{1}{2}');
   });
 
+  it('matches bounded sum-to-product zero-target equations and splits product branches', () => {
+    const result = matchTrigEquationRewriteForSolve(
+      '\\sin\\left(4x\\right)+\\sin\\left(6x\\right)=0',
+      'deg',
+    );
+
+    expect(result.kind).toBe('candidate');
+    if (result.kind !== 'candidate' || result.candidate.kind !== 'split-sum-product') {
+      throw new Error('Expected a split-sum-product rewrite candidate');
+    }
+    expect(result.candidate.rewriteKind).toBe('sum-product-split');
+    expect(result.candidate.branchLatex[0]).toContain('=0');
+    expect(result.candidate.branchLatex[1]).toContain('=0');
+  });
+
+  it('matches reducible non-zero two-term sums into a bounded single-call family', () => {
+    const result = matchTrigEquationRewriteForSolve(
+      '\\sin\\left(x\\right)+\\sin\\left(x\\right)=1',
+      'deg',
+    );
+
+    expect(result.kind).toBe('candidate');
+    if (result.kind !== 'candidate' || result.candidate.kind !== 'single-call') {
+      throw new Error('Expected a single-call sum-product rewrite candidate');
+    }
+    expect(result.candidate.rewriteKind).toBe('sum-product-single');
+    expect(result.candidate.solvedLatex.replaceAll(' ', '')).toContain('\\sin\\left(x\\right)=\\frac{1}{2}');
+  });
+
+  it('returns recognized-unresolved for non-zero two-term sum-product families outside bounded exact coverage', () => {
+    const result = matchTrigEquationRewriteForSolve(
+      '\\sin\\left(4x\\right)+\\sin\\left(6x\\right)=1',
+      'deg',
+    );
+
+    expect(result.kind).toBe('recognized-unresolved');
+    if (result.kind !== 'recognized-unresolved') {
+      throw new Error('Expected recognized-unresolved sum-product result');
+    }
+    expect(result.error).toContain('recognized trig sum-to-product family');
+  });
+
   it('blocks out-of-range trig-square equations in the real domain', () => {
     const result = matchTrigEquationRewriteForSolve(
       '\\cos^2\\left(x\\right)=2',

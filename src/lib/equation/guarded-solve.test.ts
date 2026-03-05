@@ -193,6 +193,51 @@ describe('runGuardedEquationSolve', () => {
       throw new Error('Expected guarded solve success');
     }
     expect(result.solveBadges).toContain('Log Combine');
-    expect(result.substitutionDiagnostics?.family).toBe('log-combine');
+    expect(result.substitutionDiagnostics?.family).toBe('log-same-base');
+  });
+
+  it('recognizes mixed-base log equations and returns explicit numeric guidance when exact bounded solve is unavailable', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      originalLatex: '\\log_{4}\\left(4x\\right)+\\log\\left(6x\\right)=5',
+      resolvedLatex: '\\log_{4}\\left(4x\\right)+\\log\\left(6x\\right)=5',
+    });
+
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') {
+      throw new Error('Expected guarded solve error');
+    }
+    expect(result.error).toContain('recognized mixed-base log family');
+    expect(result.solveBadges).toContain('Log Base Normalize');
+    expect(result.substitutionDiagnostics?.family).toBe('log-mixed-base');
+  });
+
+  it('solves zero-target trig sum-to-product families through branch splitting', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      originalLatex: '\\sin\\left(4x\\right)+\\sin\\left(6x\\right)=0',
+      resolvedLatex: '\\sin\\left(4x\\right)+\\sin\\left(6x\\right)=0',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected guarded sum-to-product success');
+    }
+    expect(result.solveBadges).toContain('Trig Sum-Product');
+  });
+
+  it('returns explicit numeric guidance for unresolved non-zero trig sum-to-product families', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      originalLatex: '\\sin\\left(4x\\right)+\\sin\\left(6x\\right)=1',
+      resolvedLatex: '\\sin\\left(4x\\right)+\\sin\\left(6x\\right)=1',
+    });
+
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') {
+      throw new Error('Expected guarded sum-to-product unresolved error');
+    }
+    expect(result.error).toContain('recognized trig sum-to-product family');
+    expect(result.solveBadges).toContain('Trig Sum-Product');
   });
 });

@@ -11,6 +11,7 @@ import { runNumericIntervalSolve } from './numeric-interval-solve';
 import { detectRealRangeImpossibility } from './range-impossibility';
 import { matchSubstitutionSolve } from './substitution-solve';
 import { equationToZeroFormLatex } from './domain-guards';
+import { validateCandidateRoots } from './candidate-validation';
 import { normalizeAst } from '../symbolic-engine/normalize';
 import { termKey } from '../symbolic-engine/patterns';
 import type {
@@ -22,6 +23,7 @@ import type {
 } from '../../types/calculator';
 
 const MAX_RECURSION_DEPTH = 4;
+const UNSUPPORTED_FAMILY_ERROR = 'This equation is outside the supported symbolic solve families for this milestone.';
 const ce = new ComputeEngine();
 
 type SolveLike = ReturnType<typeof solveTrigEquation>;
@@ -158,7 +160,7 @@ function mergeDisplayOutcomes(
 
     return errorOutcome(
       'Solve',
-      'This equation is outside the supported symbolic solve families for this milestone.',
+      UNSUPPORTED_FAMILY_ERROR,
       [],
       [],
       solveBadges,
@@ -231,6 +233,17 @@ function rewriteTrigSolve(request: GuardedSolveRequest): DisplayOutcome | null {
     return errorOutcome('Solve', rewriteMatch.error);
   }
 
+  if (rewriteMatch.kind === 'recognized-unresolved') {
+    return errorOutcome(
+      'Solve',
+      rewriteMatch.error,
+      [],
+      [],
+      ['Trig Sum-Product'],
+      rewriteMatch.summaryText,
+    );
+  }
+
   if (rewriteMatch.candidate.kind === 'single-call') {
     const trig = solveTrigEquation({
       equationLatex: rewriteMatch.candidate.solvedLatex,
@@ -256,6 +269,39 @@ function rewriteTrigSolve(request: GuardedSolveRequest): DisplayOutcome | null {
       trig.warnings,
       ['Trig Solve Backend'],
       ['Trig Rewrite'],
+      rewriteMatch.candidate.summaryText,
+    );
+  }
+
+  if (rewriteMatch.candidate.kind === 'split-sum-product') {
+    const outcomes = rewriteMatch.candidate.branchLatex.map((equationLatex) => {
+      const trig = solveTrigEquation({
+        equationLatex,
+        variable: 'x',
+        angleUnit: request.angleUnit,
+      });
+
+      if (isTrigSolveSuccess(trig)) {
+        return successOutcome(
+          'Solve',
+          trig.exactLatex,
+          trig.approxText,
+          trig.warnings,
+          ['Trig Solve Backend'],
+        );
+      }
+
+      return errorOutcome(
+        'Solve',
+        trig.error ?? 'No symbolic solution was found for x.',
+        trig.warnings,
+        ['Trig Solve Backend'],
+      );
+    });
+
+    return mergeDisplayOutcomes(
+      outcomes,
+      ['Trig Sum-Product'],
       rewriteMatch.candidate.summaryText,
     );
   }
@@ -336,11 +382,114 @@ function substitutionSolve(
       numericInterval: undefined,
     }, depth + 1, new Set(trail)));
 
-  return mergeDisplayOutcomes(
+  const merged = mergeDisplayOutcomes(
     outcomes,
     substitution.solveBadges,
     substitution.solveSummaryText,
     substitution.diagnostics,
+  );
+
+  const isSubstitutionUnsupported =
+    merged.kind === 'error'
+    && merged.error === UNSUPPORTED_FAMILY_ERROR;
+
+  if (isSubstitutionUnsupported && substitution.diagnostics?.family === 'log-mixed-base') {
+    return errorOutcome(
+      'Solve',
+      'This recognized mixed-base log family is outside the current exact bounded solve set. Use Numeric Solve with an interval in Equation mode.',
+      merged.warnings,
+      merged.plannerBadges ?? [],
+      dedupe([...(merged.solveBadges ?? []), 'Log Base Normalize']),
+      substitution.solveSummaryText,
+      merged.rejectedCandidateCount,
+      substitution.diagnostics,
+      merged.numericMethod,
+    );
+  }
+
+  if (isSubstitutionUnsupported && substitution.diagnostics?.family === 'trig-sum-product') {
+    return errorOutcome(
+      'Solve',
+      'This recognized trig sum-to-product family is outside the current exact bounded solve set. Use Numeric Solve with an interval in Equation mode.',
+      merged.warnings,
+      merged.plannerBadges ?? [],
+      dedupe([...(merged.solveBadges ?? []), 'Trig Sum-Product']),
+      substitution.solveSummaryText,
+      merged.rejectedCandidateCount,
+      substitution.diagnostics,
+      merged.numericMethod,
+    );
+  }
+
+  if (merged.kind !== 'success' || !substitution.domainConstraints || substitution.domainConstraints.length === 0) {
+    return merged;
+  }
+
+  const candidates = dedupe([
+    ...extractExactSolutions(merged.exactLatex),
+    ...extractApproxSolutions(merged.approxText),
+  ])
+    .map((value) => {
+      try {
+        const numeric = ce.parse(value).N?.().json;
+        if (typeof numeric === 'number' && Number.isFinite(numeric)) {
+          return numeric;
+        }
+        if (numeric && typeof numeric === 'object' && 'num' in numeric) {
+          const parsed = Number((numeric as { num: string }).num);
+          return Number.isFinite(parsed) ? parsed : null;
+        }
+      } catch {
+        return null;
+      }
+      return null;
+    })
+    .filter((value): value is number => value !== null);
+
+  if (candidates.length === 0) {
+    return merged;
+  }
+
+  const validation = validateCandidateRoots(
+    request.resolvedLatex,
+    candidates,
+    substitution.domainConstraints,
+    'symbolic-substitution',
+  );
+
+  if (validation.accepted.length === 0) {
+    return errorOutcome(
+      'Solve',
+      'Candidate roots were found but rejected after substitution back into the original equation.',
+      merged.warnings,
+      merged.plannerBadges ?? [],
+      dedupe([...(merged.solveBadges ?? []), 'Candidate Checked']),
+      merged.solveSummaryText,
+      validation.rejected.length,
+      substitution.diagnostics,
+      merged.numericMethod,
+    );
+  }
+
+  const acceptedLatex = validation.accepted.map((value) => {
+    const rounded = Number(value.toPrecision(12));
+    return `${rounded}`;
+  });
+
+  return successOutcome(
+    'Solve',
+    solutionsToLatex('x', acceptedLatex),
+    `x ~= ${validation.accepted.map((value) => {
+      const rounded = Number(value.toFixed(12));
+      return `${rounded}`.replace(/0+$/, '').replace(/\.$/, '');
+    }).join(', ')}`,
+    merged.warnings,
+    merged.plannerBadges ?? [],
+    dedupe([...(merged.solveBadges ?? []), 'Candidate Checked']),
+    merged.solveSummaryText,
+    validation.rejected.length > 0 ? validation.rejected.length : merged.rejectedCandidateCount,
+    substitution.diagnostics,
+    merged.numericMethod,
   );
 }
 
@@ -452,7 +601,7 @@ export function runGuardedEquationSolve(
 
   return errorOutcome(
     'Solve',
-    'This equation is outside the supported symbolic solve families for this milestone.',
+    UNSUPPORTED_FAMILY_ERROR,
     symbolic.warnings,
   );
 }

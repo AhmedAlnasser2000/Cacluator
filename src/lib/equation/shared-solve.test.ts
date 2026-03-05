@@ -115,7 +115,36 @@ describe('runSharedEquationSolve', () => {
       throw new Error('Expected a success outcome');
     }
     expect(result.solveBadges).toContain('Log Combine');
-    expect(result.substitutionDiagnostics?.family).toBe('log-combine');
+    expect(result.substitutionDiagnostics?.family).toBe('log-same-base');
+  });
+
+  it('flags recognized mixed-base log families for interval follow-up when exact bounded solve is unavailable', () => {
+    const result = runSharedEquationSolve({
+      ...request,
+      originalLatex: '\\log_{4}\\left(4x\\right)+\\log\\left(6x\\right)=5',
+      resolvedLatex: '\\log_{4}\\left(4x\\right)+\\log\\left(6x\\right)=5',
+    });
+
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') {
+      throw new Error('Expected an error outcome');
+    }
+    expect(result.error).toContain('recognized mixed-base log family');
+    expect(result.solveBadges).toContain('Log Base Normalize');
+  });
+
+  it('solves zero-target trig sum-to-product equations through the shared rewrite layer', () => {
+    const result = runSharedEquationSolve({
+      ...request,
+      originalLatex: '\\cos\\left(4x\\right)-\\cos\\left(2x\\right)=0',
+      resolvedLatex: '\\cos\\left(4x\\right)-\\cos\\left(2x\\right)=0',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.solveBadges).toContain('Trig Sum-Product');
   });
 
   it('returns range-guard errors for impossible bounded equations', () => {

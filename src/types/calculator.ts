@@ -180,7 +180,9 @@ export type PlannerBadge =
 export type SolveBadge =
   | 'Trig Rewrite'
   | 'Trig Square Split'
+  | 'Trig Sum-Product'
   | 'Log Combine'
+  | 'Log Base Normalize'
   | 'Symbolic Substitution'
   | 'Inverse Isolation'
   | 'Numeric Interval'
@@ -985,11 +987,13 @@ export type TrigRewriteSolveKind =
   | 'product-double-angle'
   | 'cos-double-angle'
   | 'sin-square-split'
-  | 'cos-square-split';
+  | 'cos-square-split'
+  | 'sum-product-single'
+  | 'sum-product-split';
 export type TrigRewriteSolveCandidate =
   | {
       kind: 'single-call';
-      rewriteKind: 'product-double-angle' | 'cos-double-angle';
+      rewriteKind: 'product-double-angle' | 'cos-double-angle' | 'sum-product-single';
       solvedLatex: string;
       summaryText: string;
     }
@@ -998,6 +1002,13 @@ export type TrigRewriteSolveCandidate =
       rewriteKind: 'sin-square-split' | 'cos-square-split';
       branchLatex: [string, string];
       domainSummary: string;
+      summaryText: string;
+    }
+  | {
+      kind: 'split-sum-product';
+      rewriteKind: 'sum-product-split';
+      branchLatex: [string, string];
+      normalizedLatex: string;
       summaryText: string;
     };
 export type NumericSolveInterval = {
@@ -1052,7 +1063,13 @@ export type SubstitutionSolveCandidate =
       summaryText: string;
     };
 export type SubstitutionSolveDiagnostics = {
-  family: 'trig-polynomial' | 'exp-polynomial' | 'inverse-isolation' | 'log-combine';
+  family:
+    | 'trig-polynomial'
+    | 'exp-polynomial'
+    | 'inverse-isolation'
+    | 'log-same-base'
+    | 'log-mixed-base'
+    | 'trig-sum-product';
   carrierKind: SolveCarrierKind;
   polynomialDegree?: 1 | 2;
   branchCount: number;

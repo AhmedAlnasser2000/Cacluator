@@ -73,7 +73,7 @@ describe('matchSubstitutionSolve', () => {
       throw new Error('Expected inverse-isolation branch');
     }
     expect(result.solveBadges).toContain('Inverse Isolation');
-    expect(result.solveSummaryText).toContain('x+1=\\ln\\left(2\\right)');
+    expect(result.solveSummaryText).toContain('x+1=ln(2)');
     expect(result.equations[0]).toBe('x+1=\\ln\\left(2\\right)');
     expect(result.diagnostics?.family).toBe('inverse-isolation');
   });
@@ -86,7 +86,7 @@ describe('matchSubstitutionSolve', () => {
       throw new Error('Expected inverse-isolation branch');
     }
     expect(result.solveBadges).toContain('Inverse Isolation');
-    expect(result.solveSummaryText).toContain('2x+1=e^{3}');
+    expect(result.solveSummaryText).toContain('2x+1=e^(3)');
     expect(result.equations[0]).toBe('2x+1=e^{3}');
     expect(result.diagnostics?.family).toBe('inverse-isolation');
   });
@@ -98,8 +98,41 @@ describe('matchSubstitutionSolve', () => {
       throw new Error('Expected log-combine branch');
     }
     expect(result.solveBadges).toContain('Log Combine');
+    expect(result.solveSummaryText).toContain('Combined ln(x)+ln(x+1) into (x)(x+1)=e^(2)');
     expect(result.equations[0]).toContain('\\left(x\\right)\\left(x+1\\right)=e^{2}');
-    expect(result.diagnostics?.family).toBe('log-combine');
+    expect(result.diagnostics?.family).toBe('log-same-base');
+  });
+
+  it('matches explicit same-base log-combine families', () => {
+    const result = matchSubstitutionSolve('\\log_{4}\\left(4x\\right)+\\log_{4}\\left(6x\\right)=5', 'deg');
+    expect(result.kind).toBe('branches');
+    if (result.kind !== 'branches') {
+      throw new Error('Expected explicit same-base log-combine branch');
+    }
+    expect(result.solveBadges).toContain('Log Combine');
+    expect(result.solveBadges).toContain('Log Base Normalize');
+    expect(result.equations[0]).toContain('=4^{5}');
+    expect(result.diagnostics?.family).toBe('log-same-base');
+  });
+
+  it('recognizes mixed-base log families and normalizes by change-of-base', () => {
+    const result = matchSubstitutionSolve('\\log_{4}\\left(4x\\right)+\\log\\left(6x\\right)=5', 'deg');
+    expect(result.kind).toBe('branches');
+    if (result.kind !== 'branches') {
+      throw new Error('Expected mixed-base normalized branch');
+    }
+    expect(result.solveBadges).toContain('Log Base Normalize');
+    expect(result.solveSummaryText).toContain('Normalized mixed-base logs via change-of-base');
+    expect(result.diagnostics?.family).toBe('log-mixed-base');
+  });
+
+  it('blocks invalid explicit log bases', () => {
+    const result = matchSubstitutionSolve('\\log_{1}\\left(x\\right)+\\log_{1}\\left(x+1\\right)=2', 'deg');
+    expect(result.kind).toBe('blocked');
+    if (result.kind !== 'blocked') {
+      throw new Error('Expected blocked invalid-base result');
+    }
+    expect(result.error).toContain('Log base must be a positive real number not equal to 1');
   });
 
   it('keeps unsupported logarithmic difference forms out of bounded substitution matching', () => {

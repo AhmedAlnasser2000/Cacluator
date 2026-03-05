@@ -675,6 +675,28 @@ textarea:focus-visible {
   font-size: 0.95rem;
 }
 
+.result-summary-block {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid rgba(154, 179, 159, 0.24);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.result-summary-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.result-summary-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .result-error {
   color: #7a1f0c;
 }

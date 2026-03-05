@@ -286,7 +286,7 @@ const GUIDE_ARTICLE_DRAFTS: GuideArticleDraft[] = [
     pitfalls: [
       'Typing = in Calculate does not make Calculate a solver.',
       'Interval numeric solving is explicit; it only runs when you open Numeric Solve in Equation > Symbolic.',
-      'Only bounded log-combine sums are included in this milestone. Difference, ratio, and power log transforms remain deferred.',
+      'Bounded same-base and mixed constant-base log-combine sums are included in this milestone. Difference, ratio, and power log transforms remain deferred.',
       'Inequality notation is visible before inequality-solving workflows exist.',
     ],
     exactVsNumeric: [
@@ -1312,8 +1312,8 @@ const GUIDE_ARTICLE_DRAFTS: GuideArticleDraft[] = [
     title: 'Trig Equations',
     summary: 'Solve bounded one-variable trig equations from the shared Trigonometry editor, including selected exact rewrite, affine-argument, substitution, and square-split families.',
     concepts: [
-      'The current solver focuses on sin(x)=c, cos(x)=c, tan(x)=c, affine arguments such as sin(x+30)=1/2 and cos(2x-pi/3)=0, selected exact rewrites such as sin(x)cos(x)=1/2 or 2cos^2(x)-1=0, bounded mixed linear forms such as a*sin(A)+b*cos(A)=c, and bounded single-carrier substitution families such as 2sin^2(x)-3sin(x)+1=0.',
-      'The same shared solve backend also resolves selected bounded exp/log equation families in this screen, including bounded log-combine sums, so Equation and Trigonometry stay aligned on solve behavior and badges.',
+      'The current solver focuses on sin(x)=c, cos(x)=c, tan(x)=c, affine arguments such as sin(x+30)=1/2 and cos(2x-pi/3)=0, selected exact rewrites such as sin(x)cos(x)=1/2 or 2cos^2(x)-1=0, bounded mixed linear forms such as a*sin(A)+b*cos(A)=c, bounded two-term sum-to-product normalization for sin/cos sums and differences, and bounded single-carrier substitution families such as 2sin^2(x)-3sin(x)+1=0.',
+      'The same shared solve backend also resolves selected bounded exp/log equation families in this screen, including bounded same-base and mixed constant-base log normalization paths, so Equation and Trigonometry stay aligned on solve behavior and badges.',
       'Selected impossible real equations such as sin(x^2)=5 or sin(x)+cos(x)=3 are rejected by exact range guards before solve handoff.',
       'Principal solutions are shown first and the periodic family is described in a warning line.',
       'When exact trig solving stops short, Trigonometry can send the equation into Equation mode for bracket-first interval numeric solving.',
@@ -1389,7 +1389,7 @@ const GUIDE_ARTICLE_DRAFTS: GuideArticleDraft[] = [
     pitfalls: [
       'General periodic-solution theory is intentionally bounded in the first release.',
       'Only supported one-variable forms in x and selected exact rewrite or substitution families are accepted.',
-      'Bounded log-combine sums are included, while broader log identities and transform search remain out of scope for this milestone.',
+      'Bounded log-combine sums are included, including mixed constant-base normalization, while broader log identities and transform search remain out of scope for this milestone.',
     ],
     exactVsNumeric: [
       'Special-angle equations return exact principal values when recognized.',

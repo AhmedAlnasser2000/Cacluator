@@ -333,6 +333,26 @@ function createId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function formatSolveSummaryText(text: string) {
+  return text
+    .replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, '($1)/($2)')
+    .replace(/\\left/g, '')
+    .replace(/\\right/g, '')
+    .replace(/\\ln\b/g, 'ln')
+    .replace(/\\log\b/g, 'log')
+    .replace(/\\sin\b/g, 'sin')
+    .replace(/\\cos\b/g, 'cos')
+    .replace(/\\tan\b/g, 'tan')
+    .replace(/\\pi\b/g, 'pi')
+    .replace(/\\cdot/g, '*')
+    .replace(/\\times/g, '*')
+    .replace(/\^\{([^{}]+)\}/g, '^($1)')
+    .replace(/\{([^{}]+)\}/g, '($1)')
+    .replace(/\\/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 type GeneratedPreviewCardProps = {
   title: string;
   subtitle: string;
@@ -8189,7 +8209,10 @@ export default function App() {
             && currentMode !== 'guide'
             && (displayOutcome?.kind === 'success' || displayOutcome?.kind === 'error')
             && displayOutcome.solveSummaryText ? (
-              <div className="result-approx">{displayOutcome.solveSummaryText}</div>
+              <div className="result-summary-block">
+                <div className="result-summary-label">Solve note</div>
+                <div className="result-approx result-summary-text">{formatSolveSummaryText(displayOutcome.solveSummaryText)}</div>
+              </div>
             ) : null}
             {!isLauncherOpen
             && !isEquationMenuOpen

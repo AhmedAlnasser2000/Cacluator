@@ -128,4 +128,24 @@ describe('trigonometry core draft runner', () => {
     expect(outcome.solveBadges).toContain('Log Combine');
     expect(outcome.actions).toBeUndefined();
   });
+
+  it('offers Equation handoff for recognized mixed-base log families that require interval follow-up', () => {
+    const { outcome } = runTrigonometryCoreDraft('\\log_{4}\\left(4x\\right)+\\log\\left(6x\\right)=5', {
+      screenHint: 'equationSolve',
+      angleUnit: 'deg',
+    });
+
+    expect(outcome.kind).toBe('error');
+    if (outcome.kind !== 'error') {
+      throw new Error('Expected trig equation error');
+    }
+    expect(outcome.error).toContain('recognized mixed-base log family');
+    expect(outcome.actions?.[0]?.kind).toBe('send');
+    if (outcome.actions?.[0]?.kind !== 'send') {
+      throw new Error('Expected trig handoff send action');
+    }
+    expect(outcome.actions[0].target).toBe('equation');
+    expect(outcome.actions[0].latex).toContain('\\log_{4}');
+    expect(outcome.actions[0].latex).toContain('\\log');
+  });
 });
