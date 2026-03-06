@@ -20,3 +20,5 @@
 - 2026-03-05: After Track A numeric local-minimum recovery, should root-recovery tuning stay conservative with manual threshold calibration, or move to an adaptive per-function strategy in the next solver pass?
 - 2026-03-05: After bounded Track A4 exp/log completion, should Track A5 prioritize log-combination transforms first (`ln(u) +/- ln(v)`) or broader substitution-family breadth outside log-combine forms?
 - 2026-03-05: After delivering bounded log-combine sums in A5, should the next exp/log follow-up prioritize `ln(u)-ln(v)` first or ratio/power transforms first?
+- 2026-03-06: After rolling back `App.tsx`/`App.css` to recover from Track R UI regressions, should Track R resume on a dedicated isolation branch with strict parity gates, or remain paused while product-track solver work continues on the stable shell?
+- 2026-03-06: With Track R now closed on the stable `App.tsx` shell + `AppMain.tsx` runtime shape, should a follow-up refactor target reducing `AppMain.tsx` below a hard line-count threshold, or keep decomposition work scoped to opportunistic parity-safe slices only?

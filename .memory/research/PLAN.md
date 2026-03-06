@@ -642,3 +642,59 @@ Expected outcome:
 ## Recommended sequencing from current state
 - Primary sequence: Track A -> Track B -> Track C -> Track D.
 - Keep Track E as a parallel quality lane across all tracks.
+
+## Track R Completion (as of 2026-03-05)
+
+Current status:
+- `R0` through `R7` are complete.
+- `src/App.tsx` is now a thin shell (`App.css` + `AppMain`) and stays below the `<= 4000` target.
+- Runtime orchestration currently sits in `src/AppMain.tsx` (`9394` lines after the latest extraction pass).
+- `src/App.css` is reduced to an `11`-line import manifest over `src/styles/app/*`.
+- Compatibility facades remain stable for:
+  - `src/lib/equation/substitution-solve.ts`
+  - `src/lib/equation/guarded-solve.ts`
+  - `src/lib/trigonometry/rewrite-solve.ts`
+  - `src/lib/guide/content.ts`
+  - `src/types/calculator.ts`
+
+Closed milestones:
+
+1. `R1` App presentation extraction
+- Workspace rendering is split across `src/app/workspaces/*`.
+- Preview rendering helper is split into `src/app/components/GeneratedPreviewCard.tsx`.
+
+2. `R2` Action routing extraction
+- Expression, primary-action, soft-action, and keypad routing live in `src/app/logic/*`.
+
+3. `R3` Focus/reset/guide/app-flow extraction
+- Focus routing, reset behavior, guide routing, and replay/clear/example flow helpers live in `src/app/logic/*`.
+
+4. `R4` CSS decomposition
+- Styles are split into the planned partials under `src/styles/app/*` while keeping the original cascade behavior.
+
+5. `R5` Solver decomposition
+- Equation substitution, guarded solve, and trig rewrite internals are split into module folders with stable barrel wrappers.
+
+6. `R6` Guide content decomposition
+- Guide article payloads/selectors are split by domain under `src/lib/guide/content/*` with unchanged public selectors.
+
+7. `R7` Type-system decomposition
+- Calculator types are split by domain under `src/types/calculator/*` while `src/types/calculator.ts` remains the stable facade.
+
+Verification gate used to close Track R:
+- `npm test -- --run`
+- `npm run build`
+- `npm run lint`
+- `cargo check`
+
+Manual verification artifacts now present:
+- `.memory/research/REFACTOR-R0-MANUAL-VERIFICATION-CHECKLIST.md`
+- `.memory/research/REFACTOR-R1-MANUAL-VERIFICATION-CHECKLIST.md`
+- `.memory/research/REFACTOR-R2-MANUAL-VERIFICATION-CHECKLIST.md`
+- `.memory/research/REFACTOR-R3-MANUAL-VERIFICATION-CHECKLIST.md`
+- `.memory/research/REFACTOR-R4-MANUAL-VERIFICATION-CHECKLIST.md`
+- `.memory/research/REFACTOR-R5-MANUAL-VERIFICATION-CHECKLIST.md`
+- `.memory/research/REFACTOR-R6-MANUAL-VERIFICATION-CHECKLIST.md`
+- `.memory/research/REFACTOR-R7-MANUAL-VERIFICATION-CHECKLIST.md`
+
+Anything beyond this point is no longer Track R. Future work would be optional typing cleanup or product-track work, not more required decomposition for this sweep.
