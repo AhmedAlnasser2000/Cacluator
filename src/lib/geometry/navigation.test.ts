@@ -60,5 +60,6 @@ describe('geometry navigation', () => {
   it('maps parsed request kinds back to geometry screens', () => {
     expect(geometryRequestToScreen({ kind: 'cube', sideLatex: '3' })).toBe('cube');
     expect(geometryRequestToScreen({ kind: 'triangleHeron', aLatex: '5', bLatex: '6', cLatex: '7' })).toBe('triangleHeron');
+    expect(geometryRequestToScreen({ kind: 'distanceSolveMissing', p1: { xLatex: '0', yLatex: '0' }, p2: { xLatex: '3', yLatex: '?' }, distanceLatex: '5' })).toBe('distance');
   });
 });

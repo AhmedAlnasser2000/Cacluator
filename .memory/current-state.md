@@ -33,10 +33,10 @@
 - Extracted `src/app/*`, `src/styles/app/*`, and decomposition facades under solver/guide/types are in-tree and passing regression.
 
 ## Most Recent Completed Milestone
-- Completed Track `R` closure pass:
-  - finalized R0-R7 checklist pass entries
-  - aligned Track `R` memory/session docs to current runtime shape
-  - extracted shared app utilities from `AppMain` into `src/app/logic/appUtils.ts` and `src/app/logic/solveSummary.ts`
+- Completed Track `C` bundle `P0 + P1`:
+  - P0 stabilization gate passed with full regression verification.
+  - P1 Geometry milestone delivered bounded solve-missing (`?`) support across scoped formula and coordinate families.
+  - Added strict one-unknown parser policy and unresolved-but-eligible coordinate equation handoff.
 - Regression checks:
   - `npm test -- --run`
   - `npm run build`
@@ -59,9 +59,11 @@
 - Bounded trig sum-to-product currently covers two-term `sin/cos` forms only; broader harmonic families remain deferred.
 
 ## Pending Verification
-- Optional desktop smoke pass on the current shell wiring (Calculate/Equation/Trig/Geometry/Statistics/Guide) for visual parity confidence beyond automated coverage.
+- Optional desktop smoke pass on the current shell wiring for visual parity confidence beyond automated coverage.
 - Keep the Track E manual checklist in parallel:
   - `.memory/research/TRACK-E-MANUAL-VERIFICATION-CHECKLIST.md`
+- Track C checklist artifact:
+  - `.memory/research/TRACK-C-P0-P1-MANUAL-VERIFICATION-CHECKLIST.md`
 
 ## Next Recommended Task
-- Move to the next product-track milestone (A/B/C/D/E) on the current stable shell, and treat any further `AppMain` decomposition as a separate strict parity refactor gate.
+- Continue with the next Geometry product-track milestone after user review of Track C P0/P1 behavior.

@@ -956,7 +956,17 @@ export type GeometryRequest =
   | { kind: 'distance'; p1: { xLatex: string; yLatex: string }; p2: { xLatex: string; yLatex: string } }
   | { kind: 'midpoint'; p1: { xLatex: string; yLatex: string }; p2: { xLatex: string; yLatex: string } }
   | { kind: 'slope'; p1: { xLatex: string; yLatex: string }; p2: { xLatex: string; yLatex: string } }
-  | { kind: 'lineEquation'; p1: { xLatex: string; yLatex: string }; p2: { xLatex: string; yLatex: string }; form: LineEquationState['form'] };
+  | { kind: 'lineEquation'; p1: { xLatex: string; yLatex: string }; p2: { xLatex: string; yLatex: string }; form: LineEquationState['form'] }
+  | { kind: 'squareSolveMissing'; sideLatex: string; areaLatex?: string; perimeterLatex?: string; diagonalLatex?: string }
+  | { kind: 'circleSolveMissing'; radiusLatex: string; diameterLatex?: string; circumferenceLatex?: string; areaLatex?: string }
+  | { kind: 'cubeSolveMissing'; sideLatex: string; volumeLatex?: string; surfaceAreaLatex?: string; diagonalLatex?: string }
+  | { kind: 'sphereSolveMissing'; radiusLatex: string; volumeLatex?: string; surfaceAreaLatex?: string }
+  | { kind: 'triangleAreaSolveMissing'; baseLatex: string; heightLatex: string; areaLatex: string; unknown: 'base' | 'height' }
+  | { kind: 'rectangleSolveMissing'; widthLatex: string; heightLatex: string; areaLatex?: string; perimeterLatex?: string; diagonalLatex?: string; unknown: 'width' | 'height' }
+  | { kind: 'cylinderSolveMissing'; radiusLatex: string; heightLatex: string; volumeLatex: string; unknown: 'radius' | 'height' }
+  | { kind: 'distanceSolveMissing'; p1: { xLatex: string; yLatex: string }; p2: { xLatex: string; yLatex: string }; distanceLatex: string }
+  | { kind: 'midpointSolveMissing'; p1: { xLatex: string; yLatex: string }; p2: { xLatex: string; yLatex: string }; mid: { xLatex: string; yLatex: string } }
+  | { kind: 'slopeSolveMissing'; p1: { xLatex: string; yLatex: string }; p2: { xLatex: string; yLatex: string }; slopeLatex: string };
 export type GeometryParseResult =
   | { ok: true; request: GeometryRequest; style: CoreDraftStyle }
   | { ok: false; error: string };
@@ -1350,9 +1360,9 @@ export const DEFAULT_MODE_TREE: MenuNode[] = [
     children: [
       { id: 'add', label: 'A+B', hotkey: 'F1' },
       { id: 'subtract', label: 'A-B', hotkey: 'F2' },
-      { id: 'multiply', label: 'A×B', hotkey: 'F3' },
+      { id: 'multiply', label: 'Aï¿½B', hotkey: 'F3' },
       { id: 'detA', label: 'det(A)', hotkey: 'F4' },
-      { id: 'inverseA', label: 'A?¹', hotkey: 'F5' },
+      { id: 'inverseA', label: 'A?ï¿½', hotkey: 'F5' },
       { id: 'transposeA', label: 'A?', hotkey: 'F6' },
     ],
   },

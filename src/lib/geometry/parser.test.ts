@@ -122,4 +122,67 @@ describe('geometry parser', () => {
       expect(result.error).toContain('cone');
     }
   });
+
+  it('parses structured solve-missing requests with one unknown marker', () => {
+    expect(parseGeometryDraft('square(side=?, area=25)', { screenHint: 'square' })).toEqual({
+      ok: true,
+      request: {
+        kind: 'squareSolveMissing',
+        sideLatex: '?',
+        areaLatex: '25',
+      },
+      style: 'structured',
+    });
+
+    expect(parseGeometryDraft('distance(p1=(0,0), p2=(3,?), distance=5)', { screenHint: 'distance' })).toEqual({
+      ok: true,
+      request: {
+        kind: 'distanceSolveMissing',
+        p1: { xLatex: '0', yLatex: '0' },
+        p2: { xLatex: '3', yLatex: '?' },
+        distanceLatex: '5',
+      },
+      style: 'structured',
+    });
+
+    expect(parseGeometryDraft('circle(radius=?, circumference=10*pi)', { screenHint: 'circle' })).toEqual({
+      ok: true,
+      request: {
+        kind: 'circleSolveMissing',
+        radiusLatex: '?',
+        circumferenceLatex: '10*pi',
+      },
+      style: 'structured',
+    });
+
+    expect(parseGeometryDraft('midpoint(p1=(1,2), p2=(?,8), mid=(3,5))', { screenHint: 'midpoint' })).toEqual({
+      ok: true,
+      request: {
+        kind: 'midpointSolveMissing',
+        p1: { xLatex: '1', yLatex: '2' },
+        p2: { xLatex: '?', yLatex: '8' },
+        mid: { xLatex: '3', yLatex: '5' },
+      },
+      style: 'structured',
+    });
+
+    expect(parseGeometryDraft('slope(p1=(1,2), p2=(?,8), slope=2)', { screenHint: 'slope' })).toEqual({
+      ok: true,
+      request: {
+        kind: 'slopeSolveMissing',
+        p1: { xLatex: '1', yLatex: '2' },
+        p2: { xLatex: '?', yLatex: '8' },
+        slopeLatex: '2',
+      },
+      style: 'structured',
+    });
+  });
+
+  it('rejects solve-missing requests with multiple unknown markers', () => {
+    const result = parseGeometryDraft('rectangle(width=?, height=?, area=40)', { screenHint: 'rectangle' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain('exactly one ?');
+    }
+  });
 });

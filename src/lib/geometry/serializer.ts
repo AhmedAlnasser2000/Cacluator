@@ -70,6 +70,51 @@ export function serializeGeometryRequest(
       return `slope(p1=${pointValue({ x: request.p1.xLatex, y: request.p1.yLatex })}, p2=${pointValue({ x: request.p2.xLatex, y: request.p2.yLatex })})`;
     case 'lineEquation':
       return `lineEquation(p1=${pointValue({ x: request.p1.xLatex, y: request.p1.yLatex })}, p2=${pointValue({ x: request.p2.xLatex, y: request.p2.yLatex })}, form=${lineFormValue(request.form)})`;
+    case 'squareSolveMissing':
+      return `square(${[
+        `side=${filledValue(request.sideLatex)}`,
+        ...(request.areaLatex ? [`area=${filledValue(request.areaLatex)}`] : []),
+        ...(request.perimeterLatex ? [`perimeter=${filledValue(request.perimeterLatex)}`] : []),
+        ...(request.diagonalLatex ? [`diagonal=${filledValue(request.diagonalLatex)}`] : []),
+      ].join(', ')})`;
+    case 'circleSolveMissing':
+      return `circle(${[
+        `radius=${filledValue(request.radiusLatex)}`,
+        ...(request.diameterLatex ? [`diameter=${filledValue(request.diameterLatex)}`] : []),
+        ...(request.circumferenceLatex ? [`circumference=${filledValue(request.circumferenceLatex)}`] : []),
+        ...(request.areaLatex ? [`area=${filledValue(request.areaLatex)}`] : []),
+      ].join(', ')})`;
+    case 'cubeSolveMissing':
+      return `cube(${[
+        `side=${filledValue(request.sideLatex)}`,
+        ...(request.volumeLatex ? [`volume=${filledValue(request.volumeLatex)}`] : []),
+        ...(request.surfaceAreaLatex ? [`surfaceArea=${filledValue(request.surfaceAreaLatex)}`] : []),
+        ...(request.diagonalLatex ? [`diagonal=${filledValue(request.diagonalLatex)}`] : []),
+      ].join(', ')})`;
+    case 'sphereSolveMissing':
+      return `sphere(${[
+        `radius=${filledValue(request.radiusLatex)}`,
+        ...(request.volumeLatex ? [`volume=${filledValue(request.volumeLatex)}`] : []),
+        ...(request.surfaceAreaLatex ? [`surfaceArea=${filledValue(request.surfaceAreaLatex)}`] : []),
+      ].join(', ')})`;
+    case 'triangleAreaSolveMissing':
+      return `triangleArea(base=${filledValue(request.baseLatex)}, height=${filledValue(request.heightLatex)}, area=${filledValue(request.areaLatex)})`;
+    case 'rectangleSolveMissing':
+      return `rectangle(${[
+        `width=${filledValue(request.widthLatex)}`,
+        `height=${filledValue(request.heightLatex)}`,
+        ...(request.areaLatex ? [`area=${filledValue(request.areaLatex)}`] : []),
+        ...(request.perimeterLatex ? [`perimeter=${filledValue(request.perimeterLatex)}`] : []),
+        ...(request.diagonalLatex ? [`diagonal=${filledValue(request.diagonalLatex)}`] : []),
+      ].join(', ')})`;
+    case 'cylinderSolveMissing':
+      return `cylinder(radius=${filledValue(request.radiusLatex)}, height=${filledValue(request.heightLatex)}, volume=${filledValue(request.volumeLatex)})`;
+    case 'distanceSolveMissing':
+      return `distance(p1=${pointValue({ x: request.p1.xLatex, y: request.p1.yLatex })}, p2=${pointValue({ x: request.p2.xLatex, y: request.p2.yLatex })}, distance=${filledValue(request.distanceLatex)})`;
+    case 'midpointSolveMissing':
+      return `midpoint(p1=${pointValue({ x: request.p1.xLatex, y: request.p1.yLatex })}, p2=${pointValue({ x: request.p2.xLatex, y: request.p2.yLatex })}, mid=${pointValue({ x: request.mid.xLatex, y: request.mid.yLatex })})`;
+    case 'slopeSolveMissing':
+      return `slope(p1=${pointValue({ x: request.p1.xLatex, y: request.p1.yLatex })}, p2=${pointValue({ x: request.p2.xLatex, y: request.p2.yLatex })}, slope=${filledValue(request.slopeLatex)})`;
   }
 }
 

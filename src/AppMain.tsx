@@ -2600,6 +2600,65 @@ export default function App() {
     return isGeometryMenuScreen(screen) ? 'manual' : 'guided';
   }
 
+  function geometrySolveMissingTemplates(screen: GeometryScreen) {
+    switch (screen) {
+      case 'square':
+        return [
+          { label: 's from area', latex: 'square(side=?, area=25)' },
+          { label: 's from perimeter', latex: 'square(side=?, perimeter=20)' },
+        ];
+      case 'rectangle':
+        return [
+          { label: 'w from area', latex: 'rectangle(width=?, height=5, area=40)' },
+          { label: 'h from diagonal', latex: 'rectangle(width=6, height=?, diagonal=10)' },
+        ];
+      case 'circle':
+        return [
+          { label: 'r from circumference', latex: 'circle(radius=?, circumference=10*pi)' },
+          { label: 'r from area', latex: 'circle(radius=?, area=49*pi)' },
+        ];
+      case 'triangleArea':
+        return [
+          { label: 'base from area', latex: 'triangleArea(base=?, height=6, area=30)' },
+          { label: 'height from area', latex: 'triangleArea(base=10, height=?, area=30)' },
+        ];
+      case 'cube':
+        return [
+          { label: 'side from volume', latex: 'cube(side=?, volume=64)' },
+          { label: 'side from SA', latex: 'cube(side=?, surfaceArea=54)' },
+        ];
+      case 'sphere':
+        return [
+          { label: 'r from SA', latex: 'sphere(radius=?, surfaceArea=36*pi)' },
+          { label: 'r from volume', latex: 'sphere(radius=?, volume=36*pi)' },
+        ];
+      case 'cylinder':
+        return [
+          { label: 'r from volume', latex: 'cylinder(radius=?, height=8, volume=72*pi)' },
+          { label: 'h from volume', latex: 'cylinder(radius=3, height=?, volume=72*pi)' },
+        ];
+      case 'distance':
+        return [
+          { label: 'solve point', latex: 'distance(p1=(0,0), p2=(3,?), distance=5)' },
+        ];
+      case 'midpoint':
+        return [
+          { label: 'solve point', latex: 'midpoint(p1=(1,2), p2=(?,8), mid=(3,5))' },
+        ];
+      case 'slope':
+        return [
+          { label: 'solve point', latex: 'slope(p1=(1,2), p2=(?,8), slope=2)' },
+        ];
+      default:
+        return [];
+    }
+  }
+
+  function loadGeometrySolveMissingTemplate(rawLatex: string) {
+    loadGeometryDraft(rawLatex, 'guided', true);
+    setClipboardNotice('Geometry solve-missing template loaded');
+  }
+
   function isGeometryDraftFocused(target?: EventTarget | null) {
     if (!geometryEditorIsEditable || !geometryDraftFieldRef.current) {
       return false;
@@ -6751,6 +6810,19 @@ export default function App() {
               ) : null}
               <button className="guide-chip" onClick={() => openGuideMode('geometry')}>Guide: Geometry</button>
             </div>
+            {!isGeometryMenuOpen && geometrySolveMissingTemplates(geometryScreen).length > 0 ? (
+              <div className="guide-chip-row">
+                {geometrySolveMissingTemplates(geometryScreen).map((template) => (
+                  <button
+                    key={`${geometryScreen}-${template.label}`}
+                    className="guide-chip"
+                    onClick={() => loadGeometrySolveMissingTemplate(template.latex)}
+                  >
+                    Solve Missing: {template.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
 
