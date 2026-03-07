@@ -8,6 +8,12 @@ import type {
   StatisticsWorkingSource,
 } from '../../types/calculator';
 import { numberToLatex } from '../format';
+import {
+  computeMeanConfidenceInterval,
+  computeMeanHypothesisTest,
+  parseInferenceLevel,
+  type MeanInferenceSummary,
+} from './inference';
 import { parseStatisticsDraft } from './parser';
 import { formatStatisticsNumber, parseIntegerDraft, parseNumericDraft } from './shared';
 
@@ -64,6 +70,8 @@ function requestTitle(request: StatisticsRequest) {
       return 'Descriptive';
     case 'frequency':
       return 'Frequency';
+    case 'meanInference':
+      return 'Mean Inference';
     case 'binomial':
       return 'Binomial';
     case 'normal':
@@ -106,6 +114,7 @@ function parseDatasetValues(values: string[]) {
 
 function parseFrequencyRows(rows: FrequencyRow[]) {
   const numericRows: NumericFrequencyRow[] = [];
+  const seenValues = new Set<number>();
 
   for (const row of rows) {
     const value = row.value.trim();
@@ -142,10 +151,18 @@ function parseFrequencyRows(rows: FrequencyRow[]) {
       continue;
     }
 
+    if (seenValues.has(parsedValue)) {
+      return {
+        ok: false as const,
+        error: `Frequency value "${value}" is duplicated. Merge repeated values into one row before evaluating.`,
+      };
+    }
+
     numericRows.push({
       value: parsedValue,
       frequency: parsedFrequency,
     });
+    seenValues.add(parsedValue);
   }
 
   if (numericRows.length === 0) {
@@ -244,6 +261,10 @@ function descriptiveRowsFromValues(values: number[]) {
   const range = max - min;
   const variance = values.reduce((total, value) => total + ((value - mean) ** 2), 0) / count;
   const standardDeviation = Math.sqrt(variance);
+  const sampleVariance = count > 1
+    ? values.reduce((total, value) => total + ((value - mean) ** 2), 0) / (count - 1)
+    : null;
+  const sampleStandardDeviation = sampleVariance === null ? null : Math.sqrt(sampleVariance);
 
   return {
     count,
@@ -255,6 +276,8 @@ function descriptiveRowsFromValues(values: number[]) {
     range,
     variance,
     standardDeviation,
+    sampleVariance,
+    sampleStandardDeviation,
   };
 }
 
@@ -271,6 +294,13 @@ function descriptiveRowsFromFrequency(rows: NumericFrequencyRow[]) {
     0,
   ) / count;
   const standardDeviation = Math.sqrt(variance);
+  const sampleVariance = count > 1
+    ? rows.reduce(
+      (total, row) => total + (row.frequency * ((row.value - mean) ** 2)),
+      0,
+    ) / (count - 1)
+    : null;
+  const sampleStandardDeviation = sampleVariance === null ? null : Math.sqrt(sampleVariance);
 
   return {
     count,
@@ -282,10 +312,15 @@ function descriptiveRowsFromFrequency(rows: NumericFrequencyRow[]) {
     range,
     variance,
     standardDeviation,
+    sampleVariance,
+    sampleStandardDeviation,
   };
 }
 
-function descriptiveOutcomeFromSummary(summary: ReturnType<typeof descriptiveRowsFromValues>): StatisticsEvaluation {
+function descriptiveOutcomeFromSummary(summary: MeanInferenceSummary & ReturnType<typeof descriptiveRowsFromValues>): StatisticsEvaluation {
+  const warnings = summary.count < 2
+    ? ['Sample variance and sample standard deviation need at least two values.']
+    : [];
   return {
     exactLatex: [
       `n=${summary.count}`,
@@ -297,9 +332,11 @@ function descriptiveOutcomeFromSummary(summary: ReturnType<typeof descriptiveRow
       `\\operatorname{range}=${numberToLatex(summary.range)}`,
       `\\sigma^2=${numberToLatex(summary.variance)}`,
       `\\sigma=${numberToLatex(summary.standardDeviation)}`,
-    ].join(',\\ '),
-    approxText: `n=${summary.count}, mean=${formatStatisticsNumber(summary.mean)}, median=${formatStatisticsNumber(summary.median)}, sd=${formatStatisticsNumber(summary.standardDeviation)}`,
-    warnings: [],
+      summary.sampleVariance === null ? '' : `s^2=${numberToLatex(summary.sampleVariance)}`,
+      summary.sampleStandardDeviation === null ? '' : `s=${numberToLatex(summary.sampleStandardDeviation)}`,
+    ].filter(Boolean).join(',\\ '),
+    approxText: `n=${summary.count}, mean=${formatStatisticsNumber(summary.mean)}, median=${formatStatisticsNumber(summary.median)}, population sd=${formatStatisticsNumber(summary.standardDeviation)}${summary.sampleStandardDeviation === null ? '' : `, sample sd=${formatStatisticsNumber(summary.sampleStandardDeviation)}`}`,
+    warnings,
   };
 }
 
@@ -328,6 +365,104 @@ function frequencyOutcomeFromRows(rows: NumericFrequencyRow[]): StatisticsEvalua
     exactLatex: `n=${totalCount},\\ \\left\\{${rows.map((row) => `${numberToLatex(row.value)}:${row.frequency}`).join(',\\ ')}\\right\\}${modeLatex}`,
     approxText: `n=${totalCount}, ${rows.map((row) => `${formatStatisticsNumber(row.value)}:${row.frequency}`).join(', ')}`,
     warnings,
+  };
+}
+
+function meanInferenceSummaryFromValues(values: number[]): MeanInferenceSummary {
+  const summary = descriptiveRowsFromValues(values);
+  return {
+    count: summary.count,
+    mean: summary.mean,
+    sampleVariance: summary.sampleVariance,
+    sampleStandardDeviation: summary.sampleStandardDeviation,
+  };
+}
+
+function meanInferenceSummaryFromFrequency(rows: NumericFrequencyRow[]): MeanInferenceSummary {
+  const summary = descriptiveRowsFromFrequency(rows);
+  return {
+    count: summary.count,
+    mean: summary.mean,
+    sampleVariance: summary.sampleVariance,
+    sampleStandardDeviation: summary.sampleStandardDeviation,
+  };
+}
+
+function meanInferenceOutcome(
+  request: Extract<StatisticsRequest, { kind: 'meanInference' }>,
+): StatisticsEvaluation {
+  const level = parseInferenceLevel(request.level);
+  if (level === null) {
+    return statisticsError('Mean inference level must be a decimal between 0 and 1, such as 0.95.');
+  }
+
+  const summary = request.source === 'dataset'
+    ? (() => {
+      const parsed = parseDatasetValues(request.values);
+      return parsed.ok
+        ? { ok: true as const, summary: meanInferenceSummaryFromValues(parsed.values) }
+        : parsed;
+    })()
+    : (() => {
+      const parsed = parseFrequencyRows(request.rows);
+      return parsed.ok
+        ? { ok: true as const, summary: meanInferenceSummaryFromFrequency(parsed.rows) }
+        : parsed;
+    })();
+
+  if (!summary.ok) {
+    return statisticsError(summary.error);
+  }
+
+  if (summary.summary.count < 2 || summary.summary.sampleStandardDeviation === null || summary.summary.sampleVariance === null) {
+    return statisticsError('Mean inference needs at least two numeric observations.');
+  }
+
+  if (request.mode === 'ci') {
+    const result = computeMeanConfidenceInterval(summary.summary, level);
+    if (!result) {
+      return statisticsError('Mean confidence intervals need at least two numeric observations.');
+    }
+
+    return {
+      exactLatex: [
+        `\\bar{x}=${numberToLatex(summary.summary.mean)}`,
+        `s=${numberToLatex(summary.summary.sampleStandardDeviation)}`,
+        `n=${summary.summary.count}`,
+        `t^*=${numberToLatex(result.criticalValue)}`,
+        `ME=${numberToLatex(result.marginOfError)}`,
+        `CI=${numberToLatex(result.lowerBound)}\\le\\mu\\le${numberToLatex(result.upperBound)}`,
+      ].join(',\\ '),
+      approxText: `${formatStatisticsNumber(level * 100)}% CI: (${formatStatisticsNumber(result.lowerBound)}, ${formatStatisticsNumber(result.upperBound)})`,
+      warnings: [],
+    };
+  }
+
+  const mu0 = parseNumericDraft(request.mu0 ?? '');
+  if (mu0 === null) {
+    return statisticsError('Mean hypothesis tests need a finite numeric mu0 value.');
+  }
+
+  const result = computeMeanHypothesisTest(summary.summary, level, mu0);
+  if (!result) {
+    return statisticsError('Mean hypothesis tests need at least two numeric observations.');
+  }
+
+  const tStatisticLatex = Number.isFinite(result.tStatistic) ? numberToLatex(result.tStatistic) : '\\infty';
+  const tStatisticApprox = Number.isFinite(result.tStatistic) ? formatStatisticsNumber(result.tStatistic) : 'infinity';
+
+  return {
+    exactLatex: [
+      `\\bar{x}=${numberToLatex(summary.summary.mean)}`,
+      `\\mu_0=${numberToLatex(mu0)}`,
+      `s=${numberToLatex(summary.summary.sampleStandardDeviation)}`,
+      `n=${summary.summary.count}`,
+      `t=${tStatisticLatex}`,
+      `p=${numberToLatex(result.pValue)}`,
+      `\\alpha=${numberToLatex(result.alpha)}`,
+    ].join(',\\ '),
+    approxText: `two-sided t-test: t=${tStatisticApprox}, p=${formatStatisticsNumber(result.pValue)}, ${result.rejectNull ? 'reject H0' : 'fail to reject H0'}`,
+    warnings: [],
   };
 }
 
@@ -607,6 +742,8 @@ export function runStatisticsRequest(request: StatisticsRequest): DisplayOutcome
         parsed.ok ? frequencyOutcomeFromRows(parsed.rows) : statisticsError(parsed.error),
       );
     }
+    case 'meanInference':
+      return toOutcome(title, meanInferenceOutcome(request));
     case 'binomial':
       return toOutcome(title, binomialOutcome(request));
     case 'normal':

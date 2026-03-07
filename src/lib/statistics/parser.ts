@@ -23,6 +23,8 @@ function kindFromFunctionName(name: string): StatisticsRequest['kind'] | null {
       return 'descriptive';
     case 'frequency':
       return 'frequency';
+    case 'meaninference':
+      return 'meanInference';
     case 'binomial':
       return 'binomial';
     case 'normal':
@@ -69,7 +71,7 @@ function parseStructured(source: string): StatisticsParseResult | null {
   if (kind === null) {
     return {
       ok: false,
-      error: 'Use a supported Statistics request such as dataset(...), descriptive(...), frequency(...), binomial(...), normal(...), poisson(...), regression(...), or correlation(...).',
+      error: 'Use a supported Statistics request such as dataset(...), descriptive(...), frequency(...), meanInference(...), binomial(...), normal(...), poisson(...), regression(...), or correlation(...).',
     };
   }
 
@@ -126,6 +128,71 @@ function parseStructured(source: string): StatisticsParseResult | null {
     return {
       ok: false,
       error: `${kind}(...) needs values={...} or freq={value:frequency,...}.`,
+    };
+  }
+
+  if (kind === 'meanInference') {
+    const mode = parseDistributionMode(valueFor(assignments, 'mode'), ['ci', 'test'] as const);
+    const level = valueFor(assignments, 'level', 'confidence', 'confidencelevel', 'significancelevel');
+    const mu0 = valueFor(assignments, 'mu0', 'nullmean', 'nullmu');
+    const values = valueFor(assignments, 'values');
+    const freq = valueFor(assignments, 'freq', 'frequencytable');
+
+    if (!mode || !level) {
+      return {
+        ok: false,
+        error: 'meanInference(...) needs mode=ci|test and level=0.95 style input.',
+      };
+    }
+
+    if (mode === 'test' && !mu0) {
+      return {
+        ok: false,
+        error: 'meanInference(..., mode=test, ...) also needs mu0=....',
+      };
+    }
+
+    if (values) {
+      return {
+        ok: true,
+        request: {
+          kind,
+          source: 'dataset',
+          values: parseDatasetValuesSource(values),
+          mode,
+          level,
+          mu0,
+        },
+        style: 'structured',
+      };
+    }
+
+    if (freq) {
+      const rows = parseFrequencyRowsSource(freq);
+      if (rows === null) {
+        return {
+          ok: false,
+          error: 'meanInference(freq={...}) needs value:frequency rows such as {1:2, 2:3}.',
+        };
+      }
+
+      return {
+        ok: true,
+        request: {
+          kind,
+          source: 'frequencyTable',
+          rows,
+          mode,
+          level,
+          mu0,
+        },
+        style: 'structured',
+      };
+    }
+
+    return {
+      ok: false,
+      error: 'meanInference(...) needs values={...} or freq={value:frequency,...}.',
     };
   }
 
@@ -298,6 +365,11 @@ function parseByScreenHint(source: string, options: StatisticsParseOptions): Sta
       return parseDistributionShorthand('normal', source);
     case 'poisson':
       return parseDistributionShorthand('poisson', source);
+    case 'meanInference':
+      return {
+        ok: false,
+        error: 'Mean inference uses structured requests such as meanInference(values={12,15,18}, mode=ci, level=0.95).',
+      };
     case 'regression':
       return parsePointsShorthand('regression', source);
     case 'correlation':
@@ -324,6 +396,8 @@ export function statisticsRequestToScreen(
       return 'normal';
     case 'poisson':
       return 'poisson';
+    case 'meanInference':
+      return 'meanInference';
     case 'regression':
       return 'regression';
     case 'correlation':

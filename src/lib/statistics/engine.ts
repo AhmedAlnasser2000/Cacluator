@@ -3,6 +3,7 @@ import type {
   CorrelationState,
   DisplayOutcome,
   FrequencyTable,
+  MeanInferenceState,
   NormalState,
   PoissonState,
   RegressionState,
@@ -22,11 +23,16 @@ type RunStatisticsModeRequest = {
   poisson: PoissonState;
   regression: RegressionState;
   correlation: CorrelationState;
+  meanInference: MeanInferenceState;
   workingSource?: StatisticsWorkingSource;
 };
 
 export function runStatisticsMode(request: RunStatisticsModeRequest): DisplayOutcome {
-  if (request.screen === 'home' || request.screen === 'probabilityHome') {
+  if (
+    request.screen === 'home'
+    || request.screen === 'probabilityHome'
+    || request.screen === 'inferenceHome'
+  ) {
     return {
       kind: 'error',
       title: 'Statistics',
@@ -45,6 +51,7 @@ export function runStatisticsMode(request: RunStatisticsModeRequest): DisplayOut
       binomial: request.binomial,
       normal: request.normal,
       poisson: request.poisson,
+      meanInference: request.meanInference,
       regression: request.regression,
       correlation: request.correlation,
     },

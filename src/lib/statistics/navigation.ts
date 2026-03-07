@@ -25,8 +25,9 @@ const HOME_ENTRIES: StatisticsMenuEntry[] = [
   { id: 'descriptive', label: 'Descriptive', description: 'Count, mean, median, spread, and summary measures', hotkey: '2', target: 'descriptive' },
   { id: 'frequency', label: 'Frequency', description: 'Work with grouped counts from the dataset or a manual table', hotkey: '3', target: 'frequency' },
   { id: 'probability', label: 'Probability', description: 'Open binomial, normal, and Poisson workflows', hotkey: '4', target: 'probabilityHome' },
-  { id: 'regression', label: 'Regression', description: 'Linear regression from a point set', hotkey: '5', target: 'regression' },
-  { id: 'correlation', label: 'Correlation', description: 'Pearson correlation from a point set', hotkey: '6', target: 'correlation' },
+  { id: 'inference', label: 'Inference', description: 'Open bounded inferential workflows starting with one-sample mean tools', hotkey: '5', target: 'inferenceHome' },
+  { id: 'regression', label: 'Regression', description: 'Linear regression from a point set', hotkey: '6', target: 'regression' },
+  { id: 'correlation', label: 'Correlation', description: 'Pearson correlation from a point set', hotkey: '7', target: 'correlation' },
 ];
 
 const PROBABILITY_ENTRIES: StatisticsMenuEntry[] = [
@@ -35,13 +36,17 @@ const PROBABILITY_ENTRIES: StatisticsMenuEntry[] = [
   { id: 'poisson', label: 'Poisson', description: 'Bounded Poisson PMF and CDF workflows', hotkey: '3', target: 'poisson' },
 ];
 
+const INFERENCE_ENTRIES: StatisticsMenuEntry[] = [
+  { id: 'meanInference', label: 'Mean', description: 'One-sample mean confidence intervals and two-sided t tests', hotkey: '1', target: 'meanInference' },
+];
+
 const ROUTE_META: Record<StatisticsScreen, StatisticsRouteMeta> = {
   home: {
     screen: 'home',
     label: 'Statistics',
     breadcrumb: ['Statistics'],
     description: 'Type a Statistics request above or choose a guided statistics workflow below.',
-    helpText: 'Use EXE/F1 or keys 1-6 to open a statistics tool. Focus the top editor when you want to run a draft directly.',
+    helpText: 'Use EXE/F1 or keys 1-7 to open a statistics tool. Focus the top editor when you want to run a draft directly.',
     guideArticleId: 'statistics-descriptive',
     focusTarget: 'menu',
     editorMode: 'editable',
@@ -86,6 +91,16 @@ const ROUTE_META: Record<StatisticsScreen, StatisticsRouteMeta> = {
     focusTarget: 'menu',
     editorMode: 'editable',
   },
+  inferenceHome: {
+    screen: 'inferenceHome',
+    label: 'Inference',
+    breadcrumb: ['Statistics', 'Inference'],
+    description: 'Choose a bounded inferential workflow, or type a structured inference request above.',
+    helpText: 'Use EXE/F1 or key 1 to open the mean inference tool. Focus the top editor when you want to run a structured draft directly.',
+    guideArticleId: 'statistics-inference',
+    focusTarget: 'menu',
+    editorMode: 'editable',
+  },
   binomial: {
     screen: 'binomial',
     label: 'Binomial',
@@ -113,6 +128,16 @@ const ROUTE_META: Record<StatisticsScreen, StatisticsRouteMeta> = {
     description: 'Evaluate bounded Poisson PMF and CDF requests from lambda and x.',
     helpText: 'Enter lambda, x, and the mode, then press EXE or F1. Use the top editor when you want to edit the Statistics request directly.',
     guideArticleId: 'statistics-probability',
+    focusTarget: 'guidedForm',
+    editorMode: 'editable',
+  },
+  meanInference: {
+    screen: 'meanInference',
+    label: 'Mean Inference',
+    breadcrumb: ['Statistics', 'Inference', 'Mean'],
+    description: 'Run a one-sample mean confidence interval or a two-sided t test from the active data source.',
+    helpText: 'Choose Dataset or Table as the source, set CI or Test, enter level and mu0 when needed, then press EXE or F1.',
+    guideArticleId: 'statistics-inference',
     focusTarget: 'guidedForm',
     editorMode: 'editable',
   },
@@ -144,13 +169,15 @@ function entriesForScreen(screen: StatisticsScreen) {
       return HOME_ENTRIES;
     case 'probabilityHome':
       return PROBABILITY_ENTRIES;
+    case 'inferenceHome':
+      return INFERENCE_ENTRIES;
     default:
       return [];
   }
 }
 
 export function isStatisticsMenuScreen(screen: StatisticsScreen) {
-  return screen === 'home' || screen === 'probabilityHome';
+  return screen === 'home' || screen === 'probabilityHome' || screen === 'inferenceHome';
 }
 
 export function getStatisticsMenuEntries(screen: StatisticsScreen) {
@@ -181,6 +208,7 @@ export function getStatisticsParentScreen(screen: StatisticsScreen): StatisticsS
     case 'home':
       return null;
     case 'probabilityHome':
+    case 'inferenceHome':
     case 'dataEntry':
     case 'descriptive':
     case 'frequency':
@@ -191,6 +219,8 @@ export function getStatisticsParentScreen(screen: StatisticsScreen): StatisticsS
     case 'normal':
     case 'poisson':
       return 'probabilityHome';
+    case 'meanInference':
+      return 'inferenceHome';
     default:
       return 'home';
   }
@@ -222,9 +252,11 @@ export function getStatisticsSoftActions(screen: StatisticsScreen): SoftAction[]
 export function getStatisticsMenuFooterText(screen: StatisticsScreen) {
   switch (screen) {
     case 'home':
-      return '1-6: Open | EXE/F1: Select | F2: Guide | F5/Esc: Back | F6: Exit';
+      return '1-7: Open | EXE/F1: Select | F2: Guide | F5/Esc: Back | F6: Exit';
     case 'probabilityHome':
       return '1-3: Open | EXE/F1: Select | F5/Esc: Back | F6: Exit';
+    case 'inferenceHome':
+      return '1: Open | EXE/F1: Select | F5/Esc: Back | F6: Exit';
     default:
       return '';
   }

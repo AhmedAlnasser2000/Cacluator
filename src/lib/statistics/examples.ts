@@ -2,6 +2,7 @@ import type {
   BinomialState,
   CorrelationState,
   FrequencyTable,
+  MeanInferenceState,
   NormalState,
   PoissonState,
   RegressionState,
@@ -42,6 +43,12 @@ export const DEFAULT_POISSON_STATE: PoissonState = {
   mode: 'pmf',
 };
 
+export const DEFAULT_MEAN_INFERENCE_STATE: MeanInferenceState = {
+  mode: 'ci',
+  level: '0.95',
+  mu0: '15',
+};
+
 export const DEFAULT_REGRESSION_STATE: RegressionState = {
   points: [
     { x: '1', y: '2' },
@@ -66,6 +73,7 @@ export function buildStatisticsInputLatex(
     binomial: BinomialState;
     normal: NormalState;
     poisson: PoissonState;
+    meanInference: MeanInferenceState;
     regression: RegressionState;
     correlation: CorrelationState;
   },
@@ -81,6 +89,7 @@ export function defaultStatisticsDraftForScreen(
   switch (screen) {
     case 'home':
     case 'probabilityHome':
+    case 'inferenceHome':
       return '';
     case 'dataEntry':
       return serializeStatisticsRequest({
@@ -111,6 +120,22 @@ export function defaultStatisticsDraftForScreen(
             source: 'dataset',
             values: DEFAULT_STATS_DATASET.values,
           });
+    case 'meanInference':
+      return workingSource === 'frequencyTable'
+        ? serializeStatisticsRequest({
+            kind: 'meanInference',
+            source: 'frequencyTable',
+            rows: DEFAULT_FREQUENCY_TABLE.rows,
+            mode: DEFAULT_MEAN_INFERENCE_STATE.mode,
+            level: DEFAULT_MEAN_INFERENCE_STATE.level,
+          })
+        : serializeStatisticsRequest({
+            kind: 'meanInference',
+            source: 'dataset',
+            values: DEFAULT_STATS_DATASET.values,
+            mode: DEFAULT_MEAN_INFERENCE_STATE.mode,
+            level: DEFAULT_MEAN_INFERENCE_STATE.level,
+          });
     default:
       return buildStatisticsStructuredDraft(
         screen,
@@ -120,6 +145,7 @@ export function defaultStatisticsDraftForScreen(
           binomial: DEFAULT_BINOMIAL_STATE,
           normal: DEFAULT_NORMAL_STATE,
           poisson: DEFAULT_POISSON_STATE,
+          meanInference: DEFAULT_MEAN_INFERENCE_STATE,
           regression: DEFAULT_REGRESSION_STATE,
           correlation: DEFAULT_CORRELATION_STATE,
         },

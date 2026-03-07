@@ -98,9 +98,11 @@ export type StatisticsScreen =
   | 'descriptive'
   | 'frequency'
   | 'probabilityHome'
+  | 'inferenceHome'
   | 'binomial'
   | 'normal'
   | 'poisson'
+  | 'meanInference'
   | 'regression'
   | 'correlation';
 export type EquationScreen =
@@ -900,6 +902,15 @@ export type RegressionState = {
 export type CorrelationState = {
   points: RegressionPoint[];
 };
+export type MeanInferenceState = {
+  mode: 'ci' | 'test';
+  level: string;
+  mu0: string;
+};
+export type StatisticsSourceSyncState = {
+  datasetStale: boolean;
+  frequencyTableStale: boolean;
+};
 export type CubeState = {
   side: string;
 };
@@ -1106,6 +1117,8 @@ export type StatisticsRequest =
   | { kind: 'binomial'; n: string; p: string; x: string; mode: BinomialState['mode'] }
   | { kind: 'normal'; mean: string; standardDeviation: string; x: string; mode: NormalState['mode'] }
   | { kind: 'poisson'; lambda: string; x: string; mode: PoissonState['mode'] }
+  | { kind: 'meanInference'; source: 'dataset'; values: string[]; mode: MeanInferenceState['mode']; level: string; mu0?: string }
+  | { kind: 'meanInference'; source: 'frequencyTable'; rows: FrequencyRow[]; mode: MeanInferenceState['mode']; level: string; mu0?: string }
   | { kind: 'regression'; points: RegressionPoint[] }
   | { kind: 'correlation'; points: RegressionPoint[] };
 export type StatisticsParseResult =
@@ -1558,7 +1571,7 @@ export const DEFAULT_LAUNCHER_CATEGORIES: LauncherCategory[] = [
       {
         id: 'statistics',
         label: 'Statistics',
-        description: 'Dataset entry, descriptive statistics, probability, and regression basics',
+        description: 'Dataset entry, descriptive statistics, probability, inference, and regression basics',
         hotkey: '1',
         launch: { mode: 'statistics', statisticsScreen: 'home' },
       },

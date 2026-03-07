@@ -2,6 +2,7 @@ import type {
   BinomialState,
   CorrelationState,
   FrequencyRow,
+  MeanInferenceState,
   FrequencyTable,
   NormalState,
   PoissonState,
@@ -48,6 +49,10 @@ export function serializeStatisticsRequest(
       return request.source === 'dataset'
         ? `frequency(values=${serializeValues(request.values)})`
         : `frequency(freq=${serializeFrequencyRows(request.rows)})`;
+    case 'meanInference':
+      return request.source === 'dataset'
+        ? `meanInference(values=${serializeValues(request.values)}, mode=${request.mode}, level=${filledValue(request.level)}${request.mode === 'test' && request.mu0 ? `, mu0=${filledValue(request.mu0)}` : ''})`
+        : `meanInference(freq=${serializeFrequencyRows(request.rows)}, mode=${request.mode}, level=${filledValue(request.level)}${request.mode === 'test' && request.mu0 ? `, mu0=${filledValue(request.mu0)}` : ''})`;
     case 'binomial':
       return `binomial(n=${filledValue(request.n)}, p=${filledValue(request.p)}, x=${filledValue(request.x)}, mode=${request.mode})`;
     case 'normal':
@@ -69,6 +74,7 @@ export function buildStatisticsStructuredDraft(
     binomial: BinomialState;
     normal: NormalState;
     poisson: PoissonState;
+    meanInference: MeanInferenceState;
     regression: RegressionState;
     correlation: CorrelationState;
   },
@@ -106,6 +112,26 @@ export function buildStatisticsStructuredDraft(
               kind: 'frequency',
               source: 'dataset',
               values: state.dataset.values,
+            },
+      );
+    case 'meanInference':
+      return serializeStatisticsRequest(
+        workingSource === 'frequencyTable'
+          ? {
+              kind: 'meanInference',
+              source: 'frequencyTable',
+              rows: state.frequencyTable.rows,
+              mode: state.meanInference.mode,
+              level: state.meanInference.level,
+              mu0: state.meanInference.mode === 'test' ? state.meanInference.mu0.trim() || undefined : undefined,
+            }
+          : {
+              kind: 'meanInference',
+              source: 'dataset',
+              values: state.dataset.values,
+              mode: state.meanInference.mode,
+              level: state.meanInference.level,
+              mu0: state.meanInference.mode === 'test' ? state.meanInference.mu0.trim() || undefined : undefined,
             },
       );
     case 'binomial':

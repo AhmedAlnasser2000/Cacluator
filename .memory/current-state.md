@@ -33,11 +33,11 @@
 - Extracted `src/app/*`, `src/styles/app/*`, and decomposition facades under solver/guide/types are in-tree and passing regression.
 
 ## Most Recent Completed Milestone
-- Completed Track `C` milestone `P2`:
-  - Added deferred Geometry inverse solve-missing families for cone, cuboid, arc-sector, and Heron one-side workflows.
-  - Added bounded `lineEquation(...)` one-unknown + one-constraint parsing/routing to existing coordinate solve-missing engines.
-  - Added explicit handoff mapping warning for unresolved-but-eligible coordinate sends (`x` placeholder mapping).
-  - Added P2 template seeds in Geometry workspace and updated Geometry route/help + guide copy.
+- Completed Track `D` milestones `D1 + D2`:
+  - Added explicit dataset vs frequency-table source-sync state in Statistics, including stale-state UX cleared only by explicit source actions.
+  - Hardened manual frequency-table validation by rejecting duplicate values.
+  - Expanded descriptive summaries with sample variance and sample standard deviation.
+  - Added `Statistics > Inference > Mean` with bounded one-sample confidence intervals and two-sided `t` hypothesis tests for dataset and frequency-table sources.
 - Regression checks:
   - `npm test -- --run`
   - `npm run build`
@@ -58,6 +58,8 @@
 - Some Compute Engine rule checks still print noisy stderr warnings during tests, even though assertions pass.
 - Broader log transforms (`ln(u)-ln(v)`, ratio/power forms) remain intentionally out of bounded scope and should keep explicit unsupported messaging.
 - Bounded trig sum-to-product currently covers two-term `sin/cos` forms only; broader harmonic families remain deferred.
+- Track `D3` regression/correlation diagnostics are not implemented yet; current regression and correlation outputs remain lighter than the planned quality-summary follow-up.
+- Statistics inference is intentionally bounded to one-sample mean workflows only; no proportion/categorical inference is in scope yet.
 
 ## Pending Verification
 - Optional desktop smoke pass on the current shell wiring for visual parity confidence beyond automated coverage.
@@ -66,6 +68,8 @@
 - Track C checklist artifacts:
   - `.memory/research/TRACK-C-P0-P1-MANUAL-VERIFICATION-CHECKLIST.md`
   - `.memory/research/TRACK-C-P2-MANUAL-VERIFICATION-CHECKLIST.md`
+- Track D checklist artifact:
+  - `.memory/research/TRACK-D-D1-D2-MANUAL-VERIFICATION-CHECKLIST.md`
 
 ## Next Recommended Task
-- Continue with Track C `P3` planning/implementation after user review of P2 behavior and checklist confirmation.
+- Plan and implement Track `D3` regression/correlation diagnostics after user review of the new Statistics inference behavior.

@@ -5,6 +5,7 @@ import type {
   RegressionPoint,
   RegressionState,
   StatisticsRequest,
+  StatisticsSourceSyncState,
   StatisticsWorkingSource,
   StatsDataset,
 } from '../../types/calculator';
@@ -207,6 +208,32 @@ export function formatStatisticsNumber(value: number) {
   return formatNumber(value);
 }
 
+export const DEFAULT_STATISTICS_SOURCE_SYNC_STATE: StatisticsSourceSyncState = {
+  datasetStale: false,
+  frequencyTableStale: false,
+};
+
+export function statisticsSourceSyncFromDatasetEdit(): StatisticsSourceSyncState {
+  return {
+    datasetStale: false,
+    frequencyTableStale: true,
+  };
+}
+
+export function statisticsSourceSyncFromFrequencyEdit(): StatisticsSourceSyncState {
+  return {
+    datasetStale: true,
+    frequencyTableStale: false,
+  };
+}
+
+export function clearStatisticsSourceSyncState(): StatisticsSourceSyncState {
+  return {
+    datasetStale: false,
+    frequencyTableStale: false,
+  };
+}
+
 export function collapseDatasetToFrequencyTable(dataset: StatsDataset): FrequencyTable {
   const counts = new Map<string, number>();
 
@@ -265,6 +292,7 @@ export function statisticsRequestToWorkingSource(
       return 'dataset';
     case 'descriptive':
     case 'frequency':
+    case 'meanInference':
       return request.source;
     case 'binomial':
     case 'normal':

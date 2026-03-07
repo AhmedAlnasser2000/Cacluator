@@ -1553,11 +1553,12 @@ const GUIDE_ARTICLE_DRAFTS: GuideArticleDraft[] = [
     ],
     pitfalls: [
       'Dataset and frequency-table views do not live-sync automatically after manual edits; use the explicit import or expand actions when you want to switch representations.',
+      'Descriptive output now includes both population spread and sample spread so inference can reuse the same source safely.',
     ],
     exactVsNumeric: [
       'These workflows are numeric and summary-driven rather than symbolic.',
     ],
-    relatedArticleIds: ['statistics-probability', 'statistics-regression'],
+    relatedArticleIds: ['statistics-probability', 'statistics-inference', 'statistics-regression'],
   },
   {
     id: 'statistics-probability',
@@ -1593,7 +1594,45 @@ const GUIDE_ARTICLE_DRAFTS: GuideArticleDraft[] = [
     pitfalls: [
       'This first pass focuses on one-point PDF or CDF style requests rather than interval or inverse workflows.',
     ],
-    relatedArticleIds: ['statistics-descriptive'],
+    relatedArticleIds: ['statistics-descriptive', 'statistics-inference'],
+  },
+  {
+    id: 'statistics-inference',
+    domainId: 'statistics',
+    title: 'Inference and Mean t Tools',
+    summary: 'Use Statistics > Inference > Mean for one-sample mean confidence intervals and two-sided t tests from the active dataset or frequency table.',
+    concepts: [
+      'Inference adds a bounded one-sample mean workflow on top of the existing dataset and frequency-table sources.',
+      'This milestone is t-first: it uses sample standard deviation, requires n at least 2, and does not add a known-sigma z branch.',
+      'The guided builder can use either the dataset or the manual frequency table, but source sync stays explicit rather than live.',
+      'Mean inference requests stay structured so replay and history remain self-describing.',
+    ],
+    whereToFindIt: [
+      'Menu > Data > Statistics',
+      'Statistics > Inference',
+      'Statistics > Inference > Mean',
+    ],
+    bestModes: ['statistics'],
+    symbols: [],
+    examples: [
+      {
+        id: 'statistics-inference-mean',
+        title: 'Open mean inference',
+        explanation: 'The first inferential tool covers one-sample mean confidence intervals and two-sided t tests.',
+        expected: 'The example opens Statistics > Inference > Mean.',
+        launch: {
+          kind: 'open-tool',
+          targetMode: 'statistics',
+          statisticsScreen: 'meanInference',
+          label: 'Open in Statistics',
+        },
+      },
+    ],
+    pitfalls: [
+      'This pass does not add one-proportion tests, categorical workflows, or regression inference.',
+      'Mean inference only accepts structured requests such as meanInference(values={12,15,18}, mode=ci, level=0.95).',
+    ],
+    relatedArticleIds: ['statistics-descriptive', 'statistics-probability'],
   },
   {
     id: 'statistics-regression',
@@ -1627,9 +1666,9 @@ const GUIDE_ARTICLE_DRAFTS: GuideArticleDraft[] = [
       },
     ],
     pitfalls: [
-      'This pass is linear-only and correlation-only; it does not add multivariable regression or inferential statistics.',
+      'This pass is linear-only and correlation-only; it does not add multivariable regression or deeper inferential regression workflows.',
     ],
-    relatedArticleIds: ['statistics-descriptive'],
+    relatedArticleIds: ['statistics-descriptive', 'statistics-inference'],
   },
   {
     id: 'geometry-shapes-2d',
@@ -2047,19 +2086,20 @@ export const GUIDE_MODE_REFS: GuideModeRef[] = [
   {
     modeId: 'statistics',
     title: 'Statistics',
-    summary: 'Use Statistics for dataset entry, descriptive summaries, frequency tables, bounded probability tools, and point-set regression or correlation.',
+    summary: 'Use Statistics for dataset entry, descriptive summaries, frequency tables, bounded probability tools, first-pass mean inference, and point-set regression or correlation.',
     bestFor: [
       'Reusable pasted datasets',
       'Descriptive summaries such as mean, median, spread, and standard deviation',
       'Frequency summaries from repeated values',
-      'Future probability and regression tools under one app shell',
+      'One-sample mean confidence intervals and two-sided t tests',
+      'Probability and regression tools under one app shell',
     ],
     avoidFor: [
       'Symbolic algebra or equation solving',
       'Graphing-oriented data exploration',
-      'Full inferential-statistics workflows in the first pass',
+      'Categorical statistics or broader inferential-statistics workflows in the first pass',
     ],
-    articleIds: ['statistics-descriptive', 'statistics-probability', 'statistics-regression'],
+    articleIds: ['statistics-descriptive', 'statistics-probability', 'statistics-inference', 'statistics-regression'],
   },
   {
     modeId: 'geometry',

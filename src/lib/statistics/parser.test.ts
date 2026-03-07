@@ -5,14 +5,17 @@ describe('statistics parser', () => {
   it('parses dataset and descriptive structured requests', () => {
     const dataset = parseStatisticsDraft('dataset(values={12,15,15,18,20})');
     const descriptive = parseStatisticsDraft('descriptive(freq={1:2,2:3})');
+    const meanInference = parseStatisticsDraft('meanInference(values={12,15,15,18,20}, mode=ci, level=0.95)');
 
     expect(dataset.ok).toBe(true);
     expect(descriptive.ok).toBe(true);
-    if (!dataset.ok || !descriptive.ok) {
+    expect(meanInference.ok).toBe(true);
+    if (!dataset.ok || !descriptive.ok || !meanInference.ok) {
       throw new Error('Expected Statistics structured requests to parse');
     }
     expect(dataset.request.kind).toBe('dataset');
     expect(descriptive.request.kind).toBe('descriptive');
+    expect(meanInference.request.kind).toBe('meanInference');
     if (descriptive.request.kind !== 'descriptive') {
       throw new Error('Expected descriptive request kind');
     }
@@ -43,13 +46,13 @@ describe('statistics parser', () => {
   });
 
   it('maps requests back to statistics screens', () => {
-    const parsed = parseStatisticsDraft('correlation(points={(1,2),(2,5),(3,7)})');
+    const parsed = parseStatisticsDraft('meanInference(freq={1:2,2:3,4:1}, mode=test, level=0.95, mu0=2)');
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) {
-      throw new Error('Expected correlation request to parse');
+      throw new Error('Expected mean inference request to parse');
     }
 
-    expect(statisticsRequestToScreen(parsed.request)).toBe('correlation');
+    expect(statisticsRequestToScreen(parsed.request)).toBe('meanInference');
   });
 
   it('fails cleanly for unsupported free-form statistics input', () => {
@@ -59,5 +62,15 @@ describe('statistics parser', () => {
       throw new Error('Expected unsupported Statistics input to fail');
     }
     expect(parsed.error).not.toContain('Calculate');
+  });
+
+  it('requires structured mean inference requests on the inference screen', () => {
+    const parsed = parseStatisticsDraft('12, 15, 18', { screenHint: 'meanInference' });
+
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) {
+      throw new Error('Expected shorthand mean inference input to fail');
+    }
+    expect(parsed.error).toContain('structured requests');
   });
 });

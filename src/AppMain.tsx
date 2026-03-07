@@ -174,6 +174,7 @@ import {
   DEFAULT_BINOMIAL_STATE,
   DEFAULT_CORRELATION_STATE,
   DEFAULT_FREQUENCY_TABLE,
+  DEFAULT_MEAN_INFERENCE_STATE,
   DEFAULT_NORMAL_STATE,
   DEFAULT_POISSON_STATE,
   DEFAULT_REGRESSION_STATE,
@@ -196,10 +197,14 @@ import {
   statisticsRequestToScreen,
 } from './lib/statistics/parser';
 import {
+  clearStatisticsSourceSyncState,
   collapseDatasetToFrequencyTable,
+  DEFAULT_STATISTICS_SOURCE_SYNC_STATE,
   datasetTextFromValues,
   expandFrequencyTableToDataset,
   pointsTextFromState,
+  statisticsSourceSyncFromDatasetEdit,
+  statisticsSourceSyncFromFrequencyEdit,
   statisticsRequestToWorkingSource,
 } from './lib/statistics/shared';
 import {
@@ -302,6 +307,7 @@ import {
   type GeometryScreen,
   type IntegralWorkbenchState,
   type LineEquationState,
+  type MeanInferenceState,
   type MidpointState,
   type LimitWorkbenchState,
   type NormalState,
@@ -323,6 +329,7 @@ import {
   type SimultaneousEquationView,
   type StatisticsScreen,
   type StatisticsRequest,
+  type StatisticsSourceSyncState,
   type StatisticsWorkingSource,
   type StatsDataset,
   type TableResponse,
@@ -432,13 +439,20 @@ export default function App() {
   const [statisticsMenuSelection, setStatisticsMenuSelection] = useState({
     home: 0,
     probabilityHome: 0,
+    inferenceHome: 0,
   });
   const [statisticsWorkingSource, setStatisticsWorkingSource] = useState<StatisticsWorkingSource>('dataset');
+  const [statisticsSourceSyncState, setStatisticsSourceSyncState] = useState<StatisticsSourceSyncState>(
+    DEFAULT_STATISTICS_SOURCE_SYNC_STATE,
+  );
   const [statsDataset, setStatsDataset] = useState<StatsDataset>(DEFAULT_STATS_DATASET);
   const [frequencyTable, setFrequencyTable] = useState<FrequencyTable>(DEFAULT_FREQUENCY_TABLE);
   const [binomialState, setBinomialState] = useState<BinomialState>(DEFAULT_BINOMIAL_STATE);
   const [normalState, setNormalState] = useState<NormalState>(DEFAULT_NORMAL_STATE);
   const [poissonState, setPoissonState] = useState<PoissonState>(DEFAULT_POISSON_STATE);
+  const [meanInferenceState, setMeanInferenceState] = useState<MeanInferenceState>(
+    DEFAULT_MEAN_INFERENCE_STATE,
+  );
   const [regressionState, setRegressionState] = useState<RegressionState>(DEFAULT_REGRESSION_STATE);
   const [correlationState, setCorrelationState] = useState<CorrelationState>(DEFAULT_CORRELATION_STATE);
   const [statisticsDraftState, setStatisticsDraftState] = useState<CoreDraftState>(() =>
@@ -611,6 +625,7 @@ export default function App() {
   const statisticsBinomialNRef = useRef<HTMLInputElement | null>(null);
   const statisticsNormalMeanRef = useRef<HTMLInputElement | null>(null);
   const statisticsPoissonLambdaRef = useRef<HTMLInputElement | null>(null);
+  const statisticsMeanInferenceLevelRef = useRef<HTMLInputElement | null>(null);
   const statisticsRegressionXRef = useRef<HTMLInputElement | null>(null);
   const statisticsCorrelationXRef = useRef<HTMLInputElement | null>(null);
   const statisticsFrequencyValueRef = useRef<HTMLInputElement | null>(null);
@@ -742,6 +757,7 @@ export default function App() {
     binomial: binomialState,
     normal: normalState,
     poisson: poissonState,
+    meanInference: meanInferenceState,
     regression: regressionState,
     correlation: correlationState,
   };
@@ -1305,6 +1321,11 @@ export default function App() {
 
         if (statisticsScreen === 'poisson') {
           statisticsPoissonLambdaRef.current?.focus();
+          return;
+        }
+
+        if (statisticsScreen === 'meanInference') {
+          statisticsMeanInferenceLevelRef.current?.focus();
           return;
         }
 
@@ -2429,7 +2450,7 @@ export default function App() {
   }
 
   function openStatisticsGuideForScreen(screen: StatisticsScreen = statisticsScreen) {
-    if (screen === 'home' || screen === 'probabilityHome') {
+    if (screen === 'home') {
       openGuideRoute({ screen: 'modeGuide', modeId: 'statistics' });
       setMode('guide');
       return;
@@ -2440,8 +2461,13 @@ export default function App() {
       return;
     }
 
-    if (screen === 'binomial' || screen === 'normal' || screen === 'poisson') {
+    if (screen === 'probabilityHome' || screen === 'binomial' || screen === 'normal' || screen === 'poisson') {
       openGuideArticle('statistics-probability');
+      return;
+    }
+
+    if (screen === 'inferenceHome' || screen === 'meanInference') {
+      openGuideArticle('statistics-inference');
       return;
     }
 
@@ -2725,15 +2751,15 @@ export default function App() {
   }
 
   function statisticsWorkingSourceForScreen(screen: StatisticsScreen): StatisticsWorkingSource {
-    if (screen === 'frequency') {
-      return 'frequencyTable';
+    if (screen === 'home' || screen === 'probabilityHome' || screen === 'inferenceHome') {
+      return statisticsWorkingSource;
     }
 
     if (screen === 'dataEntry') {
       return 'dataset';
     }
 
-    if (screen === 'descriptive') {
+    if (screen === 'descriptive' || screen === 'frequency' || screen === 'meanInference') {
       return statisticsWorkingSource;
     }
 
@@ -2748,6 +2774,13 @@ export default function App() {
       )?.target ?? 'binomial';
     }
 
+    if (screen === 'inferenceHome') {
+      return getStatisticsMenuEntryAtIndex(
+        'inferenceHome',
+        statisticsMenuSelection.inferenceHome,
+      )?.target ?? 'meanInference';
+    }
+
     const homeTarget = getStatisticsMenuEntryAtIndex(
       'home',
       statisticsMenuSelection.home,
@@ -2758,6 +2791,13 @@ export default function App() {
         'probabilityHome',
         statisticsMenuSelection.probabilityHome,
       )?.target ?? 'binomial';
+    }
+
+    if (homeTarget === 'inferenceHome') {
+      return getStatisticsMenuEntryAtIndex(
+        'inferenceHome',
+        statisticsMenuSelection.inferenceHome,
+      )?.target ?? 'meanInference';
     }
 
     return homeTarget;
@@ -2935,7 +2975,7 @@ export default function App() {
   }
 
   function setCurrentStatisticsMenuIndex(
-    screen: 'home' | 'probabilityHome',
+    screen: 'home' | 'probabilityHome' | 'inferenceHome',
     index: number,
   ) {
     setStatisticsMenuSelection((currentSelection) => ({
@@ -2950,7 +2990,7 @@ export default function App() {
     }
 
     setCurrentStatisticsMenuIndex(
-      statisticsScreen as 'home' | 'probabilityHome',
+      statisticsScreen as 'home' | 'probabilityHome' | 'inferenceHome',
       moveStatisticsMenuIndex(statisticsScreen, currentStatisticsMenuIndex, delta),
     );
   }
@@ -3899,6 +3939,7 @@ export default function App() {
         setStatsDataset(DEFAULT_STATS_DATASET);
         setFrequencyTable(DEFAULT_FREQUENCY_TABLE);
         setStatisticsWorkingSource('dataset');
+        setStatisticsSourceSyncState(clearStatisticsSourceSyncState());
         setStatisticsDraftState(
           statisticsDraftStateForScreen(
             'dataEntry',
@@ -3910,6 +3951,7 @@ export default function App() {
         setStatsDataset(DEFAULT_STATS_DATASET);
         setFrequencyTable(DEFAULT_FREQUENCY_TABLE);
         setStatisticsWorkingSource('dataset');
+        setStatisticsSourceSyncState(clearStatisticsSourceSyncState());
         setStatisticsDraftState(
           statisticsDraftStateForScreen(
             'descriptive',
@@ -3921,6 +3963,7 @@ export default function App() {
         setStatsDataset(DEFAULT_STATS_DATASET);
         setFrequencyTable(DEFAULT_FREQUENCY_TABLE);
         setStatisticsWorkingSource('frequencyTable');
+        setStatisticsSourceSyncState(clearStatisticsSourceSyncState());
         setStatisticsDraftState(
           statisticsDraftStateForScreen(
             'frequency',
@@ -3952,6 +3995,19 @@ export default function App() {
           statisticsDraftStateForScreen(
             'poisson',
             defaultStatisticsDraftForScreen('poisson'),
+            'guided',
+          ),
+        );
+      } else if (statisticsScreen === 'meanInference') {
+        setStatsDataset(DEFAULT_STATS_DATASET);
+        setFrequencyTable(DEFAULT_FREQUENCY_TABLE);
+        setMeanInferenceState(DEFAULT_MEAN_INFERENCE_STATE);
+        setStatisticsWorkingSource('dataset');
+        setStatisticsSourceSyncState(clearStatisticsSourceSyncState());
+        setStatisticsDraftState(
+          statisticsDraftStateForScreen(
+            'meanInference',
+            defaultStatisticsDraftForScreen('meanInference', 'dataset'),
             'guided',
           ),
         );
@@ -4904,16 +4960,27 @@ export default function App() {
     if (request.kind === 'dataset') {
       setStatsDataset({ values: request.values });
       setStatisticsWorkingSource('dataset');
+      setStatisticsSourceSyncState(statisticsSourceSyncFromDatasetEdit());
       return;
     }
 
-    if (request.kind === 'descriptive' || request.kind === 'frequency') {
+    if (request.kind === 'descriptive' || request.kind === 'frequency' || request.kind === 'meanInference') {
       const nextSource = request.source;
       setStatisticsWorkingSource(nextSource);
       if (nextSource === 'dataset') {
         setStatsDataset({ values: request.values });
+        setStatisticsSourceSyncState(statisticsSourceSyncFromDatasetEdit());
       } else {
         setFrequencyTable({ rows: request.rows });
+        setStatisticsSourceSyncState(statisticsSourceSyncFromFrequencyEdit());
+      }
+
+      if (request.kind === 'meanInference') {
+        setMeanInferenceState({
+          mode: request.mode,
+          level: request.level,
+          mu0: request.mu0 ?? '',
+        });
       }
       return;
     }
@@ -5815,6 +5882,15 @@ export default function App() {
   const statisticsDatasetText = datasetTextFromValues(statsDataset.values);
   const statisticsRegressionText = pointsTextFromState(regressionState);
   const statisticsCorrelationText = pointsTextFromState(correlationState);
+  const statisticsFilledFrequencyRowCount = frequencyTable.rows.filter(
+    (row) => row.value.trim() && row.frequency.trim(),
+  ).length;
+  const statisticsSourceSyncSummary =
+    statisticsSourceSyncState.datasetStale
+      ? 'Dataset is stale relative to the manual frequency table.'
+      : statisticsSourceSyncState.frequencyTableStale
+        ? 'Frequency table is stale relative to the dataset.'
+        : 'Dataset and frequency table are in sync.';
 
   function updateStatisticsDataset(text: string) {
     const values = text
@@ -5822,6 +5898,7 @@ export default function App() {
       .map((value) => value.trim())
       .filter((value) => value.length > 0);
     setStatsDataset({ values });
+    setStatisticsSourceSyncState(statisticsSourceSyncFromDatasetEdit());
   }
 
   function updateStatisticsFrequencyRow(
@@ -5839,12 +5916,14 @@ export default function App() {
           : row,
       ),
     }));
+    setStatisticsSourceSyncState(statisticsSourceSyncFromFrequencyEdit());
   }
 
   function addStatisticsFrequencyRow() {
     setFrequencyTable((currentTable) => ({
       rows: [...currentTable.rows, { value: '', frequency: '' }],
     }));
+    setStatisticsSourceSyncState(statisticsSourceSyncFromFrequencyEdit());
   }
 
   function removeStatisticsFrequencyRow(index: number) {
@@ -5853,6 +5932,7 @@ export default function App() {
         ? [{ value: '', frequency: '' }]
         : currentTable.rows.filter((_, rowIndex) => rowIndex !== index),
     }));
+    setStatisticsSourceSyncState(statisticsSourceSyncFromFrequencyEdit());
   }
 
   function updateRegressionPointDraft(
@@ -5892,7 +5972,11 @@ export default function App() {
 
   function switchStatisticsSource(source: StatisticsWorkingSource) {
     setStatisticsWorkingSource(source);
-    if (!isStatisticsMenuScreen(statisticsScreen) && (statisticsScreen === 'descriptive' || statisticsScreen === 'frequency')) {
+    setStatisticsSourceSyncState(clearStatisticsSourceSyncState());
+    if (
+      !isStatisticsMenuScreen(statisticsScreen)
+      && (statisticsScreen === 'descriptive' || statisticsScreen === 'frequency' || statisticsScreen === 'meanInference')
+    ) {
       updateStatisticsDraft(
         buildStatisticsInputLatex(statisticsScreen, statisticsStateSnapshot, source),
         'guided',
@@ -5905,7 +5989,12 @@ export default function App() {
     const nextTable = collapseDatasetToFrequencyTable(statsDataset);
     setFrequencyTable(nextTable);
     setStatisticsWorkingSource('frequencyTable');
-    if (statisticsScreen === 'frequency' || statisticsScreen === 'descriptive') {
+    setStatisticsSourceSyncState(clearStatisticsSourceSyncState());
+    if (
+      statisticsScreen === 'frequency'
+      || statisticsScreen === 'descriptive'
+      || statisticsScreen === 'meanInference'
+    ) {
       updateStatisticsDraft(
         buildStatisticsInputLatex(
           statisticsScreen,
@@ -5926,10 +6015,12 @@ export default function App() {
     const nextDataset = expandFrequencyTableToDataset(frequencyTable);
     setStatsDataset(nextDataset);
     setStatisticsWorkingSource('dataset');
+    setStatisticsSourceSyncState(clearStatisticsSourceSyncState());
     if (
       statisticsScreen === 'dataEntry'
       || statisticsScreen === 'descriptive'
       || statisticsScreen === 'frequency'
+      || statisticsScreen === 'meanInference'
     ) {
       updateStatisticsDraft(
         buildStatisticsInputLatex(
@@ -5993,7 +6084,7 @@ export default function App() {
                   onClick={() => openStatisticsScreen(entry.target)}
                   onMouseEnter={() =>
                     setCurrentStatisticsMenuIndex(
-                      statisticsScreen as 'home' | 'probabilityHome',
+                      statisticsScreen as 'home' | 'probabilityHome' | 'inferenceHome',
                       index,
                     )
                   }
@@ -6010,12 +6101,24 @@ export default function App() {
               <span>{statisticsMenuFooterText}</span>
             </div>
           </>
-        ) : statisticsScreen === 'dataEntry' || statisticsScreen === 'descriptive' || statisticsScreen === 'frequency' ? (
+        ) : statisticsScreen === 'dataEntry' || statisticsScreen === 'descriptive' || statisticsScreen === 'frequency' || statisticsScreen === 'meanInference' ? (
           <div className="grid-two">
             <div className="editor-card">
               <div className="card-title-row">
-                <strong>{statisticsScreen === 'dataEntry' ? 'Dataset' : statisticsScreen === 'descriptive' ? 'Descriptive Source' : 'Frequency Source'}</strong>
-                <span className="equation-badge">{statsDataset.values.length} values</span>
+                <strong>
+                  {statisticsScreen === 'dataEntry'
+                    ? 'Dataset'
+                    : statisticsScreen === 'descriptive'
+                      ? 'Descriptive Source'
+                      : statisticsScreen === 'frequency'
+                        ? 'Frequency Source'
+                        : 'Inference Source'}
+                </strong>
+                <span className="equation-badge">
+                  {statisticsScreen !== 'dataEntry' && statisticsWorkingSource === 'frequencyTable'
+                    ? `${statisticsFilledFrequencyRowCount} rows`
+                    : `${statsDataset.values.length} values`}
+                </span>
               </div>
               {statisticsScreen !== 'dataEntry' ? (
                 <div className="guide-chip-row">
@@ -6033,8 +6136,50 @@ export default function App() {
                   </button>
                 </div>
               ) : null}
+              {statisticsScreen !== 'dataEntry' ? (
+                <p className="equation-hint">{statisticsSourceSyncSummary}</p>
+              ) : null}
+              {statisticsScreen === 'meanInference' ? (
+                <>
+                  <div className="guide-chip-row">
+                    <button
+                      className={`guide-chip ${meanInferenceState.mode === 'ci' ? 'is-active' : ''}`}
+                      onClick={() => setMeanInferenceState((currentState) => ({ ...currentState, mode: 'ci' }))}
+                    >
+                      Confidence Interval
+                    </button>
+                    <button
+                      className={`guide-chip ${meanInferenceState.mode === 'test' ? 'is-active' : ''}`}
+                      onClick={() => setMeanInferenceState((currentState) => ({ ...currentState, mode: 'test' }))}
+                    >
+                      Two-Sided Test
+                    </button>
+                  </div>
+                  <div className="statistics-input-grid">
+                    <label>
+                      <span>Level</span>
+                      <SignedNumberDraftInput
+                        ref={statisticsMeanInferenceLevelRef}
+                        value={meanInferenceState.level}
+                        onValueChange={(value) => setMeanInferenceState((currentState) => ({ ...currentState, level: value }))}
+                        className="statistics-cell-input"
+                      />
+                    </label>
+                    {meanInferenceState.mode === 'test' ? (
+                      <label>
+                        <span>mu0</span>
+                        <SignedNumberDraftInput
+                          value={meanInferenceState.mu0}
+                          onValueChange={(value) => setMeanInferenceState((currentState) => ({ ...currentState, mu0: value }))}
+                          className="statistics-cell-input"
+                        />
+                      </label>
+                    ) : null}
+                  </div>
+                </>
+              ) : null}
               <label className="statistics-text-block">
-                <span>Values</span>
+                <span>{statisticsScreen === 'meanInference' ? 'Dataset values' : 'Values'}</span>
                 <textarea
                   ref={statisticsDatasetRef}
                   className="statistics-textarea"
@@ -6064,7 +6209,7 @@ export default function App() {
             <div className="editor-card">
               <div className="card-title-row">
                 <strong>Frequency Table</strong>
-                <span className="equation-badge">{frequencyTable.rows.filter((row) => row.value.trim() && row.frequency.trim()).length} rows</span>
+                <span className="equation-badge">{statisticsFilledFrequencyRowCount} rows</span>
               </div>
               <div className="statistics-table-labels" aria-hidden="true">
                 <span>Value</span>

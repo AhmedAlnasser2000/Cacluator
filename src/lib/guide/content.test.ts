@@ -128,13 +128,17 @@ describe('guide content', () => {
 
   it('keeps statistics guidance aligned with the shared statistics core', () => {
     const descriptive = getGuideArticle('statistics-descriptive')
+    const inference = getGuideArticle('statistics-inference')
     const probability = getGuideArticle('statistics-probability')
     const regression = getGuideArticle('statistics-regression')
 
     expect(descriptive?.concepts.join(' ')).toContain('top Statistics editor')
+    expect(inference?.summary).toContain('one-sample mean')
+    expect(inference?.examples[0]?.launch.statisticsScreen).toBe('meanInference')
     expect(probability?.summary).toContain('bounded binomial')
     expect(probability?.examples[0]?.launch.statisticsScreen).toBe('binomial')
     expect(regression?.summary).toContain('linear regression')
     expect(regression?.examples[0]?.launch.statisticsScreen).toBe('regression')
+    expect(getGuideModeRef('statistics')?.articleIds).toContain('statistics-inference')
   })
 })

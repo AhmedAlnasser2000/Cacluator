@@ -14,6 +14,7 @@ describe('statistics core', () => {
     }
     expect(outcome.exactLatex).toContain('\\bar{x}');
     expect(outcome.exactLatex).toContain('\\sigma');
+    expect(outcome.exactLatex).toContain('s^2');
   });
 
   it('builds frequency output from a manual table', () => {
@@ -63,6 +64,25 @@ describe('statistics core', () => {
     expect(correlation.approxText).toContain('positive');
   });
 
+  it('runs bounded mean inference from a dataset and a frequency table', () => {
+    const ci = runStatisticsCoreDraft('meanInference(values={12,15,15,18,20}, mode=ci, level=0.95)', {
+      screenHint: 'meanInference',
+      workingSourceHint: 'dataset',
+    }).outcome;
+    const test = runStatisticsCoreDraft('meanInference(freq={1:2,2:3,4:1}, mode=test, level=0.95, mu0=2)', {
+      screenHint: 'meanInference',
+      workingSourceHint: 'frequencyTable',
+    }).outcome;
+
+    expect(ci.kind).toBe('success');
+    expect(test.kind).toBe('success');
+    if (ci.kind !== 'success' || test.kind !== 'success') {
+      throw new Error('Expected mean inference to succeed');
+    }
+    expect(ci.approxText).toContain('CI');
+    expect(test.approxText).toContain('two-sided t-test');
+  });
+
   it('returns controlled errors for invalid statistics input', () => {
     const { outcome } = runStatisticsCoreDraft('binomial(n=2.5,p=1.2,x=-1,mode=pmf)', {
       screenHint: 'binomial',
@@ -73,5 +93,18 @@ describe('statistics core', () => {
       throw new Error('Expected invalid binomial input to fail');
     }
     expect(outcome.error).toContain('n');
+  });
+
+  it('rejects duplicate manual frequency values', () => {
+    const { outcome } = runStatisticsCoreDraft('frequency(freq={1:2,1:3})', {
+      screenHint: 'frequency',
+      workingSourceHint: 'frequencyTable',
+    });
+
+    expect(outcome.kind).toBe('error');
+    if (outcome.kind !== 'error') {
+      throw new Error('Expected duplicate frequency values to fail');
+    }
+    expect(outcome.error).toContain('duplicated');
   });
 });
