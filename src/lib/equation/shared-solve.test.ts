@@ -161,4 +161,19 @@ describe('runSharedEquationSolve', () => {
     expect(result.solveBadges).toContain('Range Guard');
     expect(result.error).toContain('between -1 and 1');
   });
+
+  it('rejects excluded roots after bounded rational normalization', () => {
+    const result = runSharedEquationSolve({
+      ...request,
+      originalLatex: '\\frac{x^2-1}{x-1}=0',
+      resolvedLatex: '\\frac{x^2-1}{x-1}=0',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.exactLatex).toBe('x=-1');
+    expect(result.exactSupplementLatex).toEqual(['\\text{Exclusions: } x-1\\ne0']);
+  });
 });

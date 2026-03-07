@@ -65,4 +65,23 @@ describe('statistics engine', () => {
     }
     expect(outcome.approxText).toContain('CI');
   });
+
+  it('adds a quality summary section to regression and correlation outputs', () => {
+    const regression = runStatisticsMode({
+      screen: 'regression',
+      ...baseRequest,
+    });
+    const correlation = runStatisticsMode({
+      screen: 'correlation',
+      ...baseRequest,
+    });
+
+    expect(regression.kind).toBe('success');
+    expect(correlation.kind).toBe('success');
+    if (regression.kind !== 'success' || correlation.kind !== 'success') {
+      throw new Error('Expected regression and correlation to succeed');
+    }
+    expect(regression.detailSections?.[0]?.title).toBe('Quality Summary');
+    expect(correlation.detailSections?.[0]?.title).toBe('Quality Summary');
+  });
 });

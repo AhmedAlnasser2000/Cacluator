@@ -117,7 +117,6 @@ function substitutionSolve(
 
   const candidates = dedupe([
     ...extractExactSolutions(merged.exactLatex),
-    ...extractApproxSolutions(merged.approxText),
   ])
     .map((value) => {
       try {
@@ -136,13 +135,35 @@ function substitutionSolve(
     })
     .filter((value): value is number => value !== null);
 
-  if (candidates.length === 0) {
+  const approxCandidates = candidates.length === 0
+    ? dedupe(extractApproxSolutions(merged.approxText))
+      .map((value) => {
+        try {
+          const numeric = ce.parse(value).N?.().json;
+          if (typeof numeric === 'number' && Number.isFinite(numeric)) {
+            return numeric;
+          }
+          if (numeric && typeof numeric === 'object' && 'num' in numeric) {
+            const parsed = Number((numeric as { num: string }).num);
+            return Number.isFinite(parsed) ? parsed : null;
+          }
+        } catch {
+          return null;
+        }
+        return null;
+      })
+      .filter((value): value is number => value !== null)
+    : [];
+
+  const validationCandidates = candidates.length > 0 ? candidates : approxCandidates;
+
+  if (validationCandidates.length === 0) {
     return merged;
   }
 
   const validation = validateCandidateRoots(
     request.resolvedLatex,
-    candidates,
+    validationCandidates,
     substitution.domainConstraints,
     'symbolic-substitution',
   );

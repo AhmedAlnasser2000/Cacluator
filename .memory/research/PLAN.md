@@ -698,3 +698,159 @@ Manual verification artifacts now present:
 - `.memory/research/REFACTOR-R7-MANUAL-VERIFICATION-CHECKLIST.md`
 
 Anything beyond this point is no longer Track R. Future work would be optional typing cleanup or product-track work, not more required decomposition for this sweep.
+
+## Next CAS Pillar - Exact Algebra Core (roadmap note, 2026-03-07)
+
+### Why this roadmap exists
+Calcwiz now has a much stronger guarded solve stack, bounded trig expansion, geometry solve-missing, and bounded statistics workflows, but it still does not have an app-owned exact algebra normalization layer for rational and radical math.
+
+That gap is now large enough that it blocks any serious "general-purpose CAS" claim.
+
+Current practical symptoms:
+- fraction sums and rational expressions do not consistently normalize to a common exact form
+- denominator exclusions are not carried as first-class constraints through simplification and solving
+- radical expressions do not yet have a dedicated simplification/rationalization layer
+- rational and radical equations cannot yet use bounded algebra stages like LCD clearing, conjugate transforms, and extraneous-root filtering as a shared workflow
+
+Concrete example of the current gap:
+- `1/3 + 1/(6x)` should reliably normalize to `(2x+1)/(6x)` with `x != 0`
+- that requires exact symbolic denominator management, not only generic simplify/factor/expand calls
+
+### Benchmark note
+For this area, the relevant external comparison is not only Casio's ordinary scientific/graphing calculators.
+
+Two comparison classes matter:
+- `fx-CG50` / ClassWiz-style tools:
+  - useful for exact fractions and some simplification workflows
+  - not the right ceiling for CAS-grade algebra
+- `ClassPad` CAS:
+  - relevant benchmark family for symbolic combine/simplify/expand/factor/solve expectations
+
+This means the next algebra roadmap should target ClassPad-style symbolic algebra expectations more than ordinary fraction-only calculator behavior.
+
+### Current baseline inside this repo
+- `Calculate` symbolic actions still route mainly through the generic symbolic pipeline in `src/lib/math-engine.ts`
+- there is bounded app-owned symbolic work for:
+  - factoring fallback
+  - guarded equation solving
+  - trig normalization/rewrite families
+  - derivative/partial/integral/limit subsystems
+- there is not yet a dedicated exact algebra layer for:
+  - rational normalization
+  - radical normalization
+  - denominator-domain tracking
+  - conjugate-based transforms
+  - rational/radical equation solve stages
+
+### Scope of the next algebra roadmap
+This roadmap should be treated as a dedicated algebra-core track, not as scattered one-off simplify fixes.
+
+It has four major pillars.
+
+#### Pillar 1 - Exact rational normalization
+Build an app-owned rational-expression normalization layer that can:
+- detect symbolic numerators and denominators structurally
+- compute common denominators for bounded algebraic families
+- combine fractions exactly without decimal fallback
+- normalize signs and canonical numerator/denominator placement
+- cancel common factors only when mathematically safe
+- preserve denominator exclusion constraints such as `x != 0`
+
+Target capabilities:
+- symbolic LCD/LCM handling for bounded polynomial/rational forms
+- rational combine in `Calculate`
+- rational preprocessing before `Equation` solve when the transform is exact and safe
+- plain-readable exact output instead of raw or partially decimalized artifacts
+
+#### Pillar 2 - Exact radical normalization
+Build a bounded radical-expression layer that can:
+- simplify radicands by extracting perfect powers
+- normalize nested simple radical products and quotients
+- rationalize denominators using conjugates where the transform is exact and bounded
+- enforce even-root real-domain guards before and after transforms
+
+Target capabilities:
+- `sqrt(12)` -> `2sqrt(3)`
+- bounded denominator rationalization such as `1/sqrt(3)` -> `sqrt(3)/3`
+- controlled conjugate transforms for simple binomial radical denominators
+- exact messaging when a radical transform is outside the bounded safe set
+
+#### Pillar 3 - Rational and radical equation solving
+Extend the guarded solve architecture so rational/radical equations can use exact algebra stages before fallback.
+
+Planned solve-stage tools:
+- multiply by LCD with excluded-value tracking
+- radical-isolation plus bounded power/conjugate transforms where exact
+- solve transformed equation
+- validate every candidate against the original equation and domain constraints
+- reject extraneous roots explicitly
+
+This should remain consistent with the existing guarded-solve philosophy:
+- exact first
+- domain-aware
+- candidate-validated
+- interval numeric solve only when symbolic stages stop short
+
+#### Pillar 4 - Algebra transform UX and provenance
+The algebra layer should not hide every transformation inside a vague `Simplify` button.
+
+Later planning should decide which transforms are:
+- automatic inside `Simplify`
+- explicit actions such as:
+  - `Combine Fractions`
+  - `Cancel Factors`
+  - `Use LCD`
+  - `Rationalize`
+  - `Conjugate`
+
+UX rule:
+- summaries must stay human-readable
+- do not expose raw LaTeX control wrappers like `\left`, `\right`, or parser internals in user-facing summaries
+- exact output, approximate output, domain warnings, and exclusion constraints must remain distinct
+
+### Guardrails for this roadmap
+This algebra roadmap should stay aligned with the rest of Calcwiz:
+- single-variable real algebra first
+- exact symbolic normalization before broader automation
+- domain constraints tracked as first-class data, not dropped side effects
+- no broad theorem-prover/CAS search in the first pass
+- no silent transformation that changes the mathematical domain without explicit tracking
+
+Critical domain classes for this track:
+- denominator nonzero constraints
+- even-root radicand nonnegative constraints
+- log-argument positivity when algebra transforms touch log forms
+- excluded roots created by LCD clearing or rationalization stages
+
+### Likely milestone shape for later planning
+This is not yet a locked implementation plan, but the natural milestone shape is:
+
+1. Rational normalization core
+- exact fraction combine
+- LCD/LCM/GCF handling
+- exclusion constraints
+
+2. Radical normalization core
+- radicand simplification
+- factor extraction
+- denominator rationalization
+- conjugates
+
+3. Rational/radical equation solving
+- algebraic preprocessing
+- excluded-value tracking
+- extraneous-root filtering
+
+4. Algebra UX/provenance pass
+- readable summaries
+- explicit transform controls where needed
+- exact-vs-approx/domain presentation cleanup
+
+### Outcome if this roadmap is delivered well
+If this algebra-core roadmap is completed well, Calcwiz gains the next major CAS pillar after guarded solving:
+- stronger exact simplification in `Calculate`
+- stronger preprocessing and candidate filtering in `Equation`
+- better handling of rational, radical, and fractional textbook algebra
+- a more credible path toward a real general-purpose CAS identity
+
+Without this roadmap, Calcwiz can still be a strong bounded symbolic calculator, but it will remain materially short of full CAS expectations for everyday algebra.

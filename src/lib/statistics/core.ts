@@ -1,4 +1,5 @@
 import type {
+  DisplayDetailSection,
   DisplayOutcome,
   FrequencyRow,
   RegressionPoint,
@@ -27,9 +28,24 @@ type NumericPoint = {
   y: number;
 };
 
+type RegressionFitSummary = {
+  count: number;
+  slope: number;
+  intercept: number;
+  r: number;
+  rSquared: number;
+};
+
+type RegressionDiagnostics = {
+  sse: number;
+  mse: number | null;
+  residualStandardError: number | null;
+};
+
 type StatisticsEvaluation = {
   exactLatex?: string;
   approxText?: string;
+  detailSections?: DisplayDetailSection[];
   warnings: string[];
   error?: string;
 };
@@ -50,6 +66,7 @@ function toOutcome(title: string, evaluation: StatisticsEvaluation): DisplayOutc
       warnings: evaluation.warnings,
       exactLatex: evaluation.exactLatex,
       approxText: evaluation.approxText,
+      detailSections: evaluation.detailSections,
     };
   }
 
@@ -58,6 +75,7 @@ function toOutcome(title: string, evaluation: StatisticsEvaluation): DisplayOutc
     title,
     exactLatex: evaluation.exactLatex,
     approxText: evaluation.approxText,
+    detailSections: evaluation.detailSections,
     warnings: evaluation.warnings,
   };
 }
@@ -653,6 +671,82 @@ function correlationStrength(r: number) {
   return direction === 'none' ? 'no linear direction' : `${strength} ${direction}`;
 }
 
+function regressionDiagnostics(points: NumericPoint[], summary: RegressionFitSummary): RegressionDiagnostics {
+  const sse = points.reduce((total, point) => {
+    const fitted = (summary.slope * point.x) + summary.intercept;
+    return total + ((point.y - fitted) ** 2);
+  }, 0);
+
+  if (summary.count < 3) {
+    return {
+      sse,
+      mse: null,
+      residualStandardError: null,
+    };
+  }
+
+  const mse = sse / (summary.count - 2);
+  return {
+    sse,
+    mse,
+    residualStandardError: Math.sqrt(mse),
+  };
+}
+
+function fitQualityWarnings(r: number, count: number) {
+  const warnings: string[] = [];
+  const magnitude = Math.abs(r);
+
+  if (count < 5) {
+    warnings.push('Quality summary is based on a small sample (n < 5).');
+  }
+
+  if (magnitude < 0.4) {
+    warnings.push('Weak linear fit: treat this line as descriptive rather than strongly predictive.');
+  } else if (magnitude < 0.7) {
+    warnings.push('Moderate linear fit: use the line with caution.');
+  }
+
+  return warnings;
+}
+
+function regressionQualitySection(summary: RegressionFitSummary, diagnostics: RegressionDiagnostics): DisplayDetailSection {
+  const lines = [
+    `Fit strength: ${correlationStrength(summary.r)} linear relationship.`,
+    `SSE = ${formatStatisticsNumber(diagnostics.sse)}`,
+  ];
+
+  if (diagnostics.mse === null || diagnostics.residualStandardError === null) {
+    lines.push('Residual variance and residual standard error need at least 3 points.');
+  } else {
+    lines.push(`Residual variance (MSE) = ${formatStatisticsNumber(diagnostics.mse)}`);
+    lines.push(`Residual standard error = ${formatStatisticsNumber(diagnostics.residualStandardError)}`);
+  }
+
+  return {
+    title: 'Quality Summary',
+    lines,
+  };
+}
+
+function correlationQualitySection(summary: RegressionFitSummary): DisplayDetailSection {
+  const magnitude = Math.abs(summary.r);
+  const qualityNote =
+    magnitude < 0.4
+      ? 'Quality note: weak linear relationship in this sample.'
+      : magnitude < 0.7
+        ? 'Quality note: moderate linear relationship in this sample.'
+        : 'Quality note: strong linear relationship in this sample.';
+
+  return {
+    title: 'Quality Summary',
+    lines: [
+      `Strength: ${correlationStrength(summary.r)} linear relationship.`,
+      qualityNote,
+    ],
+  };
+}
+
 function regressionOutcome(request: Extract<StatisticsRequest, { kind: 'regression' }>): StatisticsEvaluation {
   const parsed = parsePoints(request.points);
   if (!parsed.ok) {
@@ -662,6 +756,12 @@ function regressionOutcome(request: Extract<StatisticsRequest, { kind: 'regressi
   const summary = regressionSummary(parsed.points);
   if (!summary.ok) {
     return statisticsError(summary.error);
+  }
+
+  const diagnostics = regressionDiagnostics(parsed.points, summary);
+  const warnings = fitQualityWarnings(summary.r, summary.count);
+  if (summary.count < 3) {
+    warnings.push('Residual variance and residual standard error need at least 3 points.');
   }
 
   return {
@@ -674,7 +774,8 @@ function regressionOutcome(request: Extract<StatisticsRequest, { kind: 'regressi
       `n=${summary.count}`,
     ].join(',\\ '),
     approxText: `ŷ=${formatStatisticsNumber(summary.slope)}x${summary.intercept < 0 ? '' : '+'}${formatStatisticsNumber(summary.intercept)}, r=${formatStatisticsNumber(summary.r)}, r²=${formatStatisticsNumber(summary.rSquared)}, n=${summary.count}`,
-    warnings: [],
+    detailSections: [regressionQualitySection(summary, diagnostics)],
+    warnings,
   };
 }
 
@@ -700,7 +801,8 @@ function correlationOutcome(request: Extract<StatisticsRequest, { kind: 'correla
       `\\text{${strength}}`,
     ].join(',\\ '),
     approxText: `r=${formatStatisticsNumber(summary.r)}, r²=${formatStatisticsNumber(summary.rSquared)}, ${strength}, n=${summary.count}`,
-    warnings: [],
+    detailSections: [correlationQualitySection(summary)],
+    warnings: fitQualityWarnings(summary.r, summary.count),
   };
 }
 

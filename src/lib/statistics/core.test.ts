@@ -61,7 +61,41 @@ describe('statistics core', () => {
       throw new Error('Expected regression and correlation to succeed');
     }
     expect(regression.exactLatex).toContain('\\hat{y}');
+    expect(regression.detailSections?.[0]?.title).toBe('Quality Summary');
+    expect(regression.detailSections?.[0]?.lines.join(' ')).toContain('SSE');
     expect(correlation.approxText).toContain('positive');
+    expect(correlation.detailSections?.[0]?.lines.join(' ')).toContain('Quality note');
+  });
+
+  it('adds bounded regression warnings for low sample size and omitted residual metrics', () => {
+    const { outcome } = runStatisticsCoreDraft('regression(points={(1,2),(2,5)})', {
+      screenHint: 'regression',
+    });
+
+    expect(outcome.kind).toBe('success');
+    if (outcome.kind !== 'success') {
+      throw new Error('Expected two-point regression to succeed');
+    }
+    expect(outcome.warnings.join(' ')).toContain('small sample');
+    expect(outcome.warnings.join(' ')).toContain('at least 3 points');
+    expect(outcome.detailSections?.[0]?.lines.join(' ')).toContain('Residual variance and residual standard error need at least 3 points');
+  });
+
+  it('adds balanced weak-fit warnings for weak correlation and regression', () => {
+    const regression = runStatisticsCoreDraft('regression(points={(1,0),(2,1),(3,-1),(4,0)})', {
+      screenHint: 'regression',
+    }).outcome;
+    const correlation = runStatisticsCoreDraft('correlation(points={(1,0),(2,1),(3,-1),(4,0)})', {
+      screenHint: 'correlation',
+    }).outcome;
+
+    expect(regression.kind).toBe('success');
+    expect(correlation.kind).toBe('success');
+    if (regression.kind !== 'success' || correlation.kind !== 'success') {
+      throw new Error('Expected weak-fit cases to succeed');
+    }
+    expect(regression.warnings.join(' ')).toContain('Weak linear fit');
+    expect(correlation.warnings.join(' ')).toContain('Weak linear fit');
   });
 
   it('runs bounded mean inference from a dataset and a frequency table', () => {

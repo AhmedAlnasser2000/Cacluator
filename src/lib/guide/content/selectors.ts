@@ -1638,11 +1638,12 @@ const GUIDE_ARTICLE_DRAFTS: GuideArticleDraft[] = [
     id: 'statistics-regression',
     domainId: 'statistics',
     title: 'Regression and Correlation',
-    summary: 'Use Statistics for bounded linear regression and Pearson correlation from point sets.',
+    summary: 'Use Statistics for bounded linear regression and Pearson correlation from point sets, with quality summaries for fit strength and residual size.',
     concepts: [
-      'Regression fits a least-squares line and reports slope, intercept, r, r^2, and point count.',
-      'Correlation reports Pearson r, r^2, point count, and a short strength or direction summary.',
+      'Regression fits a least-squares line and reports slope, intercept, r, r^2, point count, SSE, and residual-size diagnostics.',
+      'Correlation reports Pearson r, r^2, point count, and a bounded quality summary tied to sample size and strength.',
       'Both tools use the shared top Statistics editor while the point rows below it stay as guided builders.',
+      'Correlation strength describes linear association in this sample; it does not prove causation.',
     ],
     whereToFindIt: [
       'Menu > Data > Statistics',
@@ -1667,6 +1668,8 @@ const GUIDE_ARTICLE_DRAFTS: GuideArticleDraft[] = [
     ],
     pitfalls: [
       'This pass is linear-only and correlation-only; it does not add multivariable regression or deeper inferential regression workflows.',
+      'Small samples can make a line look cleaner than it really is, so read the quality summary before trusting the fit.',
+      'Correlation strength is not causation and is not a prediction guarantee.',
     ],
     relatedArticleIds: ['statistics-descriptive', 'statistics-inference'],
   },

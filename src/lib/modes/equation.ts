@@ -69,6 +69,7 @@ type RunEquationModeRequest = {
 function toOutcome(
   title: string,
   exactLatex?: string,
+  exactSupplementLatex?: string[],
   approxText?: string,
   warnings: string[] = [],
   error?: string,
@@ -81,6 +82,7 @@ function toOutcome(
       error,
       warnings,
       exactLatex,
+      exactSupplementLatex,
       approxText,
     };
   }
@@ -89,6 +91,7 @@ function toOutcome(
     kind: 'success',
     title,
     exactLatex,
+    exactSupplementLatex,
     approxText,
     warnings,
     resultOrigin,
@@ -112,7 +115,9 @@ function withPlannerMetadata(
 
   return {
     ...outcome,
-    resolvedInputLatex: resolvedLatex !== originalLatex.trim() ? resolvedLatex : undefined,
+    resolvedInputLatex:
+      outcome.resolvedInputLatex
+      ?? (resolvedLatex !== originalLatex.trim() ? resolvedLatex : undefined),
     plannerBadges: mergedPlannerBadges.length > 0 ? mergedPlannerBadges : undefined,
   };
 }
@@ -260,6 +265,7 @@ function solvePolynomial(
     return toOutcome(
       meta.title,
       response.exactLatex,
+      response.exactSupplementLatex,
       response.approxText,
       response.warnings,
       undefined,

@@ -8350,6 +8350,9 @@ export default function App() {
                 {displayOutcome.exactLatex ? (
                   <MathStatic className="result-math" latex={displayOutcome.exactLatex} />
                 ) : null}
+                {displayOutcome.exactSupplementLatex?.map((line) => (
+                  <MathStatic key={line} className="result-math result-math-supplement" latex={line} />
+                ))}
                 {settings.outputStyle !== 'exact' && displayOutcome.approxText ? <div className="result-approx">{displayOutcome.approxText}</div> : null}
               </>
             ) : null}
@@ -8363,8 +8366,35 @@ export default function App() {
               <>
                 <div className="result-error">{displayOutcome.error}</div>
                 {displayOutcome.exactLatex ? <MathStatic className="result-math" latex={displayOutcome.exactLatex} /> : null}
+                {displayOutcome.exactSupplementLatex?.map((line) => (
+                  <MathStatic key={line} className="result-math result-math-supplement" latex={line} />
+                ))}
                 {settings.outputStyle !== 'exact' && displayOutcome.approxText ? <div className="result-approx">{displayOutcome.approxText}</div> : null}
               </>
+            ) : null}
+            {!isLauncherOpen
+            && !isEquationMenuOpen
+            && !isAdvancedCalcMenuOpen
+            && !isTrigMenuOpen
+            && !isStatisticsMenuOpen
+            && (!isGeometryMenuOpen || currentMode === 'geometry')
+            && currentMode !== 'guide'
+            && (displayOutcome?.kind === 'success' || displayOutcome?.kind === 'error')
+            && displayOutcome.detailSections?.length ? (
+              <div className="result-detail-sections">
+                {displayOutcome.detailSections.map((section) => (
+                  <div key={section.title} className="result-summary-block">
+                    <div className="result-summary-label">{section.title}</div>
+                    <div className="result-detail-lines">
+                      {section.lines.map((line) => (
+                        <div key={`${section.title}-${line}`} className="result-detail-line result-summary-text">
+                          {line}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : null}
             {!isLauncherOpen && !isEquationMenuOpen && !isAdvancedCalcMenuOpen && !isTrigMenuOpen && !isStatisticsMenuOpen && !isGeometryMenuOpen && currentMode !== 'guide' && displayOutcome?.warnings.length ? (
               <div className="warning-stack">

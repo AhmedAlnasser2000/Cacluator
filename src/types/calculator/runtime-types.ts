@@ -635,12 +635,19 @@ export type GuideSearchResult =
       route: GuideRoute;
     };
 
+export type DisplayDetailSection = {
+  title: string;
+  lines: string[];
+};
+
 export type DisplayOutcome =
   | {
       kind: 'success';
       title: string;
       exactLatex?: string;
+      exactSupplementLatex?: string[];
       approxText?: string;
+      detailSections?: DisplayDetailSection[];
       warnings: string[];
       resultOrigin?: ResultOrigin;
       actions?: DisplayOutcomeAction[];
@@ -666,7 +673,9 @@ export type DisplayOutcome =
       error: string;
       warnings: string[];
       exactLatex?: string;
+      exactSupplementLatex?: string[];
       approxText?: string;
+      detailSections?: DisplayDetailSection[];
       actions?: DisplayOutcomeAction[];
       resolvedInputLatex?: string;
       plannerBadges?: PlannerBadge[];
@@ -695,8 +704,12 @@ export type EvaluateRequest = {
 
 export type EvaluateResponse = {
   exactLatex?: string;
+  exactSupplementLatex?: string[];
   approxText?: string;
   normalizedMathJson?: unknown;
+  rawSolutions?: unknown[];
+  rawSolutionLatex?: string[];
+  numericSolutions?: (number | null)[];
   warnings: string[];
   error?: string;
   resultOrigin?: ResultOrigin;
@@ -1103,10 +1116,13 @@ export type SubstitutionSolveDiagnostics = {
 export type GuardedSolveRequest = {
   originalLatex: string;
   resolvedLatex: string;
+  validationLatex?: string;
   angleUnit: AngleUnit;
   outputStyle: OutputStyle;
   ansLatex: string;
   numericInterval?: NumericSolveInterval;
+  domainConstraints?: SolveDomainConstraint[];
+  exactSupplementLatex?: string[];
 };
 export type StatisticsRequest =
   | { kind: 'dataset'; values: string[] }

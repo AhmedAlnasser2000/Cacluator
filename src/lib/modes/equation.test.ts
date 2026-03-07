@@ -247,6 +247,38 @@ describe('runEquationMode', () => {
     expect(result.solveSummaryText).toContain('double-angle');
   });
 
+  it('normalizes bounded rational equations before solving and carries exclusions', () => {
+    const result = runEquationMode({
+      ...makeRequest(),
+      equationScreen: 'symbolic',
+      equationLatex: '\\frac{1}{3}+\\frac{1}{6x}=1',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.exactLatex).toContain('\\frac{1}{4}');
+    expect(result.exactSupplementLatex).toEqual(['\\text{Exclusions: } x\\ne0']);
+    expect(result.resolvedInputLatex).toBe('\\frac{2x+1}{6x}=1');
+  });
+
+  it('keeps denominator exclusions when solving rational-zero equations', () => {
+    const result = runEquationMode({
+      ...makeRequest(),
+      equationScreen: 'symbolic',
+      equationLatex: '\\frac{x^2-1}{x-1}=0',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.exactLatex).toBe('x=-1');
+    expect(result.exactSupplementLatex).toEqual(['\\text{Exclusions: } x-1\\ne0']);
+    expect(result.resolvedInputLatex).toBe('x+1=0');
+  });
+
   it('solves bounded trig squares through exact branch splitting', () => {
     const result = runEquationMode({
       ...makeRequest(),

@@ -40,6 +40,7 @@ function actionTitle(action: CalculateAction) {
 function toOutcome(
   title: string,
   exactLatex?: string,
+  exactSupplementLatex?: string[],
   approxText?: string,
   warnings: string[] = [],
   error?: string,
@@ -52,6 +53,7 @@ function toOutcome(
       error,
       warnings,
       exactLatex,
+      exactSupplementLatex,
       approxText,
     };
   }
@@ -60,6 +62,7 @@ function toOutcome(
     kind: 'success',
     title,
     exactLatex,
+    exactSupplementLatex,
     approxText,
     warnings,
     resultOrigin,
@@ -181,6 +184,7 @@ export function runCalculateMode({
     toOutcome(
       title,
       response.exactLatex,
+      response.exactSupplementLatex,
       response.approxText,
       response.warnings,
       response.error,

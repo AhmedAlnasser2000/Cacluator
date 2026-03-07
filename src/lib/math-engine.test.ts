@@ -242,6 +242,31 @@ describe('runExpressionAction', () => {
     expect(result.exactLatex).toContain('\\cos')
   })
 
+  it('combines exact bounded rational expressions in simplify mode', () => {
+    const result = runExpressionAction(
+      { ...request, document: { latex: '\\frac{1}{3}+\\frac{1}{6x}' } },
+      'simplify',
+    )
+
+    expect(result.error).toBeUndefined()
+    expect(result.resultOrigin).toBe('symbolic-engine')
+    expect(result.exactLatex).toBe('\\frac{2x+1}{6x}')
+    expect(result.exactSupplementLatex).toEqual(['\\text{Exclusions: } x\\ne0'])
+  })
+
+  it('factors rational numerators and denominators separately without cancellation', () => {
+    const result = runExpressionAction(
+      { ...request, document: { latex: '\\frac{x^2-1}{x^2-x}' } },
+      'factor',
+    )
+
+    expect(result.error).toBeUndefined()
+    expect(result.resultOrigin).toBe('symbolic-engine')
+    expect(result.exactLatex).toBe('\\frac{(x-1)(x+1)}{x(x-1)}')
+    expect(result.exactSupplementLatex?.[0]).toContain('x\\ne0')
+    expect(result.exactSupplementLatex?.[0]).toContain('x-1\\ne0')
+  })
+
   it('falls back numerically for supported definite integrals', () => {
     const result = runExpressionAction(
       { ...request, document: { latex: '\\int_0^1 \\sin(x^2) \\, dx' } },

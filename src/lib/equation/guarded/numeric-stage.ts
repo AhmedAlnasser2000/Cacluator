@@ -13,7 +13,11 @@ function numericIntervalSolve(request: GuardedSolveRequest): DisplayOutcome | nu
     return null;
   }
 
-  const numeric = runNumericIntervalSolve(request.resolvedLatex, request.numericInterval);
+  const numeric = runNumericIntervalSolve(
+    request.resolvedLatex,
+    request.numericInterval,
+    request.domainConstraints,
+  );
   if (numeric.kind === 'error') {
     return errorOutcome(
       'Solve',

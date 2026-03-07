@@ -22,6 +22,7 @@ import { getResultGuardError } from './result-guard';
 import { factorMathJson } from './symbolic-factor';
 import { runFactoringEngine } from './symbolic-engine/orchestrator';
 import { parsePartialDerivativeLatex, resolvePartialDerivative } from './symbolic-engine/partials';
+import { normalizeExactRationalNode } from './symbolic-engine/rational';
 
 export type SymbolicAction =
   | CalculateAction
@@ -195,6 +196,32 @@ function solutionApproximationText(symbol: string, solutions: unknown[]) {
     : `${symbol} ~= ${approximations.join(', ')}`;
 }
 
+function readNumericValue(node: unknown): number | null {
+  if (typeof node === 'number' && Number.isFinite(node)) {
+    return node;
+  }
+
+  if (typeof node === 'object' && node !== null && 'num' in node) {
+    const value = Number((node as { num: string }).num);
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof node === 'string') {
+    const value = Number(node);
+    return Number.isFinite(value) ? value : null;
+  }
+
+  return null;
+}
+
+function numericSolutionValues(solutions: unknown[]) {
+  return solutions.map((solution) => {
+    const boxed = ce.box(solution as Parameters<typeof ce.box>[0]) as BoxedLike;
+    const numeric = boxed.N?.() ?? boxed.evaluate();
+    return readNumericValue(numeric.json);
+  });
+}
+
 function guardSolvedSolutions(solutions: unknown[]) {
   for (const solution of solutions) {
     const boxed = ce.box(solution as Parameters<typeof ce.box>[0]) as BoxedLike;
@@ -274,6 +301,32 @@ export function runExpressionAction(
     }
     const expr = prepared.expr;
 
+    const rational =
+      action === 'simplify' || action === 'factor'
+        ? normalizeExactRationalNode(expr.json, action)
+        : null;
+    if (rational) {
+      const exactExpr = ce.box(rational.normalizedNode as Parameters<typeof ce.box>[0]) as BoxedLike;
+      const approx = numericExpression(exactExpr);
+      const guardError = getResultGuardError(approx?.latex, exactExpr?.latex);
+      if (guardError) {
+        return {
+          warnings: prepared.warnings,
+          error: guardError,
+          exactSupplementLatex: rational.exactSupplementLatex,
+        };
+      }
+
+      return {
+        exactLatex: rational.normalizedLatex,
+        exactSupplementLatex: rational.exactSupplementLatex,
+        approxText: latexToApproxText(approx?.latex),
+        normalizedMathJson: rational.normalizedNode,
+        warnings: prepared.warnings,
+        resultOrigin: 'symbolic-engine',
+      };
+    }
+
     if (action === 'solve') {
       const solutions = expr.solve?.('x');
       if (!Array.isArray(solutions) || solutions.length === 0) {
@@ -302,6 +355,9 @@ export function runExpressionAction(
         exactLatex,
         approxText: solutionApproximationText('x', solutions),
         normalizedMathJson: expr.json,
+        rawSolutions: solutions,
+        rawSolutionLatex: solutions.map((solution) => ce.box(solution as Parameters<typeof ce.box>[0]).latex),
+        numericSolutions: numericSolutionValues(solutions),
         warnings: [],
       };
     }

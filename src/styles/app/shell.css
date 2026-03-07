@@ -619,6 +619,10 @@ textarea:focus-visible {
   color: var(--lcd-ink);
 }
 
+.result-math-supplement {
+  margin-top: 6px;
+}
+
 .result-title {
   font-size: 0.85rem;
   letter-spacing: 0.08em;
@@ -695,6 +699,17 @@ textarea:focus-visible {
 .result-summary-text {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.result-detail-sections,
+.result-detail-lines {
+  display: grid;
+  gap: 8px;
+}
+
+.result-detail-line {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.95rem;
 }
 
 .result-error {
