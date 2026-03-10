@@ -47,6 +47,15 @@ describe('normalizeExactRadicalLatex', () => {
     expect(result?.exactSupplementLatex?.[0]).toContain('\\sqrt{x}+1\\ne0');
   });
 
+  it('rationalizes supported root-in-binomial denominators and keeps binomial conditions', () => {
+    const result = normalizeExactRadicalLatex('\\frac{1}{\\sqrt{x+1}+1}', 'simplify');
+
+    expect(result).not.toBeNull();
+    expect(result?.normalizedLatex).toContain('\\sqrt{x+1}');
+    expect(result?.exactSupplementLatex?.[0]).toContain('x+1\\ge0');
+    expect(result?.exactSupplementLatex?.[0]).toContain('\\sqrt{x+1}+1\\ne0');
+  });
+
   it('rejects broader multivariable radicals in this bounded milestone', () => {
     const result = normalizeExactRadicalLatex('\\sqrt{x^2y^2}', 'simplify');
 

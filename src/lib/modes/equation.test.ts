@@ -338,7 +338,7 @@ describe('runEquationMode', () => {
       throw new Error('Expected a success outcome');
     }
     expect(result.exactLatex).toBe('x=3');
-    expect(result.rejectedCandidateCount).toBeUndefined();
+    expect(result.rejectedCandidateCount).toBe(1);
   });
 
   it('solves bounded trig squares through exact branch splitting', () => {
@@ -386,5 +386,37 @@ describe('runEquationMode', () => {
     expect(result.transformBadges).toEqual(['Use LCD']);
     expect(result.transformSummaryText).toContain('Cleared the equation');
     expect(result.exactSupplementLatex?.[0]).toContain('x\\ne0');
+  });
+
+  it('widens explicit equation transforms to binomial denominator families', () => {
+    const result = runEquationAlgebraTransform({
+      action: 'useLCD',
+      equationLatex: '\\frac{1}{x^2+1}+\\frac{1}{x-1}=0',
+      angleUnit: 'deg',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.exactLatex).toBe('x^2+x=0');
+    expect(result.transformBadges).toEqual(['Use LCD']);
+    expect(result.transformSummaryText).toContain('(x-1)(x^2+1)');
+    expect(result.exactSupplementLatex?.[0]).toContain('x^2+1\\ne0');
+  });
+
+  it('solves bounded conjugate families through the shared symbolic backend', () => {
+    const result = runEquationMode({
+      ...makeRequest(),
+      equationScreen: 'symbolic',
+      equationLatex: '\\frac{1}{\\sqrt{x}+1}=\\frac{1}{2}',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.exactLatex).toBe('x=1');
+    expect(result.solveBadges).toContain('Conjugate Transform');
   });
 });

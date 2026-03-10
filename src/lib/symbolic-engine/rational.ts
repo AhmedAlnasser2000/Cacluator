@@ -261,12 +261,85 @@ function addScalars(left: ExactScalar, right: ExactScalar): ExactScalar {
   ) ?? { numerator: 0, denominator: 1 };
 }
 
+function isSupportedMonomialBase(node: unknown, variable: string | undefined): boolean {
+  if (!variable) {
+    return false;
+  }
+
+  const normalized = normalizeAst(node);
+  if (normalized === variable) {
+    return true;
+  }
+
+  if (readExactScalar(normalized)) {
+    return true;
+  }
+
+  if (!isNodeArray(normalized) || normalized.length === 0) {
+    return false;
+  }
+
+  if (normalized[0] === 'Negate' && normalized.length === 2) {
+    return isSupportedMonomialBase(normalized[1], variable);
+  }
+
+  if (
+    normalized[0] === 'Power'
+    && normalized.length === 3
+    && normalized[1] === variable
+  ) {
+    const exponent = readExactScalar(normalized[2]);
+    return Boolean(exponent && exponent.denominator === 1 && exponent.numerator > 0);
+  }
+
+  if (normalized[0] === 'Multiply') {
+    let sawSymbolic = false;
+    for (const child of normalized.slice(1)) {
+      if (readExactScalar(child)) {
+        continue;
+      }
+      if (!isSupportedMonomialBase(child, variable)) {
+        return false;
+      }
+      sawSymbolic = true;
+    }
+    return sawSymbolic;
+  }
+
+  if (normalized[0] === 'Divide' && normalized.length === 3) {
+    return (
+      (isSupportedMonomialBase(normalized[1], variable) && Boolean(readExactScalar(normalized[2])))
+      || (Boolean(readExactScalar(normalized[1])) && isSupportedMonomialBase(normalized[2], variable))
+    );
+  }
+
+  return false;
+}
+
+function isSupportedBinomialBase(node: unknown, variable: string | undefined): boolean {
+  if (!variable) {
+    return false;
+  }
+
+  const normalized = normalizeAst(node);
+  if (!isNodeArray(normalized) || normalized[0] !== 'Add') {
+    return false;
+  }
+
+  const terms = flattenAdd(normalized);
+  return terms.length === 2 && terms.every((term) => isSupportedMonomialBase(term, variable));
+}
+
 function isSupportedAtomicBase(node: unknown, variable: string | undefined): boolean {
   if (!variable) {
     return false;
   }
 
-  if (node === variable) {
+  if (isSupportedMonomialBase(node, variable)) {
+    return true;
+  }
+
+  if (isSupportedBinomialBase(node, variable)) {
     return true;
   }
 
@@ -588,6 +661,13 @@ function extractExclusionBases(terms: RationalTerm[]) {
   const bases = new Map<string, unknown>();
   for (const term of terms) {
     for (const entry of term.denominatorFactors.values()) {
+      const factored = decomposeProduct(factorNode(entry.node));
+      if (factored) {
+        for (const factor of factored.factors.values()) {
+          bases.set(termKey(factor.node), factor.node);
+        }
+        continue;
+      }
       bases.set(termKey(entry.node), entry.node);
     }
   }

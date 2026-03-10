@@ -29,6 +29,15 @@ describe('normalizeExactRationalLatex', () => {
     expect(result?.exactSupplementLatex[0]).toContain('x-1\\ne0');
   });
 
+  it('supports binomial denominator factors in LCD mode', () => {
+    const result = normalizeExactRationalLatex('\\frac{1}{x^2+1}+\\frac{1}{x-1}', 'lcd');
+
+    expect(result).not.toBeNull();
+    expect(result?.normalizedLatex).toContain('(x-1)(x^2+1)');
+    expect(result?.exactSupplementLatex[0]).toContain('x^2+1\\ne0');
+    expect(result?.exactSupplementLatex[0]).toContain('x-1\\ne0');
+  });
+
   it('rejects multivariable rational expressions for this bounded milestone', () => {
     const result = normalizeExactRationalLatex('\\frac{1}{x}+\\frac{1}{y}', 'simplify');
 

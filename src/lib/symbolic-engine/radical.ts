@@ -395,6 +395,39 @@ function parseMonomial(node: unknown): Monomial | null {
   return null;
 }
 
+function parseSupportedBinomial(node: unknown) {
+  const normalized = normalizeAst(node);
+  if (!isNodeArray(normalized) || normalized[0] !== 'Add') {
+    return null;
+  }
+
+  const terms = flattenAdd(normalized);
+  if (terms.length !== 2) {
+    return null;
+  }
+
+  let variable: string | undefined;
+  for (const term of terms) {
+    const monomial = parseMonomial(term);
+    if (!monomial) {
+      return null;
+    }
+    variable = combineVariables(variable, monomial.variable) ?? undefined;
+    if (variable === undefined && monomial.variable) {
+      return null;
+    }
+  }
+
+  return {
+    node: normalized,
+    variable,
+  };
+}
+
+function isSupportedRadicandExpression(node: unknown) {
+  return Boolean(readExactScalar(node) || parseMonomial(node) || parseSupportedBinomial(node));
+}
+
 function monomialDependsOnVariable(monomial: Monomial) {
   return Boolean(monomial.variable && monomial.exponent !== 0);
 }
@@ -409,6 +442,15 @@ function isProvablyNonnegativeMonomial(monomial: Monomial) {
   }
 
   return Math.abs(monomial.exponent) % 2 === 0;
+}
+
+function needsEvenRootConstraint(node: unknown) {
+  const monomial = parseMonomial(node);
+  if (monomial) {
+    return monomialDependsOnVariable(monomial) && !isProvablyNonnegativeMonomial(monomial);
+  }
+
+  return Boolean(parseSupportedBinomial(node) && expressionHasVariable(node));
 }
 
 function buildMonomialNode(monomial: Monomial): unknown {
@@ -777,6 +819,10 @@ function isSupportedConjugateOther(node: unknown, variable?: string) {
     return true;
   }
 
+  if (parseSupportedBinomial(node)) {
+    return true;
+  }
+
   if (!variable) {
     return false;
   }
@@ -905,7 +951,7 @@ function tryRationalizeSquareRootBinomial(
     return null;
   }
 
-  if (!parseMonomial(rootTerm.radicand) || !isSupportedConjugateOther(rootTerm.other, variable)) {
+  if (!isSupportedRadicandExpression(rootTerm.radicand) || !isSupportedConjugateOther(rootTerm.other, variable)) {
     return null;
   }
 
@@ -954,7 +1000,7 @@ function canApplyConjugateTransform(
 
   return Boolean(
     rootTerm
-    && parseMonomial(rootTerm.radicand)
+    && isSupportedRadicandExpression(rootTerm.radicand)
     && isSupportedConjugateOther(rootTerm.other, variable)
   );
 }
@@ -1001,10 +1047,17 @@ function normalizeNode(
       };
     }
 
+    const conditionConstraints = needsEvenRootConstraint(childResult.node)
+      ? mergeConstraints(childResult.conditionConstraints, [{
+        kind: 'nonnegative',
+        expressionLatex: boxLatex(childResult.node),
+      }])
+      : childResult.conditionConstraints;
+
     return {
       node: ['Sqrt', childResult.node],
       changed: childResult.changed,
-      conditionConstraints: childResult.conditionConstraints,
+      conditionConstraints,
       rationalized: childResult.rationalized,
     };
   }
@@ -1038,10 +1091,17 @@ function normalizeNode(
       };
     }
 
+    const conditionConstraints = index % 2 === 0 && needsEvenRootConstraint(childResult.node)
+      ? mergeConstraints(childResult.conditionConstraints, [{
+        kind: 'nonnegative',
+        expressionLatex: boxLatex(childResult.node),
+      }])
+      : childResult.conditionConstraints;
+
     return {
       node: ['Root', childResult.node, index],
       changed: childResult.changed,
-      conditionConstraints: childResult.conditionConstraints,
+      conditionConstraints,
       rationalized: childResult.rationalized,
     };
   }

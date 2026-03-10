@@ -195,6 +195,41 @@ describe('runSharedEquationSolve', () => {
     expect(result.exactSupplementLatex?.[0]).toContain('x+1\\ne0');
   });
 
+  it('solves broader binomial-denominator rational families after LCD clearing', () => {
+    const result = runSharedEquationSolve({
+      ...request,
+      originalLatex: '\\frac{1}{x^2+1}+\\frac{1}{x-1}=0',
+      resolvedLatex: '\\frac{1}{x^2+1}+\\frac{1}{x-1}=0',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.solveBadges).toContain('Candidate Checked');
+    expect(result.exactLatex).toContain('x\\in');
+    expect(result.exactLatex).toContain('-1');
+    expect(result.exactLatex).toContain('0');
+    expect(result.resolvedInputLatex).toBe('x^2+x=0');
+    expect(result.exactSupplementLatex?.[0]).toContain('x^2+1\\ne0');
+    expect(result.exactSupplementLatex?.[0]).toContain('x-1\\ne0');
+  });
+
+  it('routes non-finite direct symbolic outputs back through guarded rational transforms', () => {
+    const result = runSharedEquationSolve({
+      ...request,
+      originalLatex: '\\frac{x^2-1}{x^2-x}=1',
+      resolvedLatex: '\\frac{x^2-1}{x^2-x}=1',
+    });
+
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') {
+      throw new Error('Expected an error outcome');
+    }
+    expect(result.solveBadges).toContain('LCD Clear');
+    expect(result.error).toContain('No real solutions');
+  });
+
   it('solves isolated square-root equations through the guarded algebra stage', () => {
     const result = runSharedEquationSolve({
       ...request,
@@ -222,7 +257,7 @@ describe('runSharedEquationSolve', () => {
       throw new Error('Expected a success outcome');
     }
     expect(result.exactLatex).toBe('x=3');
-    expect(result.rejectedCandidateCount).toBeUndefined();
+    expect(result.rejectedCandidateCount).toBe(1);
   });
 
   it('solves reciprocal square-root equations through bounded radical inversion', () => {
@@ -267,5 +302,22 @@ describe('runSharedEquationSolve', () => {
       throw new Error('Expected an error outcome');
     }
     expect(result.solveBadges).toContain('Conjugate Transform');
+  });
+
+  it('solves supported conjugate families when the transformed equation stays bounded', () => {
+    const result = runSharedEquationSolve({
+      ...request,
+      originalLatex: '\\frac{1}{\\sqrt{x}+1}=\\frac{1}{2}',
+      resolvedLatex: '\\frac{1}{\\sqrt{x}+1}=\\frac{1}{2}',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.exactLatex).toBe('x=1');
+    expect(result.solveBadges).toContain('Conjugate Transform');
+    expect(result.solveBadges).toContain('Candidate Checked');
+    expect(result.exactSupplementLatex?.[0]).toContain('x\\ge0');
   });
 });

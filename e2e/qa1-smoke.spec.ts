@@ -62,6 +62,16 @@ test('Equation smoke covers LCD-cleared rational solving', async ({ page }) => {
   await expect(page.getByTestId('display-outcome-supplement-0')).toContainText('x');
 });
 
+test('Equation smoke covers bounded conjugate solving', async ({ page }) => {
+  await openEquationSymbolic(page);
+  await setMathFieldLatex(page, '\\frac{1}{\\sqrt{x}+1}=\\frac{1}{2}');
+  await page.getByTestId('soft-action-solve').click();
+
+  await expect(page.getByTestId('display-outcome-success')).toBeVisible();
+  await expect(page.getByText('Conjugate Transform')).toBeVisible();
+  await expect(page.getByTestId('display-outcome-supplement-0')).toContainText('x');
+});
+
 test('Trigonometry smoke covers solved and handoff cases', async ({ page }) => {
   await openTrigEquationSolve(page);
   await setMathFieldLatex(page, '\\sin\\left(x\\right)=\\frac{1}{2}');

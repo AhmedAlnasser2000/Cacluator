@@ -79,6 +79,19 @@ describe('AppMain UI automation flows', () => {
     expect(screen.getByText('LCD Clear')).toBeInTheDocument();
   });
 
+  it('renders bounded conjugate solves with conditions and provenance', async () => {
+    const { user } = await renderAppMain();
+
+    await openEquationSymbolic(user);
+    setMathFieldLatex('main-editor', '\\frac{1}{\\sqrt{x}+1}=\\frac{1}{2}');
+    await user.click(screen.getByTestId('soft-action-solve'));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expectMathStaticLatex(screen.getByTestId('display-outcome-exact'), 'x=1');
+    expectMathStaticLatex(screen.getByTestId('display-outcome-supplement-0'), /x\\ge0/);
+    expect(screen.getByText('Conjugate Transform')).toBeInTheDocument();
+  });
+
   it('shows Trigonometry handoff only for numeric-eligible unresolved cases', async () => {
     const { user } = await renderAppMain();
 

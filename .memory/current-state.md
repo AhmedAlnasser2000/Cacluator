@@ -33,12 +33,11 @@
 - Extracted `src/app/*`, `src/styles/app/*`, and decomposition facades under solver/guide/types are in-tree and passing regression.
 
 ## Most Recent Completed Milestone
-- Completed Exact Algebra Core `R4` as explicit algebra transform UX/provenance on top of the shipped `R1`/`R2`/`R3` stack:
-  - added shared explicit transform actions for bounded `Combine Fractions`, `Cancel Factors`, `Use LCD`, `Rationalize`, and `Conjugate`
-  - changed `Calculate` standard soft keys so `F4` is now `Algebra`, opening an inline transform tray when the current expression is eligible
-  - added the same transform tray shape to `Equation > Symbolic`, with transform-only behavior that keeps solving as a separate deliberate step
-  - added explicit transform badges and short transform-summary lines separate from solve provenance
-  - kept exclusions / conditions in the second exact line and moved direct numeric rerun in `Calculate` to a result action instead of a permanent soft key
+- Completed Exact Algebra Core `R5` as broader monomial/binomial rational and radical solving on top of the shipped `R1`/`R2`/`R3`/`R4` stack:
+  - widened bounded rational solving from affine-only factors to one-variable monomial/binomial denominator and numerator families
+  - widened bounded radical solving to monomial/binomial radicands with safe depth-2 square-root transform chains
+  - promoted supported square-root-binomial conjugate equations from recognized-only into actual solve paths when the transformed equation stays inside the bounded surface
+  - preserved original exclusions / conditions through chained transforms and rejected excluded or extraneous roots against the original equation
 - Regression checks:
   - `npm run test:gate`
 
@@ -80,6 +79,11 @@
   - `Equation > Symbolic` uses the same tray shape, but transform chips rewrite the equation without auto-solving it
   - transform results now carry `transformBadges` and `transformSummaryText` separate from solve badges/summaries
   - browser-first automation now covers the new tray flows in both `Calculate` and `Equation`
+- Exact Algebra Core `R5` is verified:
+  - the guarded algebra stage now solves supported one-variable monomial/binomial rational equations after exact LCD clearing and recursion
+  - square-root equations with supported monomial/binomial radicands may now use one additional safe isolation/power step before candidate validation
+  - supported square-root-binomial conjugate families now solve when the transformed equation stays inside the bounded shared solve surface
+  - browser-first automation covers widened rational/radical Equation flows and the existing transform tray remains the user-facing control surface
 - Repo line endings are now governed by `.gitattributes`:
   - LF for source, docs, and config text
   - CRLF only for Windows-native scripts
@@ -103,12 +107,12 @@
   - single-variable exact rational normalization only
   - simple denominator factors only (`v^n`, `av+b`, products/powers)
   - no automatic LCD clearing or broader rational-equation family solving yet
-- Exact Algebra Core `R3` is intentionally bounded:
-  - single-variable rational/radical equation solving only inside the current guarded-solve surface
-  - rational denominator families stay limited to the shipped `R1` support set
-  - radical solving stays bounded to one isolated supported radical plus simple square-root conjugate families
-  - no repeated unrestricted squaring or theorem-prover-style search
-  - no nested denesting or broad polynomial-under-root factorization
+- Exact Algebra Core `R5` is intentionally bounded:
+  - single-variable exact algebra only
+  - rational factors are widened only to one-variable monomial/binomial families, not arbitrary polynomial factors
+  - radical solving stays centered on square-root monomial/binomial radicands with at most two safe transform steps
+  - no nested denesting, unrestricted repeated squaring, or theorem-prover-style search
+  - broader nth-root chaining beyond single-radical isolation remains deferred
 - QA1 automation is intentionally bounded:
   - browser-first only
   - smoke-level E2E per core mode, not exhaustive UI coverage
@@ -131,6 +135,7 @@
   - `.memory/research/TRACK-ALG-R3-QA-MANUAL-VERIFICATION-CHECKLIST.md`
 - Exact Algebra Core checklist artifact:
   - `.memory/research/TRACK-ALG-R4-MANUAL-VERIFICATION-CHECKLIST.md`
+  - `.memory/research/TRACK-ALG-R5-MANUAL-VERIFICATION-CHECKLIST.md`
 
 ## Next Recommended Task
-- Plan Exact Algebra Core `R5` as broader algebra-family expansion on top of the explicit `R4` transform surface.
+- Plan Exact Algebra Core `R6` as the next bounded algebra expansion beyond monomial/binomial families, or pause for targeted UX polish and coverage expansion on the shipped `R5` surface.

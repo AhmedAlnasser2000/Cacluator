@@ -1,4 +1,4 @@
-import { ComputeEngine } from '@cortex-js/compute-engine';
+import { ComputeEngine, expand } from '@cortex-js/compute-engine';
 import { normalizeAst } from '../../symbolic-engine/normalize';
 import { boxLatex, isNodeArray, termKey } from '../../symbolic-engine/patterns';
 import { normalizeExactRationalNode } from '../../symbolic-engine/rational';
@@ -26,6 +26,11 @@ type ExactScalar = {
 type AffineExpression = {
   a: ExactScalar;
   b: ExactScalar;
+};
+
+type PlaceholderLinearExpression = {
+  a: ExactScalar;
+  remainder: unknown;
 };
 
 type SupportedRadical = {
@@ -255,6 +260,16 @@ function parseMonomial(node: unknown, variable: string): boolean {
   return false;
 }
 
+function parseBinomial(node: unknown, variable: string): boolean {
+  const normalized = normalizeAst(node);
+  if (!isNodeArray(normalized) || normalized[0] !== 'Add') {
+    return false;
+  }
+
+  const terms = normalized.slice(1);
+  return terms.length === 2 && terms.every((term) => parseMonomial(term, variable));
+}
+
 function parseAffine(node: unknown, variable: string): AffineExpression | null {
   const normalized = normalizeAst(node);
   if (normalized === variable) {
@@ -384,8 +399,143 @@ function isSupportedRadicand(node: unknown, variable: string) {
   return Boolean(
     readExactScalar(node)
     || parseMonomial(node, variable)
-    || parseAffine(node, variable),
+    || parseAffine(node, variable)
+    || parseBinomial(node, variable),
   );
+}
+
+function buildScaledNode(node: unknown, scalar: ExactScalar) {
+  if (isZeroScalar(scalar)) {
+    return 0;
+  }
+
+  if (scalar.numerator === scalar.denominator) {
+    return node;
+  }
+
+  return buildProductNode(buildScalarNode(scalar), node);
+}
+
+function parseLinearPlaceholder(node: unknown, placeholder: string): PlaceholderLinearExpression | null {
+  const normalized = normalizeAst(node);
+  if (normalized === placeholder) {
+    return {
+      a: { numerator: 1, denominator: 1 },
+      remainder: 0,
+    };
+  }
+
+  const scalar = readExactScalar(normalized);
+  if (scalar) {
+    return {
+      a: { numerator: 0, denominator: 1 },
+      remainder: buildScalarNode(scalar),
+    };
+  }
+
+  if (!isNodeArray(normalized) || normalized.length === 0) {
+    return null;
+  }
+
+  if (normalized[0] === 'Negate' && normalized.length === 2) {
+    const child = parseLinearPlaceholder(normalized[1], placeholder);
+    if (!child) {
+      return null;
+    }
+
+    return {
+      a: negateScalar(child.a),
+      remainder: buildNegatedNode(child.remainder),
+    };
+  }
+
+  if (normalized[0] === 'Add') {
+    let coefficient: ExactScalar = { numerator: 0, denominator: 1 };
+    let remainder: unknown = 0;
+
+    for (const child of normalized.slice(1)) {
+      const parsed = parseLinearPlaceholder(child, placeholder);
+      if (!parsed) {
+        return null;
+      }
+
+      const nextCoefficient = addScalar(coefficient, parsed.a);
+      if (!nextCoefficient) {
+        return null;
+      }
+      coefficient = nextCoefficient;
+      remainder = buildSumNode(remainder, parsed.remainder);
+    }
+
+    return {
+      a: coefficient,
+      remainder,
+    };
+  }
+
+  if (normalized[0] === 'Multiply') {
+    let scalarFactor: ExactScalar = { numerator: 1, denominator: 1 };
+    let linearChild: PlaceholderLinearExpression | null = null;
+
+    for (const child of normalized.slice(1)) {
+      const childScalar = readExactScalar(child);
+      if (childScalar) {
+        const nextFactor = multiplyScalar(scalarFactor, childScalar);
+        if (!nextFactor) {
+          return null;
+        }
+        scalarFactor = nextFactor;
+        continue;
+      }
+
+      const parsed = parseLinearPlaceholder(child, placeholder);
+      if (!parsed || linearChild) {
+        return null;
+      }
+      linearChild = parsed;
+    }
+
+    if (!linearChild) {
+      return {
+        a: { numerator: 0, denominator: 1 },
+        remainder: buildScalarNode(scalarFactor),
+      };
+    }
+
+    const nextA = multiplyScalar(scalarFactor, linearChild.a);
+    if (!nextA) {
+      return null;
+    }
+
+    return {
+      a: nextA,
+      remainder: buildScaledNode(linearChild.remainder, scalarFactor),
+    };
+  }
+
+  if (normalized[0] === 'Divide' && normalized.length === 3) {
+    const denominatorScalar = readExactScalar(normalized[2]);
+    if (!denominatorScalar) {
+      return null;
+    }
+
+    const numeratorLinear = parseLinearPlaceholder(normalized[1], placeholder);
+    if (!numeratorLinear) {
+      return null;
+    }
+
+    const nextA = divideScalar(numeratorLinear.a, denominatorScalar);
+    if (!nextA) {
+      return null;
+    }
+
+    return {
+      a: nextA,
+      remainder: buildQuotientNode(numeratorLinear.remainder, buildScalarNode(denominatorScalar)),
+    };
+  }
+
+  return null;
 }
 
 function matchSupportedRadical(node: unknown, variable: string): SupportedRadical | null {
@@ -540,8 +690,52 @@ function appendSolveMetadata(
   };
 }
 
-function isSupportedRightSideExpression(node: unknown, variable: string) {
-  return Boolean(readExactScalar(node) || parseAffine(node, variable));
+function isSupportedRightSideExpression(node: unknown, variable: string): boolean {
+  const normalized = normalizeAst(node);
+  if (
+    readExactScalar(normalized)
+    || parseAffine(normalized, variable)
+    || parseMonomial(normalized, variable)
+    || parseBinomial(normalized, variable)
+  ) {
+    return true;
+  }
+
+  if (matchSupportedRadical(normalized, variable)) {
+    return true;
+  }
+
+  if (!isNodeArray(normalized) || normalized.length === 0) {
+    return false;
+  }
+
+  if (normalized[0] === 'Negate' && normalized.length === 2) {
+    return isSupportedRightSideExpression(normalized[1], variable);
+  }
+
+  if (normalized[0] === 'Add') {
+    return (
+      collectSupportedRoots(normalized, variable).length <= 1
+      && normalized.slice(1).every((child) => isSupportedRightSideExpression(child, variable))
+    );
+  }
+
+  if (normalized[0] === 'Multiply') {
+    return (
+      collectSupportedRoots(normalized, variable).length <= 1
+      && normalized.slice(1).every((child) =>
+        Boolean(readExactScalar(child) || isSupportedRightSideExpression(child, variable)))
+    );
+  }
+
+  if (normalized[0] === 'Divide' && normalized.length === 3) {
+    return Boolean(
+      readExactScalar(normalized[2])
+      && isSupportedRightSideExpression(normalized[1], variable)
+    );
+  }
+
+  return false;
 }
 
 function matchRationalTransform(request: GuardedSolveRequest): AlgebraTransform | null {
@@ -580,13 +774,13 @@ function buildIsolatedExpression(
     return null;
   }
 
-  const affine = parseAffine(replaced.node, PLACEHOLDER_SYMBOL);
-  if (!affine || isZeroScalar(affine.a)) {
+  const linear = parseLinearPlaceholder(replaced.node, PLACEHOLDER_SYMBOL);
+  if (!linear || isZeroScalar(linear.a)) {
     return null;
   }
 
-  const numerator = buildDifferenceNode(otherSide, buildScalarNode(affine.b));
-  const isolated = buildQuotientNode(numerator, buildScalarNode(affine.a));
+  const numerator = buildDifferenceNode(otherSide, linear.remainder);
+  const isolated = buildQuotientNode(numerator, buildScalarNode(linear.a));
   return {
     isolated,
   };
@@ -597,7 +791,9 @@ function buildRadicalPowerTransform(
   isolated: unknown,
   extraConstraints: SolveDomainConstraint[] = [],
 ): AlgebraTransform {
-  const powered = buildPowerNode(isolated, root.index);
+  const powered = root.index === 2
+    ? normalizeAst((expand(ce.box(['Power', isolated, 2] as Parameters<typeof ce.box>[0]) as never) as { json: unknown }).json)
+    : buildPowerNode(isolated, root.index);
   const equationLatex = `${boxLatex(root.radicand)}=${boxLatex(powered)}`;
   const domainConstraints = [...extraConstraints];
 
@@ -646,10 +842,15 @@ function matchRadicalIsolationTransform(request: GuardedSolveRequest): AlgebraTr
   collectVariables(rightNode);
   const variable = variables.size === 1 ? [...variables][0] : 'x';
 
-  const totalSupportedRoots =
-    collectSupportedRoots(leftNode, variable).length
-    + collectSupportedRoots(rightNode, variable).length;
-  if (totalSupportedRoots !== 1) {
+  const supportedRoots = [
+    ...collectSupportedRoots(leftNode, variable),
+    ...collectSupportedRoots(rightNode, variable),
+  ];
+  if (supportedRoots.length === 0 || supportedRoots.length > 2) {
+    return null;
+  }
+
+  if (supportedRoots.length > 1 && supportedRoots.some((root) => root.index !== 2)) {
     return null;
   }
 
@@ -716,7 +917,12 @@ function decomposeSignedTerm(node: unknown) {
 }
 
 function matchConjugateOther(node: unknown, variable: string) {
-  return Boolean(readExactScalar(node) || parseAffine(node, variable) || parseMonomial(node, variable));
+  return Boolean(
+    readExactScalar(node)
+    || parseAffine(node, variable)
+    || parseMonomial(node, variable)
+    || parseBinomial(node, variable)
+  );
 }
 
 function tryRationalizeSquareRootBinomialSide(node: unknown, variable: string): AlgebraTransform | null {
@@ -775,6 +981,61 @@ function tryRationalizeSquareRootBinomialSide(node: unknown, variable: string): 
   };
 }
 
+function isSupportedClearableDenominator(node: unknown, variable: string) {
+  return Boolean(
+    readExactScalar(node)
+    || parseMonomial(node, variable)
+    || parseAffine(node, variable)
+    || parseBinomial(node, variable)
+  );
+}
+
+function tryCrossMultiplySingleFractionEquation(equationLatex: string, variable: string) {
+  const parsed = ce.parse(equationLatex).json;
+  if (!isNodeArray(parsed) || parsed[0] !== 'Equal' || parsed.length !== 3) {
+    return null;
+  }
+
+  const leftNode = normalizeAst(parsed[1]);
+  const rightNode = normalizeAst(parsed[2]);
+  const attempts: Array<{ fractionSide: unknown; otherSide: unknown; fractionOnLeft: boolean }> = [
+    { fractionSide: leftNode, otherSide: rightNode, fractionOnLeft: true },
+    { fractionSide: rightNode, otherSide: leftNode, fractionOnLeft: false },
+  ];
+
+  for (const attempt of attempts) {
+    if (
+      !isNodeArray(attempt.fractionSide)
+      || attempt.fractionSide[0] !== 'Divide'
+      || attempt.fractionSide.length !== 3
+    ) {
+      continue;
+    }
+
+    const denominator = normalizeAst(attempt.fractionSide[2]);
+    if (!isSupportedClearableDenominator(denominator, variable)) {
+      continue;
+    }
+
+    const clearedLeft = attempt.fractionOnLeft
+      ? normalizeAst(attempt.fractionSide[1])
+      : buildProductNode(leftNode, denominator);
+    const clearedRight = attempt.fractionOnLeft
+      ? buildProductNode(rightNode, denominator)
+      : normalizeAst(attempt.fractionSide[1]);
+
+    return {
+      equationLatex: `${boxLatex(clearedLeft)}=${boxLatex(clearedRight)}`,
+      domainConstraints: [],
+      solveBadges: ['Conjugate Transform', 'LCD Clear'] as SolveBadge[],
+      solveSummaryText: 'Applied a conjugate and cleared the remaining supported denominator',
+      unresolvedError: 'This recognized radical conjugate family is outside the current exact bounded solve set. Use Numeric Solve with an interval in Equation mode.',
+    };
+  }
+
+  return null;
+}
+
 function matchConjugateTransform(request: GuardedSolveRequest): AlgebraTransform | null {
   const parsed = ce.parse(request.resolvedLatex).json;
   if (!isNodeArray(parsed) || parsed[0] !== 'Equal' || parsed.length !== 3) {
@@ -803,6 +1064,13 @@ function matchConjugateTransform(request: GuardedSolveRequest): AlgebraTransform
   const leftTransform = tryRationalizeSquareRootBinomialSide(leftNode, variable);
   if (leftTransform) {
     const equationLatex = `${leftTransform.equationLatex}=${boxLatex(rightNode)}`;
+    const cleared = tryCrossMultiplySingleFractionEquation(equationLatex, variable);
+    if (cleared && equationStateKey(cleared.equationLatex) !== equationStateKey(request.resolvedLatex)) {
+      return {
+        ...cleared,
+        domainConstraints: mergeConstraints(leftTransform.domainConstraints, cleared.domainConstraints),
+      };
+    }
     if (equationStateKey(equationLatex) !== equationStateKey(request.resolvedLatex)) {
       return {
         ...leftTransform,
@@ -814,6 +1082,13 @@ function matchConjugateTransform(request: GuardedSolveRequest): AlgebraTransform
   const rightTransform = tryRationalizeSquareRootBinomialSide(rightNode, variable);
   if (rightTransform) {
     const equationLatex = `${boxLatex(leftNode)}=${rightTransform.equationLatex}`;
+    const cleared = tryCrossMultiplySingleFractionEquation(equationLatex, variable);
+    if (cleared && equationStateKey(cleared.equationLatex) !== equationStateKey(request.resolvedLatex)) {
+      return {
+        ...cleared,
+        domainConstraints: mergeConstraints(rightTransform.domainConstraints, cleared.domainConstraints),
+      };
+    }
     if (equationStateKey(equationLatex) !== equationStateKey(request.resolvedLatex)) {
       return {
         ...rightTransform,

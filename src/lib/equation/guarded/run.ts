@@ -67,6 +67,20 @@ function formatAcceptedApproximations(values: number[]) {
   return parts.length === 1 ? `x ~= ${parts[0]}` : `x ~= ${parts.join(', ')}`;
 }
 
+function hasNonFiniteRawSolutions(symbolic: ReturnType<typeof runExpressionAction>) {
+  if (symbolic.rawSolutionLatex?.some((solution) => solution.includes('\\infty') || solution.includes('\\tilde\\infty'))) {
+    return true;
+  }
+
+  return Boolean(symbolic.rawSolutions?.some((solution) => {
+    if (!solution || typeof solution !== 'object') {
+      return false;
+    }
+    const value = (solution as { _value?: unknown })._value;
+    return value === Infinity || value === -Infinity;
+  }));
+}
+
 function attachAlgebraMetadata(
   outcome: DisplayOutcome,
   originalResolvedLatex: string,
@@ -225,7 +239,7 @@ function validateDirectSymbolicOutcome(
     [],
     ['Candidate Checked'],
     undefined,
-    validation.rejected.length,
+    validation.rejected.length > 0 ? validation.rejected.length : undefined,
   );
 }
 
@@ -255,27 +269,7 @@ function runGuardedEquationSolve(
     'solve',
   );
 
-  if (!symbolic.error && symbolic.exactLatex) {
-    const validated = validateDirectSymbolicOutcome(preparedRequest, symbolic);
-    return attachAlgebraMetadata(validated ?? successOutcome(
-      'Solve',
-      symbolic.exactLatex,
-      symbolic.approxText,
-      symbolic.warnings,
-    ), request.resolvedLatex, preparedRequest);
-  }
-
   const rangeImpossibility = detectRealRangeImpossibility(preparedRequest.resolvedLatex);
-  if (rangeImpossibility.kind === 'impossible') {
-    return attachAlgebraMetadata(errorOutcome(
-      'Solve',
-      rangeImpossibility.error,
-      symbolic.warnings,
-      [],
-      ['Range Guard'],
-      rangeImpossibility.summaryText,
-    ), request.resolvedLatex, preparedRequest);
-  }
 
   const algebraTransformed = algebraTransformSolve(
     preparedRequest,
@@ -286,6 +280,25 @@ function runGuardedEquationSolve(
   );
   if (algebraTransformed?.kind === 'success') {
     return attachAlgebraMetadata(algebraTransformed, request.resolvedLatex, preparedRequest);
+  }
+  if (rangeImpossibility.kind === 'impossible') {
+    return attachAlgebraMetadata(errorOutcome(
+      'Solve',
+      rangeImpossibility.error,
+      symbolic.warnings,
+      [],
+      ['Range Guard'],
+      rangeImpossibility.summaryText,
+    ), request.resolvedLatex, preparedRequest);
+  }
+  if (!symbolic.error && symbolic.exactLatex && !hasNonFiniteRawSolutions(symbolic)) {
+    const validated = validateDirectSymbolicOutcome(preparedRequest, symbolic);
+    return attachAlgebraMetadata(validated ?? successOutcome(
+      'Solve',
+      symbolic.exactLatex,
+      symbolic.approxText,
+      symbolic.warnings,
+    ), request.resolvedLatex, preparedRequest);
   }
   if (algebraTransformed?.kind === 'error') {
     return attachAlgebraMetadata(algebraTransformed, request.resolvedLatex, preparedRequest);

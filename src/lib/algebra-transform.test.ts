@@ -54,6 +54,26 @@ describe('algebra-transform', () => {
     expect(result?.transformBadges).toEqual(['Use LCD']);
   });
 
+  it('widens calculate transform eligibility to binomial denominator families', () => {
+    const actions = getEligibleExpressionTransforms('\\frac{1}{x^2+1}+\\frac{1}{x-1}');
+    const result = applyExpressionTransform('\\frac{1}{x^2+1}+\\frac{1}{x-1}', 'useLCD');
+
+    expect(actions).toContain('combineFractions');
+    expect(actions).toContain('useLCD');
+    expect(result?.exactLatex).toContain('(x-1)(x^2+1)');
+    expect(result?.transformBadges).toEqual(['Use LCD']);
+  });
+
+  it('widens explicit radical transforms to binomial radicands', () => {
+    const actions = getEligibleExpressionTransforms('\\frac{1}{\\sqrt{x+1}+1}');
+    const result = applyExpressionTransform('\\frac{1}{\\sqrt{x+1}+1}', 'conjugate');
+
+    expect(actions).toContain('rationalize');
+    expect(actions).toContain('conjugate');
+    expect(result?.exactLatex).toContain('\\sqrt{x+1}');
+    expect(result?.transformBadges).toEqual(['Conjugate']);
+  });
+
   it('cancels factors inside equation sides without auto-solving', () => {
     const result = applyEquationTransform('\\frac{x^2-1}{x-1}=0', 'cancelFactors');
 
