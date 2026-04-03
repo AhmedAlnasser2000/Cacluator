@@ -895,13 +895,16 @@ First controls:
 - overlay remains the fallback when the window does not have enough spare side room
 
 ### Stage 2 - `PRL1` Power / Root / Log Display Normalization
+Status: shipped on 2026-04-03.
+
 Fix how exponents, roots, and logs are shown before broadening their capabilities.
 
-Goals:
-- prefer flatter and more human-readable exact forms
-- reduce ugly nested radical output
-- avoid turning readable input into visually worse exact output
-- make symbolic display respond to the new settings surface where appropriate
+Delivered:
+- added a bounded display-only normalization layer for selected rendered exact-math surfaces
+- made `Symbolic Display` settings live on result rendering instead of preview-only
+- kept copy/editor/history flows on the raw engine exact LaTeX for safety
+- normalized selected awkward/nested root-power forms while keeping familiar plain roots unchanged
+- added light notation cleanup for `\ln` and base-10 `\log`
 
 Example direction:
 - prefer `⁶√x` over root-of-root output when safe

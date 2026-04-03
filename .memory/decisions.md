@@ -99,3 +99,5 @@
 - 2026-03-10: `SX1` keeps top-row quick toggles as shortcuts over the same persisted settings state and makes Settings/History mutually exclusive side surfaces.
 - 2026-03-10: `SX1` persists `Display` and `Symbolic Display` preferences now, but broad symbolic output changes remain deferred to `PRL1`; in `SX1` those symbolic settings affect only the preview and saved preference state.
 - 2026-04-03: `SX1.1` corrects the settings/history shell model: on wide windows both surfaces use a shared outboard right rail only when real spare gutter space exists, the calculator shell never shrinks to make room, and overlay remains the fallback when that space is unavailable.
+- 2026-04-03: `PRL1` is display-only. Rendered exact math may be normalized through a bounded power/root/log display layer, but engine output, copy/editor flows, replay, and persisted history keep the raw exact LaTeX unchanged.
+- 2026-04-03: `PRL1` makes `Symbolic Display` settings live across result rendering, with `Auto` power-leaning for awkward/nontrivial forms while still preserving familiar plain roots like `\sqrt{x}` and `\sqrt[3]{x}`.

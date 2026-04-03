@@ -33,13 +33,12 @@
 - Extracted `src/app/*`, `src/styles/app/*`, and decomposition facades under solver/guide/types are in-tree and passing regression.
 
 ## Most Recent Completed Milestone
-- Completed `SX1` as the canonical settings surface for the app shell:
-  - added a dedicated top-bar `Settings` entry point next to `Guide`
-  - settings now render as a docked right inspector on wide layouts and as a right slide-over overlay on narrower layouts
-  - settings and history are mutually exclusive side surfaces
-  - settings now include live-applied, persisted controls for display scale, math scale, result scale, high contrast, symbolic display preferences, angle unit, output style, auto-switch to Equation, and history recording
-  - top-row quick toggles remain as shortcuts over the same persisted settings state
-  - symbolic display preferences are present, previewed, and persisted in SX1 only; broad output behavior changes remain deferred to `PRL1`
+- Completed `PRL1` as the first power/root/log display-normalization pass:
+  - added a bounded display-only symbolic normalization layer for rendered exact math
+  - made `Symbolic Display` settings from `SX1` live on exact results, supplement lines, exact-error math, transform preview math, and the settings preview
+  - kept copy-to-clipboard, `To Editor`, replay, and persisted history on raw engine exact LaTeX for safety
+  - normalized selected awkward/nested root-power forms while keeping familiar plain roots readable across modes
+  - added light log notation cleanup (`\ln`, base-10 `\log`) without introducing broader symbolic log algebra
 - Regression checks:
   - `npm run test:gate`
 
@@ -97,6 +96,11 @@
   - outboard mode now depends on measured spare right gutter space (`>= 424px`) on top of the existing `1180px` viewport floor
   - the calculator shell stays full-width when the rail opens; overlay remains the fallback whenever real gutter space is not available
   - browser-first automation now checks both outboard settings/history presentation and shell-width stability on wide layouts
+- `PRL1` power/root/log display normalization is verified:
+  - `src/lib/symbolic-display.ts` now provides a bounded display-only normalization layer over exact LaTeX for selected rendered math surfaces
+  - `src/components/MathStatic.tsx` can opt into display preferences without changing raw exact LaTeX used by copy/editor/history flows
+  - `SX1` symbolic display preferences are now live in app output instead of preview-only
+  - browser-first automation covers settings-driven display changes while preserving raw exact LaTeX for `Copy Result` and `To Editor`
 - Repo line endings are now governed by `.gitattributes`:
   - LF for source, docs, and config text
   - CRLF only for Windows-native scripts
@@ -107,6 +111,10 @@
 - Some Compute Engine rule checks still print noisy stderr warnings during tests, even though assertions pass.
 - Browser-first automation does not cover Tauri-shell-specific behavior yet; desktop-shell automation remains deferred behind the stronger repo-owned browser gate.
 - Broader log transforms (`ln(u)-ln(v)`, ratio/power forms) remain intentionally out of bounded scope and should keep explicit unsupported messaging.
+- `PRL1` is intentionally presentation-only:
+  - no broader power/root/log capability has shipped yet
+  - no engine canonicalization or symbolic-solve breadth changed in this pass
+  - prettier radical-product rewrites such as `x\sqrt{x}` remain deferred
 - Bounded trig sum-to-product currently covers two-term `sin/cos` forms only; broader harmonic families remain deferred.
 - Statistics inference is intentionally bounded to one-sample mean workflows only; no proportion/categorical inference is in scope yet.
 - Statistics still has no prediction UI, residual table, outlier/leverage tooling, or inferential regression; D3 stayed bounded to quality summaries only.
@@ -154,8 +162,7 @@
 
 ## Next Recommended Task
 - Preferred next roadmap is now:
-  1. `PRL1` power/root/log display normalization
-  2. `PRL2` broad numeric exponent/root/log support
-  3. `PRL3` bounded symbolic exponent/root/log support
-  4. `PRL4` bounded solve expansion for these families
-- This remains preferred over jumping directly into an `R6` algebra expansion.
+  1. `PRL2` broad numeric exponent/root/log support
+  2. `PRL3` bounded symbolic exponent/root/log support
+  3. `PRL4` bounded solve expansion for these families
+- `PRL2` remains the best next move after `PRL1`: broaden real-domain numeric coverage before taking on broader symbolic or solve-family risk.

@@ -1,4 +1,5 @@
 import { MathStatic } from './MathStatic';
+import { normalizeSymbolicDisplayLatex } from '../lib/symbolic-display';
 import type { AngleUnit, OutputStyle, Settings, SettingsPatch } from '../types/calculator';
 
 type SettingsPanelPresentation = 'outboard' | 'overlay';
@@ -16,20 +17,17 @@ const OUTPUT_OPTIONS: OutputStyle[] = ['exact', 'decimal', 'both'];
 const SYMBOLIC_DISPLAY_OPTIONS: Array<Settings['symbolicDisplayMode']> = ['roots', 'powers', 'auto'];
 
 function symbolicPreviewLatex(settings: Settings) {
-  if (settings.symbolicDisplayMode === 'powers') {
-    return 'x^{\\frac{1}{6}}';
-  }
-
-  if (settings.flattenNestedRootsWhenSafe) {
-    return '\\sqrt[6]{x}';
-  }
-
-  return '\\sqrt[3]{\\sqrt{x}}';
+  return normalizeSymbolicDisplayLatex('\\left(\\sqrt{x}\\right)^{\\frac{1}{3}}', settings)
+    ?? '\\sqrt[3]{\\sqrt{x}}';
 }
 
 function symbolicPreviewSummary(settings: Settings) {
   if (settings.symbolicDisplayMode === 'powers') {
     return 'Previewing the power-preferred exact form.';
+  }
+
+  if (settings.symbolicDisplayMode === 'auto') {
+    return 'Previewing the default power-leaning exact form while keeping plain roots readable.';
   }
 
   if (settings.flattenNestedRootsWhenSafe) {

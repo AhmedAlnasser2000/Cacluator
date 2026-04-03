@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   expectMathStaticLatex,
   openEquationSymbolic,
@@ -22,6 +22,7 @@ function setViewportWidth(width: number) {
 describe('AppMain UI automation flows', () => {
   beforeEach(() => {
     setViewportWidth(1366);
+    vi.clearAllMocks();
   });
 
   it('opens the settings panel from the top bar and toggles it with Ctrl+,', async () => {
@@ -108,7 +109,7 @@ describe('AppMain UI automation flows', () => {
     await user.click(screen.getByTestId('settings-toggle'));
     await screen.findByTestId('settings-panel');
 
-    expectMathStaticLatex(screen.getByTestId('settings-symbolic-preview-result'), '\\sqrt[6]{x}');
+    expectMathStaticLatex(screen.getByTestId('settings-symbolic-preview-result'), 'x^{\\frac{1}{6}}');
     await user.click(screen.getByTestId('settings-symbolic-mode-powers'));
     expectMathStaticLatex(screen.getByTestId('settings-symbolic-preview-result'), 'x^{\\frac{1}{6}}');
     await user.click(screen.getByTestId('settings-symbolic-mode-roots'));
@@ -117,6 +118,41 @@ describe('AppMain UI automation flows', () => {
       screen.getByTestId('settings-symbolic-preview-result'),
       '\\sqrt[3]{\\sqrt{x}}',
     );
+  });
+
+  it('applies symbolic-display settings live to rendered exact results while keeping raw exact latex for copy/editor flows', async () => {
+    const { user } = await renderAppMain();
+    const writeTextSpy = vi.spyOn(navigator.clipboard, 'writeText');
+
+    await user.click(screen.getByTestId('settings-toggle'));
+    await screen.findByTestId('settings-panel');
+    await user.click(screen.getByTestId('settings-symbolic-mode-powers'));
+
+    setMathFieldLatex('main-editor', '\\left(\\sqrt{x}\\right)^{\\frac{1}{3}}');
+    await user.click(screen.getByTestId('soft-action-simplify'));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expectMathStaticLatex(screen.getByTestId('display-outcome-exact'), 'x^{\\frac{1}{6}}');
+
+    await user.click(screen.getByRole('button', { name: 'Copy Result' }));
+    expect(writeTextSpy).toHaveBeenCalledWith('\\sqrt[3]{\\sqrt{x}}');
+
+    await user.click(screen.getByTestId('display-outcome-action-to-editor'));
+    expect(screen.getByTestId('main-editor')).toHaveAttribute('data-value', '\\sqrt[3]{\\sqrt{x}}');
+  });
+
+  it('keeps plain familiar roots as roots in auto mode', async () => {
+    const { user } = await renderAppMain();
+
+    await user.click(screen.getByTestId('settings-toggle'));
+    await screen.findByTestId('settings-panel');
+    await user.click(screen.getByTestId('settings-symbolic-mode-auto'));
+
+    setMathFieldLatex('main-editor', '\\sqrt{x}');
+    await user.click(screen.getByTestId('soft-action-simplify'));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expectMathStaticLatex(screen.getByTestId('display-outcome-exact'), '\\sqrt{x}');
   });
 
   it('renders Calculate exact results and exclusion supplements', async () => {

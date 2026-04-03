@@ -13,6 +13,15 @@ export async function setMathFieldLatex(page: Page, latex: string, testId = 'mai
   }, latex);
 }
 
+export async function getMathFieldLatex(page: Page, testId = 'main-editor') {
+  const editor = page.getByTestId(testId);
+  await editor.waitFor();
+  return editor.evaluate((element) => {
+    const field = element as HTMLElement & { getValue?: (format?: string) => string };
+    return typeof field.getValue === 'function' ? field.getValue('latex') : '';
+  });
+}
+
 export async function openLauncherApp(page: Page, categoryLabel: string, appLabel: string) {
   await page.getByTestId('keypad-menu').click();
   await page.getByRole('button', { name: new RegExp(categoryLabel, 'i') }).click();

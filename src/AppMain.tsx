@@ -686,6 +686,10 @@ export default function App() {
     '--math-scale': `${settings.mathScale / 100}`,
     '--result-scale': `${settings.resultScale / 100}`,
   } as CSSProperties;
+  const symbolicDisplayPrefs = {
+    symbolicDisplayMode: settings.symbolicDisplayMode,
+    flattenNestedRootsWhenSafe: settings.flattenNestedRootsWhenSafe,
+  } as const;
   const sideSurfaceHostStyle = {
     left: `${sideSurfaceOutboardLeft}px`,
     width: `${SIDE_SURFACE_WIDTH}px`,
@@ -8576,17 +8580,18 @@ export default function App() {
             && currentMode !== 'guide'
             && (displayOutcome?.kind === 'success' || displayOutcome?.kind === 'error')
             && displayOutcome.transformSummaryText ? (
-              <div className="result-summary-block">
-                <div className="result-summary-label">Transform</div>
-                <div className="result-approx result-summary-text">{formatSolveSummaryText(displayOutcome.transformSummaryText)}</div>
-                {displayOutcome.transformSummaryLatex ? (
-                  <MathStatic
-                    className="preview-math result-summary-math"
-                    latex={displayOutcome.transformSummaryLatex}
-                    block={false}
-                  />
-                ) : null}
-              </div>
+                <div className="result-summary-block">
+                  <div className="result-summary-label">Transform</div>
+                  <div className="result-approx result-summary-text">{formatSolveSummaryText(displayOutcome.transformSummaryText)}</div>
+                  {displayOutcome.transformSummaryLatex ? (
+                    <MathStatic
+                      className="preview-math result-summary-math"
+                      displayPrefs={symbolicDisplayPrefs}
+                      latex={displayOutcome.transformSummaryLatex}
+                      block={false}
+                    />
+                  ) : null}
+                </div>
             ) : null}
             {!isLauncherOpen
             && !isEquationMenuOpen
@@ -8695,12 +8700,20 @@ export default function App() {
               <div data-testid="display-outcome-success">
                 {displayOutcome.exactLatex ? (
                   <div data-testid="display-outcome-exact">
-                    <MathStatic className="result-math" latex={displayOutcome.exactLatex} />
+                    <MathStatic
+                      className="result-math"
+                      latex={displayOutcome.exactLatex}
+                      displayPrefs={symbolicDisplayPrefs}
+                    />
                   </div>
                 ) : null}
                 {displayOutcome.exactSupplementLatex?.map((line, index) => (
                   <div key={line} data-testid={`display-outcome-supplement-${index}`}>
-                    <MathStatic className="result-math result-math-supplement" latex={line} />
+                    <MathStatic
+                      className="result-math result-math-supplement"
+                      latex={line}
+                      displayPrefs={symbolicDisplayPrefs}
+                    />
                   </div>
                 ))}
                 {settings.outputStyle !== 'exact' && displayOutcome.approxText ? <div className="result-approx" data-testid="display-outcome-approx">{displayOutcome.approxText}</div> : null}
@@ -8717,12 +8730,20 @@ export default function App() {
                 <div className="result-error" data-testid="display-outcome-error-text">{displayOutcome.error}</div>
                 {displayOutcome.exactLatex ? (
                   <div data-testid="display-outcome-exact">
-                    <MathStatic className="result-math" latex={displayOutcome.exactLatex} />
+                    <MathStatic
+                      className="result-math"
+                      latex={displayOutcome.exactLatex}
+                      displayPrefs={symbolicDisplayPrefs}
+                    />
                   </div>
                 ) : null}
                 {displayOutcome.exactSupplementLatex?.map((line, index) => (
                   <div key={line} data-testid={`display-outcome-supplement-${index}`}>
-                    <MathStatic className="result-math result-math-supplement" latex={line} />
+                    <MathStatic
+                      className="result-math result-math-supplement"
+                      latex={line}
+                      displayPrefs={symbolicDisplayPrefs}
+                    />
                   </div>
                 ))}
                 {settings.outputStyle !== 'exact' && displayOutcome.approxText ? <div className="result-approx" data-testid="display-outcome-approx">{displayOutcome.approxText}</div> : null}

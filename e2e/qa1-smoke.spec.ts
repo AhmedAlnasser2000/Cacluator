@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import {
+  getMathFieldLatex,
   openEquationSymbolic,
   openGeometrySlope,
   openSettingsPanel,
@@ -159,4 +160,37 @@ test('Settings smoke keeps quick toggles in sync and stays mutually exclusive wi
   await expect(page.getByTestId('history-panel')).toBeVisible();
   await expect(page.getByTestId('history-panel')).toHaveAttribute('data-history-presentation', 'outboard');
   await expect(page.getByTestId('settings-panel')).toHaveCount(0);
+});
+
+test('PRL1 smoke applies symbolic display preferences to rendered results while leaving editor load on raw exact latex', async ({ page }) => {
+  await page.setViewportSize({ width: 2400, height: 960 });
+  await page.reload();
+  await expect(page.getByTestId('main-editor')).toBeVisible();
+
+  await openSettingsPanel(page);
+  await page.getByTestId('settings-symbolic-mode-powers').click();
+
+  await setMathFieldLatex(page, '\\left(\\sqrt{x}\\right)^{\\frac{1}{3}}');
+  await page.getByTestId('soft-action-simplify').click();
+
+  await expect(page.getByTestId('display-outcome-success')).toBeVisible();
+  await expect(page.getByTestId('display-outcome-exact').locator('[aria-label="x^{\\\\frac{1}{6}}"]')).toBeVisible();
+
+  await page.getByTestId('display-outcome-action-to-editor').click();
+  await expect.poll(() => getMathFieldLatex(page)).toBe('\\sqrt[3]{\\sqrt{x}}');
+});
+
+test('PRL1 smoke keeps plain sqrt as a root in auto mode', async ({ page }) => {
+  await page.setViewportSize({ width: 2400, height: 960 });
+  await page.reload();
+  await expect(page.getByTestId('main-editor')).toBeVisible();
+
+  await openSettingsPanel(page);
+  await page.getByTestId('settings-symbolic-mode-auto').click();
+
+  await setMathFieldLatex(page, '\\sqrt{x}');
+  await page.getByTestId('soft-action-simplify').click();
+
+  await expect(page.getByTestId('display-outcome-success')).toBeVisible();
+  await expect(page.getByTestId('display-outcome-exact').locator('[aria-label="\\\\sqrt{x}"]')).toBeVisible();
 });

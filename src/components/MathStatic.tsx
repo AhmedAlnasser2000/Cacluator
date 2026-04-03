@@ -1,10 +1,13 @@
 import { convertLatexToMarkup } from 'mathlive';
+import type { SymbolicDisplayPrefs } from '../lib/symbolic-display';
+import { normalizeSymbolicDisplayLatex } from '../lib/symbolic-display';
 
 type MathStaticProps = {
   latex?: string;
   className?: string;
   block?: boolean;
   emptyLabel?: string;
+  displayPrefs?: SymbolicDisplayPrefs;
 };
 
 export function MathStatic({
@@ -12,18 +15,22 @@ export function MathStatic({
   className,
   block = true,
   emptyLabel,
+  displayPrefs,
 }: MathStaticProps) {
   if (!latex) {
     return emptyLabel ? <div className={className}>{emptyLabel}</div> : null;
   }
 
-  const markup = convertLatexToMarkup(latex, {
+  const displayLatex = normalizeSymbolicDisplayLatex(latex, displayPrefs) ?? latex;
+
+  const markup = convertLatexToMarkup(displayLatex, {
     defaultMode: block ? 'math' : 'inline-math',
   });
 
   return (
     <div
-      aria-label={latex}
+      aria-label={displayLatex}
+      data-raw-latex={latex}
       className={className}
       dangerouslySetInnerHTML={{ __html: markup }}
     />
