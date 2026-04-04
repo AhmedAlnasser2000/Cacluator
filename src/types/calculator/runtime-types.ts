@@ -185,6 +185,7 @@ export type SolveBadge =
   | 'Outer Inversion'
   | 'Composition Branch'
   | 'Nested Recursion'
+  | 'Periodic Family'
   | 'Trig Rewrite'
   | 'Trig Square Split'
   | 'Trig Sum-Product'
@@ -662,11 +663,32 @@ export type DisplayDetailSection = {
   lines: string[];
 };
 
+export type PeriodicFamilyRepresentative = {
+  label: string;
+  exactLatex?: string;
+  approxText?: string;
+};
+
+export type PeriodicIntervalSuggestion = {
+  label: string;
+  start: string;
+  end: string;
+};
+
+export type PeriodicFamilyInfo = {
+  carrierLatex: string;
+  parameterLatex: string;
+  branchesLatex: string[];
+  representatives?: PeriodicFamilyRepresentative[];
+  suggestedIntervals?: PeriodicIntervalSuggestion[];
+};
+
 export type DisplayOutcome =
   | {
       kind: 'success';
       title: string;
       exactLatex?: string;
+      periodicFamily?: PeriodicFamilyInfo;
       exactSupplementLatex?: string[];
       approxText?: string;
       detailSections?: DisplayDetailSection[];
@@ -699,6 +721,7 @@ export type DisplayOutcome =
       error: string;
       warnings: string[];
       exactLatex?: string;
+      periodicFamily?: PeriodicFamilyInfo;
       exactSupplementLatex?: string[];
       approxText?: string;
       detailSections?: DisplayDetailSection[];

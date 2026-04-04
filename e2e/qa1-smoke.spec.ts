@@ -486,10 +486,11 @@ test('COMP2 smoke hands bounded inversions into the trig backend when the downst
   await page.getByTestId('soft-action-solve').click();
 
   await expect(page.getByTestId('display-outcome-success')).toBeVisible();
+  await expect(page.locator('.result-badges .equation-origin-badge', { hasText: 'Periodic Family' })).toBeVisible();
   await expect(page.locator('.result-badges .equation-origin-badge', { hasText: 'Outer Inversion' })).toBeVisible();
   await expect(page.locator('.result-badges .equation-origin-badge', { hasText: 'Nested Recursion' })).toBeVisible();
-  await expect(page.locator('.result-badges .equation-badge', { hasText: 'Trig Solve Backend' })).toBeVisible();
-  await expect(page.getByTestId('display-outcome-exact')).toContainText('π');
+  await expect(page.getByTestId('display-outcome-exact')).toContainText(/2πk/);
+  await expect(page.getByTestId('display-outcome-periodic-representatives')).toContainText(/k=0/);
 });
 
 test('COMP2 smoke hands bounded inversions into PRL/algebra solve families', async ({ page }) => {
@@ -519,7 +520,7 @@ test('COMP1 smoke proves impossible nested trig compositions from the bounded in
   await expect(page.getByTestId('display-outcome-error')).toContainText(/inner image/i);
 });
 
-test('COMP1 smoke branches finite nested trig compositions when the proven inner image leaves finitely many inverse constants', async ({ page }) => {
+test('COMP3 smoke renders finite nested trig compositions as symbolic periodic families', async ({ page }) => {
   await openSettingsPanel(page);
   await page.getByTestId('settings-angle-unit-rad').click();
   await page.getByTestId('side-surface-overlay-backdrop').click();
@@ -529,11 +530,13 @@ test('COMP1 smoke branches finite nested trig compositions when the proven inner
   await page.getByTestId('soft-action-solve').click();
 
   await expect(page.getByTestId('display-outcome-success')).toBeVisible();
+  await expect(page.getByTestId('display-outcome-periodic-family')).toBeVisible();
   await expect(page.locator('.result-badges .equation-origin-badge', { hasText: 'Composition Branch' })).toBeVisible();
-  await expect(page.locator('.result-badges .equation-origin-badge', { hasText: 'Candidate Checked' })).toBeVisible();
+  await expect(page.getByTestId('display-outcome-exact')).toContainText(/arccos/);
+  await expect(page.getByTestId('display-outcome-periodic-intervals')).toContainText(/near x/i);
 });
 
-test('COMP1 smoke keeps recognized but unresolved compositions on explicit numeric guidance', async ({ page }) => {
+test('COMP3 smoke keeps recognized but unresolved compositions on structured periodic guidance', async ({ page }) => {
   await openSettingsPanel(page);
   await page.getByTestId('settings-angle-unit-rad').click();
   await page.getByTestId('side-surface-overlay-backdrop').click();
@@ -543,11 +546,13 @@ test('COMP1 smoke keeps recognized but unresolved compositions on explicit numer
   await page.getByTestId('soft-action-solve').click();
 
   await expect(page.getByTestId('display-outcome-error')).toBeVisible();
+  await expect(page.getByTestId('display-outcome-periodic-family')).toBeVisible();
   await expect(page.locator('.result-badges .equation-origin-badge', { hasText: 'Composition Branch' })).toBeVisible();
-  await expect(page.getByTestId('display-outcome-error')).toContainText(/recognized composition family/i);
+  await expect(page.getByTestId('display-outcome-error')).toContainText(/recognized periodic family/i);
+  await expect(page.getByTestId('display-outcome-periodic-intervals')).toContainText(/near x/i);
 });
 
-test('COMP2 smoke keeps periodic or deep-branch composition stops on explicit numeric guidance', async ({ page }) => {
+test('COMP3 smoke solves tan-log compositions as periodic families', async ({ page }) => {
   await openSettingsPanel(page);
   await page.getByTestId('settings-angle-unit-rad').click();
   await page.getByTestId('side-surface-overlay-backdrop').click();
@@ -556,9 +561,26 @@ test('COMP2 smoke keeps periodic or deep-branch composition stops on explicit nu
   await setMathFieldLatex(page, '\\tan\\left(\\ln\\left(x+1\\right)\\right)=1');
   await page.getByTestId('soft-action-solve').click();
 
-  await expect(page.getByTestId('display-outcome-error')).toBeVisible();
+  await expect(page.getByTestId('display-outcome-success')).toBeVisible();
+  await expect(page.getByTestId('display-outcome-periodic-family')).toBeVisible();
   await expect(page.locator('.result-badges .equation-origin-badge', { hasText: 'Composition Branch' })).toBeVisible();
-  await expect(page.getByTestId('display-outcome-error')).toContainText(/recognized composition family/i);
+  await expect(page.getByTestId('display-outcome-exact')).toContainText(/exp/);
+  await expect(page.getByTestId('display-outcome-periodic-intervals')).toContainText(/1\.19328/);
+});
+
+test('COMP3 smoke formats periodic families in degree mode with numeric-angle branches', async ({ page }) => {
+  await openSettingsPanel(page);
+  await page.getByTestId('settings-angle-unit-deg').click();
+  await page.getByTestId('side-surface-overlay-backdrop').click();
+
+  await openEquationSymbolic(page);
+  await setMathFieldLatex(page, '\\ln\\left(\\sin\\left(x\\right)\\right)=0');
+  await page.getByTestId('soft-action-solve').click();
+
+  await expect(page.getByTestId('display-outcome-success')).toBeVisible();
+  await expect(page.getByTestId('display-outcome-periodic-family')).toBeVisible();
+  await expect(page.getByTestId('display-outcome-exact')).toContainText(/360k\+90/);
+  await expect(page.getByTestId('display-outcome-periodic-representatives')).toContainText(/x=90/);
 });
 
 test('Equation numeric interval smoke can follow up unresolved composition guidance with a valid interval', async ({ page }) => {

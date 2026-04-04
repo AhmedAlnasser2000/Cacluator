@@ -8770,6 +8770,54 @@ export default function App() {
             && (!isGeometryMenuOpen || currentMode === 'geometry')
             && currentMode !== 'guide'
             && (displayOutcome?.kind === 'success' || displayOutcome?.kind === 'error')
+            && displayOutcome.periodicFamily ? (
+              <div className="result-detail-sections" data-testid="display-outcome-periodic-family">
+                {displayOutcome.periodicFamily.representatives?.length ? (
+                  <div className="result-summary-block" data-testid="display-outcome-periodic-representatives">
+                    <div className="result-summary-label">Representative Branches</div>
+                    <div className="result-detail-lines">
+                      {displayOutcome.periodicFamily.representatives.map((representative, index) => (
+                        <div key={`${representative.label}-${index}`} className="result-detail-line">
+                          <div className="result-approx">{representative.label}</div>
+                          {representative.exactLatex ? (
+                            <MathStatic
+                              className="result-math result-math-supplement"
+                              latex={representative.exactLatex}
+                              displayPrefs={symbolicDisplayPrefs}
+                            />
+                          ) : null}
+                          {representative.approxText ? (
+                            <div className="result-detail-line result-summary-text">
+                              {representative.approxText}
+                            </div>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                {displayOutcome.periodicFamily.suggestedIntervals?.length ? (
+                  <div className="result-summary-block" data-testid="display-outcome-periodic-intervals">
+                    <div className="result-summary-label">Suggested Intervals</div>
+                    <div className="result-detail-lines">
+                      {displayOutcome.periodicFamily.suggestedIntervals.map((suggestion) => (
+                        <div key={`${suggestion.label}-${suggestion.start}-${suggestion.end}`} className="result-detail-line result-summary-text">
+                          {suggestion.label}: [{suggestion.start}, {suggestion.end}]
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            {!isLauncherOpen
+            && !isEquationMenuOpen
+            && !isAdvancedCalcMenuOpen
+            && !isTrigMenuOpen
+            && !isStatisticsMenuOpen
+            && (!isGeometryMenuOpen || currentMode === 'geometry')
+            && currentMode !== 'guide'
+            && (displayOutcome?.kind === 'success' || displayOutcome?.kind === 'error')
             && displayOutcome.detailSections?.length ? (
               <div className="result-detail-sections" data-testid="display-outcome-detail-sections">
                 {displayOutcome.detailSections.map((section, sectionIndex) => (

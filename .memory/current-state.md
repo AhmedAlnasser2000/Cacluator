@@ -33,6 +33,13 @@
 - Extracted `src/app/*`, `src/styles/app/*`, and decomposition facades under solver/guide/types are in-tree and passing regression.
 
 ## Most Recent Completed Milestone
+- Completed `COMP3` as the periodic branch-family milestone for composition solving:
+  - upgraded bounded trig follow-on from numeric-guidance-only stops to symbolic periodic-family results when the remaining carrier can still finish through bounded exact handoff
+  - added structured periodic-family metadata to Equation outcomes, including general family latex, representative branches, and branch-aware numeric interval suggestions
+  - added unit-aware non-radian family formatting for `DEG` / `GRAD` periodic solves so branch families now render as native numeric-angle formulas like `360k+90` or `400k+100`
+  - kept nonlinear-in-`k` carriers honest by surfacing structured periodic guidance plus suggested intervals instead of fake exact closure
+- Regression checks:
+  - `npm run test:gate`
 - Completed `COMP2` as the bounded multi-step outer-inversion and supported-family handoff milestone:
   - promoted composition nesting to an explicit guarded policy with a hard cap of two successful outer inversions per solve attempt
   - allowed chained non-periodic composition solves such as `ln(sqrt(x+1))=2` and `sqrt(log_3((x+1)^2))=2` to recurse through the existing guarded backend
@@ -66,6 +73,11 @@
   - `npm run test:gate`
 
 ## Recent Verified Context
+- `COMP3` periodic family solving is now verified in `Equation > Symbolic`:
+  - bounded trig follow-on now yields symbolic family output instead of guidance-only stops when the remaining carrier can still finish through exact bounded handoff
+  - periodic-family results now carry general family latex, representative branches, and branch-aware interval suggestions in the shared result card
+  - unit-aware periodic family formatting now works in `RAD`, `DEG`, and `GRAD`, including non-radian families like `x=360k+90`
+  - exact exponential follow-on families such as `\sin(e^x)=\frac{1}{2}` now finish symbolically with branch conditions, while nonlinear-in-`k` carriers like `\sin(x^2)=\frac{1}{2}` still stop honestly with structured periodic guidance
 - Equation numeric interval solving is now angle-unit consistent and explicit-user-intent first:
   - direct trig residual evaluation, candidate validation, and numeric interval solving now all honor the selected `RAD` / `DEG` / `GRAD` mode
   - explicit `Run Numeric Solve` now executes the numeric interval stage before later symbolic-family stops, so unresolved composition guidance no longer blocks valid interval-based solving
@@ -206,6 +218,10 @@
   - composition depth is capped at two successful outer inversions
   - supported-family handoff is allowed only when the downstream trig/PRL/algebra family still yields a finite honest symbolic result
   - broader periodic-family synthesis, inverse-trig outers, and open-ended multi-layer composition search remain deferred
+- `COMP3` is intentionally bounded:
+  - only one periodic parameter `k \in \mathbb{Z}` is introduced
+  - direct periodic families may finish through bounded exact handoff, but nonlinear-in-`k` carrier solves still stop at structured guidance plus interval suggestions
+  - unrestricted periodic-family generation, broader inverse-trig outer families, and open-ended multi-layer composition search remain deferred
 - `NP1` numeric output controls are display-only:
   - internal solver precision / effort is still app-managed
   - scientific notation preferences do not change Equation or Calculate solver breadth
@@ -259,9 +275,9 @@
   - `.memory/research/TRACK-PRL4-MANUAL-VERIFICATION-CHECKLIST.md`
 
 ## Next Recommended Task
-- The `PRL1`-`PRL4` stack plus `COMP1`-`COMP2` are now shipped end-to-end.
+- The `PRL1`-`PRL4` stack plus `COMP1`-`COMP3` are now shipped end-to-end.
 - Best next discussion point:
-  1. decide whether the next composition follow-up should target deeper periodic trig-family synthesis or wider supported outer-function depth first
+  1. decide whether `COMP4` should target parameterized nonlinear solves in `k` (for example `x^2 = \alpha + 2\pi k`) or a wider set of bounded inverse-trig / outer-family handoffs first
 
 ## Recent Verified Context
 - Equation numeric interval solving now respects `RAD` / `DEG` / `GRAD` consistently across residual checks, candidate validation, and interval search.

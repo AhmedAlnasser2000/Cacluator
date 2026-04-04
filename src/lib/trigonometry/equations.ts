@@ -1,5 +1,6 @@
 import type { TrigEquationState } from '../../types/calculator';
 import type { TrigEvaluation } from './angles';
+import { formatNumber } from '../format';
 import {
   matchBoundedMixedLinearTrigEquation,
   matchBoundedTrigEquation,
@@ -14,6 +15,18 @@ import {
 const EPSILON = 1e-9;
 
 type TrigEquationKind = 'sin' | 'cos' | 'tan';
+
+export type TrigPeriodicBranch = {
+  latex: string;
+  representativeValue: number;
+};
+
+export type TrigPeriodicTemplate = {
+  kind: TrigEquationKind;
+  branches: TrigPeriodicBranch[];
+  periodLatex: string;
+  periodValue: number;
+};
 
 function dedupe(values: number[]) {
   return values.filter((value, index, list) =>
@@ -122,6 +135,15 @@ function buildApproxText(solutionsDegrees: number[], unit: TrigEquationState['an
   return values.length === 1 ? `x ~= ${values[0]}` : `x ~= ${values.join(', ')}`;
 }
 
+function formatPeriodicUnitScalarLatex(degrees: number, unit: TrigEquationState['angleUnit']) {
+  if (unit === 'rad') {
+    return formatDegreesAsUnitLatex(degrees, unit);
+  }
+
+  const value = unit === 'deg' ? degrees : convertAngle(degrees, 'deg', unit);
+  return formatNumber(value);
+}
+
 function buildPeriodicFamily(kind: TrigEquationKind, solutionsDegrees: number[], coefficient: number, unit: TrigEquationState['angleUnit']) {
   const periodDegrees = kind === 'tan' ? 180 / coefficient : 360 / coefficient;
   const families = solutionsDegrees.map((degrees) => {
@@ -131,6 +153,94 @@ function buildPeriodicFamily(kind: TrigEquationKind, solutionsDegrees: number[],
   });
 
   return `Periodic families: ${families.join(' or ')}.`;
+}
+
+function branchFormulaLatex(baseLatex: string, periodLatex: string) {
+  return `${baseLatex}+k\\cdot\\left(${periodLatex}\\right)`;
+}
+
+function inverseFamilyBranches(
+  kind: TrigEquationKind,
+  valueLatex: string,
+  value: number,
+  unit: TrigEquationState['angleUnit'],
+): TrigPeriodicBranch[] {
+  if (unit !== 'rad') {
+    const startsDegrees = dedupe(numericCycleSolutions(kind, value)).map(normalizeDegrees);
+    return startsDegrees.map((degrees) => ({
+      latex: branchFormulaLatex(
+        formatPeriodicUnitScalarLatex(degrees, unit),
+        formatPeriodicUnitScalarLatex(kind === 'tan' ? 180 : 360, unit),
+      ),
+      representativeValue: unit === 'deg' ? degrees : convertAngle(degrees, 'deg', unit),
+    }));
+  }
+
+  if (kind === 'sin') {
+    const principal = `\\arcsin\\left(${valueLatex}\\right)`;
+    return dedupeBranchByLatex([
+      { latex: branchFormulaLatex(principal, '2\\pi'), representativeValue: Math.asin(value) },
+      { latex: branchFormulaLatex(`\\pi-${principal}`, '2\\pi'), representativeValue: Math.PI - Math.asin(value) },
+    ]);
+  }
+
+  if (kind === 'cos') {
+    const principal = `\\arccos\\left(${valueLatex}\\right)`;
+    return dedupeBranchByLatex([
+      { latex: branchFormulaLatex(principal, '2\\pi'), representativeValue: Math.acos(value) },
+      { latex: branchFormulaLatex(`-${principal}`, '2\\pi'), representativeValue: -Math.acos(value) },
+    ]);
+  }
+
+  const principal = `\\arctan\\left(${valueLatex}\\right)`;
+  return [
+    { latex: branchFormulaLatex(principal, '\\pi'), representativeValue: Math.atan(value) },
+  ];
+}
+
+function dedupeBranchByLatex(branches: TrigPeriodicBranch[]) {
+  const seen = new Set<string>();
+  return branches.filter((branch) => {
+    if (seen.has(branch.latex)) {
+      return false;
+    }
+    seen.add(branch.latex);
+    return true;
+  });
+}
+
+export function buildTrigPeriodicTemplate(
+  kind: TrigEquationKind,
+  value: number,
+  valueLatex: string,
+  unit: TrigEquationState['angleUnit'],
+): TrigPeriodicTemplate | null {
+  if ((kind === 'sin' || kind === 'cos') && (value < -1 - EPSILON || value > 1 + EPSILON)) {
+    return null;
+  }
+
+  const exactSolutions = exactCycleSolutions(kind, value);
+  const periodDegrees = kind === 'tan' ? 180 : 360;
+  const periodLatex = formatPeriodicUnitScalarLatex(periodDegrees, unit);
+  const periodValue = unit === 'deg' ? periodDegrees : convertAngle(periodDegrees, 'deg', unit);
+
+  const branches = exactSolutions
+    ? dedupeBranchByLatex(
+        dedupe(exactSolutions)
+          .map(normalizeDegrees)
+          .map((degrees) => ({
+            latex: branchFormulaLatex(formatPeriodicUnitScalarLatex(degrees, unit), periodLatex),
+            representativeValue: unit === 'deg' ? degrees : convertAngle(degrees, 'deg', unit),
+          })),
+      )
+    : dedupeBranchByLatex(inverseFamilyBranches(kind, valueLatex, value, unit));
+
+  return {
+    kind,
+    branches,
+    periodLatex,
+    periodValue,
+  };
 }
 
 function solveMixedLinearTrigEquation(state: TrigEquationState): TrigEvaluation | null {

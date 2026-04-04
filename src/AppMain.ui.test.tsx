@@ -693,10 +693,11 @@ describe('AppMain UI automation flows', () => {
     await user.click(screen.getByTestId('soft-action-solve'));
 
     await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expect(screen.getByText('Periodic Family')).toBeInTheDocument();
     expect(screen.getByText('Outer Inversion')).toBeInTheDocument();
     expect(screen.getByText('Nested Recursion')).toBeInTheDocument();
-    expect(screen.getByText('Trig Solve Backend')).toBeInTheDocument();
-    expectMathStaticLatex(screen.getByTestId('display-outcome-exact'), 'x=\\frac{\\pi}{2}');
+    expectMathStaticLatex(screen.getByTestId('display-outcome-exact'), 'x=2\\pi k+\\frac{\\pi}{2}');
+    expect(screen.getByTestId('display-outcome-periodic-representatives')).toHaveTextContent(/k=0/);
   });
 
   it('hands COMP2 inversions into bounded PRL/algebra families without fabricating exact output', async () => {
@@ -732,7 +733,7 @@ describe('AppMain UI automation flows', () => {
     expect(screen.getByTestId('display-outcome-error')).toHaveTextContent(/inner image/i);
   });
 
-  it('branches finite COMP1 trig compositions when the proven inner image leaves finitely many inverse constants', async () => {
+  it('renders finite COMP3 trig composition branches as symbolic periodic families', async () => {
     const { user } = await renderAppMain();
 
     await user.click(screen.getByTestId('settings-toggle'));
@@ -746,11 +747,13 @@ describe('AppMain UI automation flows', () => {
     await user.click(screen.getByTestId('soft-action-solve'));
 
     await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expect(screen.getByText('Periodic Family')).toBeInTheDocument();
     expect(screen.getByText('Composition Branch')).toBeInTheDocument();
-    expect(screen.getByText('Candidate Checked')).toBeInTheDocument();
+    expect(screen.getByTestId('display-outcome-exact')).toHaveTextContent(/arccos/);
+    expect(screen.getByTestId('display-outcome-periodic-intervals')).toHaveTextContent(/near x/i);
   });
 
-  it('shows explicit numeric guidance for recognized but still-unresolved COMP1 compositions', async () => {
+  it('shows structured periodic guidance for recognized but still-unresolved COMP3 compositions', async () => {
     const { user } = await renderAppMain();
 
     await user.click(screen.getByTestId('settings-toggle'));
@@ -764,11 +767,14 @@ describe('AppMain UI automation flows', () => {
     await user.click(screen.getByTestId('soft-action-solve'));
 
     await waitFor(() => expect(screen.getByTestId('display-outcome-error')).toBeInTheDocument());
+    expect(screen.getByText('Periodic Family')).toBeInTheDocument();
     expect(screen.getByText('Composition Branch')).toBeInTheDocument();
-    expect(screen.getByTestId('display-outcome-error')).toHaveTextContent(/recognized composition family/i);
+    expect(screen.getByTestId('display-outcome-error')).toHaveTextContent(/recognized periodic family/i);
+    expect(screen.getByTestId('display-outcome-periodic-family')).toBeInTheDocument();
+    expect(screen.getByTestId('display-outcome-periodic-intervals')).toHaveTextContent(/near x/i);
   });
 
-  it('keeps COMP2 periodic/deep-branch composition stops on explicit numeric guidance', async () => {
+  it('renders COMP3 tan-log composition families symbolically with interval guidance', async () => {
     const { user } = await renderAppMain();
 
     await user.click(screen.getByTestId('settings-toggle'));
@@ -781,9 +787,30 @@ describe('AppMain UI automation flows', () => {
     setMathFieldLatex('main-editor', '\\tan\\left(\\ln\\left(x+1\\right)\\right)=1');
     await user.click(screen.getByTestId('soft-action-solve'));
 
-    await waitFor(() => expect(screen.getByTestId('display-outcome-error')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expect(screen.getByText('Periodic Family')).toBeInTheDocument();
     expect(screen.getByText('Composition Branch')).toBeInTheDocument();
-    expect(screen.getByTestId('display-outcome-error')).toHaveTextContent(/recognized composition family/i);
+    expect(screen.getByTestId('display-outcome-exact')).toHaveTextContent(/exp/);
+    expect(screen.getByTestId('display-outcome-periodic-intervals')).toHaveTextContent(/1\.19328/);
+  });
+
+  it('formats periodic composition families in degree mode with unit-native numeric branches', async () => {
+    const { user } = await renderAppMain();
+
+    await user.click(screen.getByTestId('settings-toggle'));
+    await screen.findByTestId('settings-panel');
+    await user.click(screen.getByTestId('settings-angle-unit-deg'));
+    await user.click(screen.getByTestId('settings-toggle'));
+    await waitFor(() => expect(screen.queryByTestId('settings-panel')).not.toBeInTheDocument());
+
+    await openEquationSymbolic(user);
+    setMathFieldLatex('main-editor', '\\ln\\left(\\sin\\left(x\\right)\\right)=0');
+    await user.click(screen.getByTestId('soft-action-solve'));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expect(screen.getByText('Periodic Family')).toBeInTheDocument();
+    expect(screen.getByTestId('display-outcome-exact')).toHaveTextContent(/360k\+90/);
+    expect(screen.getByTestId('display-outcome-periodic-representatives')).toHaveTextContent(/x=90/);
   });
 
   it('shows the new PRL3 Equation transforms without auto-solving the rewritten equation', async () => {

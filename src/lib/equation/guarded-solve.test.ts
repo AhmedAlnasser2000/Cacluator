@@ -526,9 +526,10 @@ describe('runGuardedEquationSolve', () => {
     if (result.kind !== 'success') {
       throw new Error('Expected guarded trig-handoff composition success');
     }
+    expect(result.solveBadges).toContain('Periodic Family');
     expect(result.solveBadges).toContain('Outer Inversion');
     expect(result.solveBadges).toContain('Nested Recursion');
-    expect(result.plannerBadges).toContain('Trig Solve Backend');
+    expect(result.periodicFamily?.branchesLatex[0]).toContain('2\\pi k');
     expect(result.exactLatex ?? '').toContain('\\frac{\\pi}{2}');
   });
 
@@ -579,8 +580,10 @@ describe('runGuardedEquationSolve', () => {
     if (result.kind !== 'success') {
       throw new Error('Expected finite trig composition branch success');
     }
+    expect(result.solveBadges).toContain('Periodic Family');
     expect(result.solveBadges).toContain('Composition Branch');
-    expect(result.solveBadges).toContain('Candidate Checked');
+    expect(result.periodicFamily?.branchesLatex.join(' ')).toContain('\\arccos');
+    expect(result.periodicFamily?.suggestedIntervals?.length ?? 0).toBeGreaterThan(0);
   });
 
   it('returns explicit numeric guidance for recognized composition families with unsupported inverse branching', () => {
@@ -595,11 +598,14 @@ describe('runGuardedEquationSolve', () => {
     if (result.kind !== 'error') {
       throw new Error('Expected unresolved composition guidance');
     }
+    expect(result.solveBadges).toContain('Periodic Family');
     expect(result.solveBadges).toContain('Composition Branch');
-    expect(result.error).toContain('recognized composition family');
+    expect(result.error).toContain('recognized periodic family');
+    expect(result.exactLatex ?? '').toContain('x^2');
+    expect(result.periodicFamily?.suggestedIntervals?.length ?? 0).toBeGreaterThan(0);
   });
 
-  it('returns explicit numeric guidance for bounded tan composition families that still imply infinite periodic branches', () => {
+  it('solves bounded tan composition families as explicit periodic branch families', () => {
     const result = runGuardedEquationSolve({
       ...request,
       angleUnit: 'rad',
@@ -607,15 +613,18 @@ describe('runGuardedEquationSolve', () => {
       resolvedLatex: '\\tan\\left(\\ln\\left(x+1\\right)\\right)=1',
     });
 
-    expect(result.kind).toBe('error');
-    if (result.kind !== 'error') {
-      throw new Error('Expected unresolved tan composition guidance');
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected periodic tan composition success');
     }
+    expect(result.solveBadges).toContain('Periodic Family');
     expect(result.solveBadges).toContain('Composition Branch');
-    expect(result.error).toContain('recognized composition family');
+    expect(result.exactLatex ?? '').toContain('\\exp');
+    expect(result.exactLatex ?? '').toContain('\\pi k');
+    expect(result.periodicFamily?.suggestedIntervals?.[0]?.start).toContain('0.');
   });
 
-  it('returns explicit numeric guidance for recognized compositions with infinite positive-exponential inner image', () => {
+  it('solves positive-exponential periodic follow-on families when the downstream exact handoff stays bounded', () => {
     const result = runGuardedEquationSolve({
       ...request,
       angleUnit: 'rad',
@@ -623,12 +632,32 @@ describe('runGuardedEquationSolve', () => {
       resolvedLatex: '\\sin\\left(e^x\\right)=\\frac{1}{2}',
     });
 
-    expect(result.kind).toBe('error');
-    if (result.kind !== 'error') {
-      throw new Error('Expected unresolved composition guidance');
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected periodic exponential follow-on success');
     }
+    expect(result.solveBadges).toContain('Periodic Family');
     expect(result.solveBadges).toContain('Composition Branch');
-    expect(result.error).toContain('recognized composition family');
+    expect(result.exactLatex ?? '').toContain('\\ln');
+    expect(result.exactSupplementLatex?.join(' ') ?? '').toContain('Branch conditions');
+    expect(result.periodicFamily?.suggestedIntervals?.length ?? 0).toBeGreaterThan(0);
+  });
+
+  it('formats periodic branch families in the selected non-radian unit', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      angleUnit: 'deg',
+      originalLatex: '\\ln\\left(\\sin\\left(x\\right)\\right)=0',
+      resolvedLatex: '\\ln\\left(\\sin\\left(x\\right)\\right)=0',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected degree-mode periodic family success');
+    }
+    expect(result.solveBadges).toContain('Periodic Family');
+    expect(result.exactLatex ?? '').toContain('360k+90');
+    expect(result.periodicFamily?.representatives?.[0]?.exactLatex ?? '').toContain('90');
   });
 
   it('stops with explicit numeric guidance when a composition would exceed the two-step inversion cap', () => {

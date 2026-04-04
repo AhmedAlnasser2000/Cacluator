@@ -1,6 +1,7 @@
 import { solutionsToLatex } from '../../format';
 import type {
   DisplayOutcome,
+  PeriodicFamilyInfo,
   SolveBadge,
   SubstitutionSolveDiagnostics,
 } from '../../../types/calculator';
@@ -47,6 +48,33 @@ function dedupe<T>(values: T[]) {
   return [...new Set(values)];
 }
 
+function mergePeriodicFamilies(families: PeriodicFamilyInfo[]) {
+  if (families.length === 0) {
+    return undefined;
+  }
+
+  const carrierLatex = families[0].carrierLatex;
+  const parameterLatex = families[0].parameterLatex;
+  if (families.some((family) => family.carrierLatex !== carrierLatex || family.parameterLatex !== parameterLatex)) {
+    return families[0];
+  }
+
+  const representatives = dedupe(
+    families.flatMap((family) => family.representatives ?? []).map((entry) => JSON.stringify(entry)),
+  ).map((entry) => JSON.parse(entry));
+  const suggestedIntervals = dedupe(
+    families.flatMap((family) => family.suggestedIntervals ?? []).map((entry) => JSON.stringify(entry)),
+  ).map((entry) => JSON.parse(entry));
+
+  return {
+    carrierLatex,
+    parameterLatex,
+    branchesLatex: dedupe(families.flatMap((family) => family.branchesLatex)),
+    representatives: representatives.length > 0 ? representatives : undefined,
+    suggestedIntervals: suggestedIntervals.length > 0 ? suggestedIntervals : undefined,
+  } satisfies PeriodicFamilyInfo;
+}
+
 function mergeDisplayOutcomes(
   outcomes: DisplayOutcome[],
   solveBadges: SolveBadge[],
@@ -91,11 +119,17 @@ function mergeDisplayOutcomes(
   const candidateValues = dedupe(successes.flatMap((outcome) => outcome.candidateValues ?? []));
   const rejectedCandidateCount = successes.reduce((total, outcome) => total + (outcome.rejectedCandidateCount ?? 0), 0);
   const numericMethod = dedupe(successes.map((outcome) => outcome.numericMethod).filter((method): method is string => Boolean(method))).join('; ');
+  const periodicFamily = mergePeriodicFamilies(
+    successes
+      .map((outcome) => outcome.periodicFamily)
+      .filter((family): family is PeriodicFamilyInfo => Boolean(family)),
+  );
 
   return {
     kind: 'success',
     title: 'Solve',
     exactLatex: exactValues.length > 0 ? solutionsToLatex('x', exactValues) : undefined,
+    periodicFamily,
     exactSupplementLatex: exactSupplementLatex.length > 0 ? exactSupplementLatex : undefined,
     approxText: approxValues.length > 0 ? `x ~= ${approxValues.join(', ')}` : undefined,
     warnings,
