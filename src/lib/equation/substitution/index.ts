@@ -7,6 +7,7 @@ import {
 } from './shared';
 import { matchTrigPolynomialSubstitution } from './trig-polynomial';
 import { matchExponentialPolynomialSubstitution } from './exp-polynomial';
+import { matchSameBaseEquality } from './same-base-equality';
 import { matchInverseIsolation } from './inverse-isolation';
 import { matchLogCombineSolve } from './log-combine';
 
@@ -36,6 +37,11 @@ function matchSubstitutionSolve(
   }
 
   const normalizedEquationAst = normalizeAst(ce.parse(equationLatex).json);
+
+  const sameBaseEquality = matchSameBaseEquality(normalizedEquationAst);
+  if (sameBaseEquality.kind !== 'none') {
+    return sameBaseEquality;
+  }
 
   const inverse = matchInverseIsolation(normalizedEquationAst);
   if (inverse.kind !== 'none') {

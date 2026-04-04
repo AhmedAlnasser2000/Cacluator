@@ -73,6 +73,36 @@ describe('runGuardedEquationSolve', () => {
     expect(result.substitutionDiagnostics?.family).toBe('inverse-isolation');
   });
 
+  it('solves same-base exponential equalities through bounded substitution before generic symbolic solve', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      originalLatex: 'e^{x+1}=e^{3x-5}',
+      resolvedLatex: 'e^{x+1}=e^{3x-5}',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected guarded solve success');
+    }
+    expect(result.exactLatex).toBe('x=3');
+    expect(result.solveBadges).toContain('Same-Base Equality');
+  });
+
+  it('reports preserved domain conditions when a reduced same-base log equality has no valid real solution', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      originalLatex: '\\ln(4x+2)=\\ln(5x+6)',
+      resolvedLatex: '\\ln(4x+2)=\\ln(5x+6)',
+    });
+
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') {
+      throw new Error('Expected guarded solve error');
+    }
+    expect(result.error).toContain('preserved domain conditions');
+    expect(result.solveBadges).toContain('Candidate Checked');
+  });
+
   it('solves bounded common-log inverse isolation forms', () => {
     const result = runGuardedEquationSolve({
       ...request,
@@ -86,6 +116,21 @@ describe('runGuardedEquationSolve', () => {
     }
     expect(result.solveBadges).toContain('Inverse Isolation');
     expect(result.substitutionDiagnostics?.family).toBe('inverse-isolation');
+  });
+
+  it('solves bounded explicit-base log inverse-isolation forms', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      originalLatex: '\\log_{4}\\left(2x+8\\right)=3',
+      resolvedLatex: '\\log_{4}\\left(2x+8\\right)=3',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected guarded solve success');
+    }
+    expect(result.exactLatex).toBe('x=28');
+    expect(result.solveBadges).toContain('Inverse Isolation');
   });
 
   it('solves affine phase-shift trig equations through the direct bounded backend', () => {
@@ -196,6 +241,37 @@ describe('runGuardedEquationSolve', () => {
     expect(result.substitutionDiagnostics?.family).toBe('log-same-base');
   });
 
+  it('solves bounded log-quotient equations through the guarded backend', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      originalLatex: '\\log_{5}\\left(x+5\\right)-\\log_{5}\\left(x\\right)=1',
+      resolvedLatex: '\\log_{5}\\left(x+5\\right)-\\log_{5}\\left(x\\right)=1',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected guarded solve success');
+    }
+    expect(result.exactLatex).toBe('x=\\frac{5}{4}');
+    expect(result.solveBadges).toContain('Log Quotient');
+  });
+
+  it('solves bounded mixed-base log equations when change-of-base coefficients stay rational', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      originalLatex: '\\log_{9}\\left(x\\right)-\\log_{3}\\left(x\\right)=-1',
+      resolvedLatex: '\\log_{9}\\left(x\\right)-\\log_{3}\\left(x\\right)=-1',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected guarded solve success');
+    }
+    expect(result.exactLatex).toBe('x=9');
+    expect(result.solveBadges).toContain('Log Base Normalize');
+    expect(result.substitutionDiagnostics?.family).toBe('log-mixed-base-rational');
+  });
+
   it('recognizes mixed-base log equations and returns explicit numeric guidance when exact bounded solve is unavailable', () => {
     const result = runGuardedEquationSolve({
       ...request,
@@ -210,6 +286,21 @@ describe('runGuardedEquationSolve', () => {
     expect(result.error).toContain('recognized mixed-base log family');
     expect(result.solveBadges).toContain('Log Base Normalize');
     expect(result.substitutionDiagnostics?.family).toBe('log-mixed-base');
+  });
+
+  it('solves bounded rational-power equations through the guarded algebra stage', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      originalLatex: 'x^{\\frac{3}{2}}=8',
+      resolvedLatex: 'x^{\\frac{3}{2}}=8',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected guarded solve success');
+    }
+    expect(result.exactLatex).toBe('x=4');
+    expect(result.solveBadges).toContain('Power Lift');
   });
 
   it('solves zero-target trig sum-to-product families through branch splitting', () => {

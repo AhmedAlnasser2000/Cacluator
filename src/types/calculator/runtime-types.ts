@@ -184,9 +184,13 @@ export type SolveBadge =
   | 'Trig Square Split'
   | 'Trig Sum-Product'
   | 'Log Combine'
+  | 'Log Quotient'
   | 'Log Base Normalize'
+  | 'Same-Base Equality'
   | 'LCD Clear'
   | 'Radical Isolation'
+  | 'Root Isolation'
+  | 'Power Lift'
   | 'Conjugate Transform'
   | 'Symbolic Substitution'
   | 'Inverse Isolation'
@@ -1127,8 +1131,11 @@ export type SubstitutionSolveDiagnostics = {
     | 'trig-polynomial'
     | 'exp-polynomial'
     | 'inverse-isolation'
+    | 'same-base-equality'
     | 'log-same-base'
+    | 'log-quotient'
     | 'log-mixed-base'
+    | 'log-mixed-base-rational'
     | 'trig-sum-product';
   carrierKind: SolveCarrierKind;
   polynomialDegree?: 1 | 2;

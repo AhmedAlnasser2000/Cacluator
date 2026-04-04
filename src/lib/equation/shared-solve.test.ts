@@ -103,6 +103,39 @@ describe('runSharedEquationSolve', () => {
     expect(result.substitutionDiagnostics?.family).toBe('exp-polynomial');
   });
 
+  it('solves same-base exponential equalities through bounded reduction', () => {
+    const result = runSharedEquationSolve({
+      ...request,
+      originalLatex: 'e^{x+1}=e^{3x-5}',
+      resolvedLatex: 'e^{x+1}=e^{3x-5}',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.exactLatex).toBe('x=3');
+    expect(result.solveBadges).toContain('Same-Base Equality');
+    expect(result.substitutionDiagnostics?.family).toBe('same-base-equality');
+  });
+
+  it('solves same-base logarithmic equalities with positivity conditions', () => {
+    const result = runSharedEquationSolve({
+      ...request,
+      originalLatex: '\\ln\\left(x+1\\right)=\\ln\\left(2x-3\\right)',
+      resolvedLatex: '\\ln\\left(x+1\\right)=\\ln\\left(2x-3\\right)',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.exactLatex).toBe('x=4');
+    expect(result.solveBadges).toContain('Same-Base Equality');
+    expect(result.exactSupplementLatex?.[0]).toContain('x+1>0');
+    expect(result.exactSupplementLatex?.[0]).toContain('2x-3>0');
+  });
+
   it('solves bounded log-combine sum families', () => {
     const result = runSharedEquationSolve({
       ...request,
@@ -116,6 +149,40 @@ describe('runSharedEquationSolve', () => {
     }
     expect(result.solveBadges).toContain('Log Combine');
     expect(result.substitutionDiagnostics?.family).toBe('log-same-base');
+  });
+
+  it('solves bounded log-quotient families', () => {
+    const result = runSharedEquationSolve({
+      ...request,
+      originalLatex: '\\ln\\left(x+1\\right)-\\ln\\left(x\\right)=\\ln\\left(2\\right)',
+      resolvedLatex: '\\ln\\left(x+1\\right)-\\ln\\left(x\\right)=\\ln\\left(2\\right)',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.exactLatex).toBe('x=1');
+    expect(result.solveBadges).toContain('Log Quotient');
+    const supplements = result.exactSupplementLatex?.join(' ') ?? '';
+    expect(supplements).toContain('x+1>0');
+    expect(supplements).toContain('x>0');
+  });
+
+  it('solves bounded mixed-base log equations when coefficients normalize exactly', () => {
+    const result = runSharedEquationSolve({
+      ...request,
+      originalLatex: '\\log_{2}\\left(x\\right)+\\log_{4}\\left(x\\right)=3',
+      resolvedLatex: '\\log_{2}\\left(x\\right)+\\log_{4}\\left(x\\right)=3',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.exactLatex).toBe('x=4');
+    expect(result.solveBadges).toContain('Log Base Normalize');
+    expect(result.substitutionDiagnostics?.family).toBe('log-mixed-base-rational');
   });
 
   it('flags recognized mixed-base log families for interval follow-up when exact bounded solve is unavailable', () => {
@@ -288,6 +355,38 @@ describe('runSharedEquationSolve', () => {
     }
     expect(result.exactLatex).toBe('x=14');
     expect(result.solveBadges).toContain('Radical Isolation');
+  });
+
+  it('solves bounded rational-power isolation families exactly', () => {
+    const result = runSharedEquationSolve({
+      ...request,
+      originalLatex: 'x^{\\frac{3}{2}}=8',
+      resolvedLatex: 'x^{\\frac{3}{2}}=8',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.exactLatex).toBe('x=4');
+    expect(result.solveBadges).toContain('Power Lift');
+    expect(result.exactSupplementLatex?.[0]).toContain('x\\ge0');
+  });
+
+  it('solves bounded two-sided rational-power families with candidate validation', () => {
+    const result = runSharedEquationSolve({
+      ...request,
+      originalLatex: '\\left(2x+1\\right)^{\\frac{2}{3}}=5',
+      resolvedLatex: '\\left(2x+1\\right)^{\\frac{2}{3}}=5',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.exactLatex).toContain('x\\in');
+    expect(result.exactLatex).toContain('\\sqrt{5}');
+    expect(result.solveBadges).toContain('Power Lift');
   });
 
   it('recognizes bounded conjugate families without claiming false symbolic success', () => {

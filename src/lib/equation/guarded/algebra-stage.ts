@@ -2,6 +2,7 @@ import { ComputeEngine, expand } from '@cortex-js/compute-engine';
 import { normalizeAst } from '../../symbolic-engine/normalize';
 import { boxLatex, isNodeArray, termKey } from '../../symbolic-engine/patterns';
 import { normalizeExactRationalNode } from '../../symbolic-engine/rational';
+import { evaluateRealNumericExpression } from '../../real-numeric-eval';
 import type {
   DisplayOutcome,
   GuardedSolveRequest,
@@ -12,7 +13,7 @@ import {
   UNSUPPORTED_FAMILY_ERROR,
   errorOutcome,
 } from './outcome';
-import { dedupe } from './merge';
+import { dedupe, mergeDisplayOutcomes } from './merge';
 import { equationStateKey } from './state-key';
 
 const ce = new ComputeEngine();
@@ -39,6 +40,13 @@ type SupportedRadical = {
   index: number;
 };
 
+type SupportedRationalPower = {
+  node: unknown;
+  base: unknown;
+  numerator: number;
+  denominator: number;
+};
+
 type RadicalTarget =
   | {
       kind: 'root';
@@ -50,10 +58,16 @@ type RadicalTarget =
       targetNode: unknown;
       root: SupportedRadical;
       numeratorScalar: ExactScalar;
+    }
+  | {
+      kind: 'power';
+      targetNode: unknown;
+      power: SupportedRationalPower;
     };
 
 type AlgebraTransform = {
   equationLatex: string;
+  branchEquations?: string[];
   domainConstraints?: SolveDomainConstraint[];
   solveBadges: SolveBadge[];
   solveSummaryText: string;
@@ -133,6 +147,33 @@ function parseInteger(node: unknown) {
   return scalar && scalar.denominator === 1 ? scalar.numerator : null;
 }
 
+function parsePositiveRational(node: unknown): ExactScalar | null {
+  const scalar = readExactScalar(node);
+  if (!scalar || scalar.numerator <= 0 || scalar.denominator <= 0) {
+    return null;
+  }
+
+  return scalar;
+}
+
+function expressionHasVariable(node: unknown): boolean {
+  if (typeof node === 'string') {
+    return node !== 'Pi' && node !== 'ExponentialE';
+  }
+
+  if (!isNodeArray(node) || node.length === 0) {
+    return false;
+  }
+
+  for (const child of node.slice(1)) {
+    if (expressionHasVariable(child)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function multiplyScalar(left: ExactScalar, right: ExactScalar): ExactScalar | null {
   return normalizeScalar(
     left.numerator * right.numerator,
@@ -207,6 +248,21 @@ function buildQuotientNode(numerator: unknown, denominator: unknown) {
 
 function buildPowerNode(base: unknown, exponent: number) {
   return simplifyNode(['Power', base, exponent]);
+}
+
+function buildPoweredNode(base: unknown, exponent: ExactScalar) {
+  const poweredNode = simplifyNode(['Power', base, buildScalarNode(exponent)]);
+  if (!expressionHasVariable(poweredNode)) {
+    const numeric = evaluateRealNumericExpression(poweredNode, boxLatex(poweredNode));
+    if (numeric.kind === 'success') {
+      const roundedInteger = Math.round(numeric.value);
+      if (Math.abs(numeric.value - roundedInteger) < 1e-10) {
+        return roundedInteger;
+      }
+    }
+  }
+
+  return poweredNode;
 }
 
 function parseMonomial(node: unknown, variable: string): boolean {
@@ -566,6 +622,77 @@ function matchSupportedRadical(node: unknown, variable: string): SupportedRadica
   return null;
 }
 
+function matchSupportedRationalPower(node: unknown, variable: string): SupportedRationalPower | null {
+  const normalized = normalizeAst(node);
+  if (!isNodeArray(normalized) || normalized.length === 0) {
+    return null;
+  }
+
+  if (normalized[0] === 'Power' && normalized.length === 3) {
+    const exponent = parsePositiveRational(normalized[2]);
+    if (exponent && exponent.denominator > 1 && isSupportedRadicand(normalized[1], variable)) {
+      if (!expressionHasVariable(normalized[1])) {
+        return null;
+      }
+      return {
+        node: normalized,
+        base: normalized[1],
+        numerator: exponent.numerator,
+        denominator: exponent.denominator,
+      };
+    }
+
+    if (!isSupportedRadicand(normalized[1], variable)) {
+      const radicalBase = matchSupportedRadical(normalized[1], variable);
+      const integerExponent = parseInteger(normalized[2]);
+      if (!radicalBase || integerExponent === null || integerExponent <= 0) {
+        return null;
+      }
+      if (!expressionHasVariable(radicalBase.radicand)) {
+        return null;
+      }
+
+      return {
+        node: normalized,
+        base: radicalBase.radicand,
+        numerator: integerExponent,
+        denominator: radicalBase.index,
+      };
+    }
+
+    return null;
+  }
+
+  const radical = matchSupportedRadical(normalized, variable);
+  if (radical && expressionHasVariable(radical.radicand)) {
+    if (
+      isNodeArray(radical.radicand)
+      && radical.radicand[0] === 'Power'
+      && radical.radicand.length === 3
+      && isSupportedRadicand(radical.radicand[1], variable)
+    ) {
+      const numerator = parseInteger(radical.radicand[2]);
+      if (numerator !== null && numerator > 0) {
+        return {
+          node: normalized,
+          base: radical.radicand[1],
+          numerator,
+          denominator: radical.index,
+        };
+      }
+    }
+
+    return {
+      node: normalized,
+      base: radical.radicand,
+      numerator: 1,
+      denominator: radical.index,
+    };
+  }
+
+  return null;
+}
+
 function collectSupportedRoots(node: unknown, variable: string, roots: SupportedRadical[] = []) {
   const radical = matchSupportedRadical(node, variable);
   if (radical) {
@@ -609,6 +736,15 @@ function collectRadicalTargets(node: unknown, variable: string, targets: Radical
         numeratorScalar,
       });
     }
+  }
+
+  const power = matchSupportedRationalPower(normalized, variable);
+  if (power) {
+    targets.push({
+      kind: 'power',
+      targetNode: normalized,
+      power,
+    });
   }
 
   if (!isNodeArray(normalized) || normalized.length === 0) {
@@ -667,6 +803,25 @@ function mergeConstraints(
     }
   }
   return [...merged.values()];
+}
+
+function buildConstraintSupplementLatex(constraints: SolveDomainConstraint[] = []) {
+  const supported = constraints.flatMap((constraint) => {
+    switch (constraint.kind) {
+      case 'nonnegative':
+        return [`${constraint.expressionLatex}\\ge0`];
+      case 'positive':
+        return [`${constraint.expressionLatex}>0`];
+      default:
+        return [];
+    }
+  });
+
+  if (supported.length === 0) {
+    return [] as string[];
+  }
+
+  return [`\\text{Conditions: } ${supported.join(',\\;')}`];
 }
 
 function appendSolveMetadata(
@@ -811,10 +966,117 @@ function buildRadicalPowerTransform(
   return {
     equationLatex,
     domainConstraints,
-    solveBadges: ['Radical Isolation'],
-    solveSummaryText: 'Isolated a radical and applied an exact power transform',
+    solveBadges: ['Radical Isolation', 'Root Isolation', 'Power Lift'],
+    solveSummaryText: 'Isolated a root and applied an exact power lift',
     unresolvedError: 'This recognized radical family is outside the current exact bounded solve set. Use Numeric Solve with an interval in Equation mode.',
   };
+}
+
+function buildLiftedPowerTransform(
+  power: SupportedRationalPower,
+  isolated: unknown,
+): AlgebraTransform {
+  const inverseExponent = normalizeScalar(power.denominator, power.numerator);
+  const domainConstraints: SolveDomainConstraint[] = [];
+  if (!inverseExponent) {
+    return {
+      equationLatex: `${boxLatex(power.node)}=${boxLatex(isolated)}`,
+      solveBadges: ['Power Lift'],
+      solveSummaryText: 'Isolated a rational power and applied an exact lift',
+      unresolvedError: 'This recognized rational-power family is outside the current exact bounded solve set. Use Numeric Solve with an interval in Equation mode.',
+    };
+  }
+
+  if (power.denominator % 2 === 0) {
+    domainConstraints.push({
+      kind: 'nonnegative',
+      expressionLatex: boxLatex(power.base),
+    });
+    domainConstraints.push({
+      kind: 'nonnegative',
+      expressionLatex: boxLatex(isolated),
+    });
+  }
+
+  if (power.denominator % 2 !== 0 && power.numerator % 2 === 0) {
+    domainConstraints.push({
+      kind: 'nonnegative',
+      expressionLatex: boxLatex(isolated),
+    });
+  }
+
+  const solvedMagnitude = buildPoweredNode(isolated, inverseExponent);
+  const branchNodes = [solvedMagnitude];
+  if (power.denominator % 2 !== 0 && power.numerator % 2 === 0) {
+    branchNodes.push(buildNegatedNode(solvedMagnitude));
+  }
+
+  const branchEquations = dedupe(
+    branchNodes.map((branchNode) => `${boxLatex(power.base)}=${boxLatex(branchNode)}`),
+  );
+
+  return {
+    equationLatex: branchEquations[0],
+    branchEquations,
+    domainConstraints,
+    solveBadges: ['Power Lift'],
+    solveSummaryText: 'Isolated a rational power and applied an exact lift',
+    unresolvedError: 'This recognized rational-power family is outside the current exact bounded solve set. Use Numeric Solve with an interval in Equation mode.',
+  };
+}
+
+function matchDirectRationalPowerTransform(request: GuardedSolveRequest): AlgebraTransform | null {
+  const parsed = ce.parse(request.resolvedLatex).json;
+  if (!isNodeArray(parsed) || parsed[0] !== 'Equal' || parsed.length !== 3) {
+    return null;
+  }
+
+  const leftNode = normalizeAst(parsed[1]);
+  const rightNode = normalizeAst(parsed[2]);
+
+  const variables = new Set<string>();
+  const collectVariables = (node: unknown) => {
+    if (typeof node === 'string' && node !== 'Pi' && node !== 'ExponentialE') {
+      variables.add(node);
+      return;
+    }
+    if (!isNodeArray(node) || node.length === 0) {
+      return;
+    }
+    for (const child of node.slice(1)) {
+      collectVariables(child);
+    }
+  };
+  collectVariables(leftNode);
+  collectVariables(rightNode);
+  const variable = variables.size === 1 ? [...variables][0] : 'x';
+
+  const attempts: Array<{ target: unknown; other: unknown }> = [
+    { target: leftNode, other: rightNode },
+    { target: rightNode, other: leftNode },
+  ];
+
+  for (const attempt of attempts) {
+    const power = matchSupportedRationalPower(attempt.target, variable);
+    if (!power || !isSupportedRightSideExpression(attempt.other, variable)) {
+      continue;
+    }
+    const normalizedTarget = normalizeAst(attempt.target);
+    if (
+      isNodeArray(normalizedTarget)
+      && (normalizedTarget[0] === 'Sqrt' || normalizedTarget[0] === 'Root')
+      && power.numerator === 1
+    ) {
+      continue;
+    }
+
+    const transform = buildLiftedPowerTransform(power, attempt.other);
+    if (equationStateKey(transform.equationLatex) !== equationStateKey(request.resolvedLatex)) {
+      return transform;
+    }
+  }
+
+  return null;
 }
 
 function matchRadicalIsolationTransform(request: GuardedSolveRequest): AlgebraTransform | null {
@@ -846,7 +1108,16 @@ function matchRadicalIsolationTransform(request: GuardedSolveRequest): AlgebraTr
     ...collectSupportedRoots(leftNode, variable),
     ...collectSupportedRoots(rightNode, variable),
   ];
-  if (supportedRoots.length === 0 || supportedRoots.length > 2) {
+  const supportedTargets = [
+    ...collectRadicalTargets(leftNode, variable),
+    ...collectRadicalTargets(rightNode, variable),
+  ];
+
+  if (supportedTargets.length === 0) {
+    return null;
+  }
+
+  if (supportedRoots.length > 2) {
     return null;
   }
 
@@ -864,8 +1135,18 @@ function matchRadicalIsolationTransform(request: GuardedSolveRequest): AlgebraTr
       continue;
     }
 
-    const candidates = collectRadicalTargets(attempt.targetSide, variable).sort((left, right) =>
-      left.kind === right.kind ? 0 : left.kind === 'reciprocal-root' ? -1 : 1);
+    const candidates = collectRadicalTargets(attempt.targetSide, variable).sort((left, right) => {
+      const priority = (target: RadicalTarget) => {
+        if (target.kind === 'reciprocal-root') {
+          return 0;
+        }
+        if (target.kind === 'root') {
+          return 1;
+        }
+        return 2;
+      };
+      return priority(left) - priority(right);
+    });
 
     for (const candidate of candidates) {
       const isolatedBase = buildIsolatedExpression(
@@ -874,6 +1155,14 @@ function matchRadicalIsolationTransform(request: GuardedSolveRequest): AlgebraTr
         termKey(candidate.targetNode),
       );
       if (!isolatedBase) {
+        continue;
+      }
+
+      if (candidate.kind === 'power') {
+        const transform = buildLiftedPowerTransform(candidate.power, isolatedBase.isolated);
+        if (equationStateKey(transform.equationLatex) !== equationStateKey(request.resolvedLatex)) {
+          return transform;
+        }
         continue;
       }
 
@@ -1119,20 +1408,39 @@ function recurseTransform(
     );
   }
 
-  const recursiveRequest: GuardedSolveRequest = {
-    ...request,
-    originalLatex: transform.equationLatex,
-    resolvedLatex: transform.equationLatex,
-    validationLatex: request.validationLatex ?? request.resolvedLatex,
-    numericInterval: undefined,
-    domainConstraints: mergeConstraints(request.domainConstraints, transform.domainConstraints),
-  };
-
-  const recursiveOutcome = runGuardedEquationSolve(
-    recursiveRequest,
-    depth + 1,
-    new Set(trail),
+  const parentKey = equationStateKey(request.resolvedLatex);
+  const branchEquations = dedupe(transform.branchEquations ?? [transform.equationLatex]).filter(
+    (equationLatex) => equationStateKey(equationLatex) !== parentKey,
   );
+  if (branchEquations.length === 0) {
+    return null;
+  }
+
+  const recursiveOutcomes = branchEquations.map((equationLatex) =>
+    runGuardedEquationSolve(
+      {
+        ...request,
+        originalLatex: equationLatex,
+        resolvedLatex: equationLatex,
+        validationLatex: request.validationLatex ?? request.resolvedLatex,
+        numericInterval: undefined,
+        domainConstraints: mergeConstraints(request.domainConstraints, transform.domainConstraints),
+      },
+      depth + 1,
+      new Set(trail),
+    ));
+
+  const recursiveOutcome = recursiveOutcomes.length === 1
+    ? recursiveOutcomes[0]
+    : mergeDisplayOutcomes(
+        recursiveOutcomes,
+        transform.solveBadges,
+        dedupe([
+          transform.solveSummaryText,
+          ...recursiveOutcomes
+            .flatMap((outcome) => (outcome.kind !== 'prompt' && outcome.solveSummaryText ? [outcome.solveSummaryText] : [])),
+        ]).join('; '),
+      );
 
   if (recursiveOutcome.kind === 'error' && recursiveOutcome.error === UNSUPPORTED_FAMILY_ERROR) {
     if (request.numericInterval) {
@@ -1152,7 +1460,25 @@ function recurseTransform(
     );
   }
 
-  return appendSolveMetadata(recursiveOutcome, transform.solveBadges, transform.solveSummaryText);
+  const supplementedOutcome: DisplayOutcome =
+    recursiveOutcome.kind === 'success'
+      ? (() => {
+          const supplements = dedupe([
+            ...(recursiveOutcome.exactSupplementLatex ?? []),
+            ...buildConstraintSupplementLatex(transform.domainConstraints),
+          ]);
+          return {
+            ...recursiveOutcome,
+            exactSupplementLatex: supplements.length > 0 ? supplements : undefined,
+          };
+        })()
+      : recursiveOutcome;
+
+  if (recursiveOutcomes.length > 1) {
+    return supplementedOutcome;
+  }
+
+  return appendSolveMetadata(supplementedOutcome, transform.solveBadges, transform.solveSummaryText);
 }
 
 function algebraTransformSolve(
@@ -1167,6 +1493,21 @@ function algebraTransformSolve(
     const recursive = recurseTransform(
       request,
       rationalTransform,
+      depth,
+      trail,
+      maxRecursionDepth,
+      runGuardedEquationSolve,
+    );
+    if (recursive) {
+      return recursive;
+    }
+  }
+
+  const directPowerTransform = matchDirectRationalPowerTransform(request);
+  if (directPowerTransform) {
+    const recursive = recurseTransform(
+      request,
+      directPowerTransform,
       depth,
       trail,
       maxRecursionDepth,

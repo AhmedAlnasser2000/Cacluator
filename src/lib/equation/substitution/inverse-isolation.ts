@@ -44,7 +44,23 @@ function matchInverseCarrier(node: unknown): InverseCarrier | null {
       inner: normalized[1],
       innerLatex: boxLatex(normalized[1]),
       carrierLatex: boxLatex(normalized),
+      baseLatex: '10',
+      baseNumeric: 10,
     };
+  }
+
+  if (isNodeArray(normalized) && normalized.length === 3 && normalized[0] === 'Log') {
+    const baseNumeric = numericFromNode(normalized[2]);
+    if (baseNumeric !== undefined && baseNumeric > 0 && Math.abs(baseNumeric - 1) > EPSILON) {
+      return {
+        kind: 'log',
+        inner: normalized[1],
+        innerLatex: boxLatex(normalized[1]),
+        carrierLatex: boxLatex(normalized),
+        baseLatex: boxLatex(normalized[2]),
+        baseNumeric,
+      };
+    }
   }
 
   if (isNodeArray(normalized) && normalized.length === 3 && normalized[0] === 'Power') {
@@ -143,7 +159,7 @@ function inverseEquation(carrier: InverseCarrier, isolatedValueLatex: string): {
 
   if (carrier.kind === 'log') {
     return {
-      nextEquationLatex: `${carrier.innerLatex}=10^{${isolatedValueLatex}}`,
+      nextEquationLatex: `${carrier.innerLatex}=${carrier.baseLatex}^{${isolatedValueLatex}}`,
     };
   }
 

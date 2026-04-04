@@ -3,6 +3,7 @@ import { solutionsToLatex } from '../../format';
 import { matchSubstitutionSolve } from '../substitution-solve';
 import { validateCandidateRoots } from '../candidate-validation';
 import type {
+  CandidateValidationResult,
   DisplayOutcome,
   GuardedSolveRequest,
 } from '../../../types/calculator';
@@ -77,6 +78,45 @@ function matchAcceptedExactSolutions(exactLatex: string | undefined, accepted: n
   return matched;
 }
 
+function buildConstraintSupplementLatex(constraints: GuardedSolveRequest['domainConstraints'] = []) {
+  const supported = constraints.flatMap((constraint) => {
+    switch (constraint.kind) {
+      case 'positive':
+        return [`${constraint.expressionLatex}>0`];
+      case 'nonnegative':
+        return [`${constraint.expressionLatex}\\ge0`];
+      case 'nonzero':
+        return [`${constraint.expressionLatex}\\ne0`];
+      default:
+        return [];
+    }
+  });
+
+  if (supported.length === 0) {
+    return [] as string[];
+  }
+
+  return [`\\text{Conditions: } ${supported.join(',\\;')}`];
+}
+
+function substitutionRejectionMessage(rejected: CandidateValidationResult[]) {
+  const rejectedReasons = rejected.map((entry) => entry.reason.toLowerCase());
+
+  if (
+    rejectedReasons.some((reason) =>
+      reason.includes('denominator zero')
+      || reason.includes('non-positive')
+      || reason.includes('even root negative')
+      || reason.includes('undefined or non-real substitution')
+      || reason.includes('outside the permitted interval')
+      || reason.includes('must stay positive'))
+  ) {
+    return 'Candidate roots were found but rejected after applying preserved domain conditions to the original equation.';
+  }
+
+  return 'Candidate roots were found but rejected after substitution back into the original equation.';
+}
+
 function substitutionSolve(
   request: GuardedSolveRequest,
   depth: number,
@@ -129,6 +169,7 @@ function substitutionSolve(
     substitution.solveSummaryText,
     substitution.diagnostics,
   );
+  const substitutionSupplementLatex = buildConstraintSupplementLatex(substitution.domainConstraints);
 
   const isSubstitutionUnsupported =
     merged.kind === 'error'
@@ -194,7 +235,7 @@ function substitutionSolve(
   if (validation.accepted.length === 0) {
     return errorOutcome(
       'Solve',
-      'Candidate roots were found but rejected after substitution back into the original equation.',
+      substitutionRejectionMessage(validation.rejected),
       merged.warnings,
       merged.plannerBadges ?? [],
       dedupe([...(merged.solveBadges ?? []), 'Candidate Checked']),
@@ -217,6 +258,7 @@ function substitutionSolve(
     kind: 'success',
     title: 'Solve',
     exactLatex: solutionsToLatex('x', acceptedLatex),
+    exactSupplementLatex: dedupe([...(merged.exactSupplementLatex ?? []), ...substitutionSupplementLatex]),
     approxText: `x ~= ${validation.accepted.map((value) => {
       const rounded = Number(value.toFixed(12));
       return `${rounded}`.replace(/0+$/, '').replace(/\.$/, '');

@@ -91,6 +91,33 @@ describe('matchSubstitutionSolve', () => {
     expect(result.diagnostics?.family).toBe('inverse-isolation');
   });
 
+  it('matches same-base equality for exponential carriers', () => {
+    const result = matchSubstitutionSolve('e^{x+1}=e^{3x-5}', 'deg');
+
+    expect(result.kind).toBe('branches');
+    if (result.kind !== 'branches') {
+      throw new Error('Expected same-base equality branch');
+    }
+    expect(result.solveBadges).toContain('Same-Base Equality');
+    expect(result.equations[0]).toBe('x+1=3x-5');
+    expect(result.diagnostics?.family).toBe('same-base-equality');
+  });
+
+  it('matches same-base equality for logarithmic carriers', () => {
+    const result = matchSubstitutionSolve('\\ln\\left(x+1\\right)=\\ln\\left(2x-3\\right)', 'deg');
+
+    expect(result.kind).toBe('branches');
+    if (result.kind !== 'branches') {
+      throw new Error('Expected same-base equality branch');
+    }
+    expect(result.solveBadges).toContain('Same-Base Equality');
+    expect(result.equations[0]).toBe('x+1=2x-3');
+    expect(result.domainConstraints).toEqual([
+      { kind: 'positive', expressionLatex: 'x+1' },
+      { kind: 'positive', expressionLatex: '2x-3' },
+    ]);
+  });
+
   it('matches bounded log-combine sum families', () => {
     const result = matchSubstitutionSolve('\\ln\\left(x\\right)+\\ln\\left(x+1\\right)=2', 'deg');
     expect(result.kind).toBe('branches');
@@ -115,6 +142,40 @@ describe('matchSubstitutionSolve', () => {
     expect(result.diagnostics?.family).toBe('log-same-base');
   });
 
+  it('matches same-base log-quotient families', () => {
+    const result = matchSubstitutionSolve('\\ln\\left(x+1\\right)-\\ln\\left(x\\right)=\\ln\\left(2\\right)', 'deg');
+    expect(result.kind).toBe('branches');
+    if (result.kind !== 'branches') {
+      throw new Error('Expected log-quotient branch');
+    }
+    expect(result.solveBadges).toContain('Log Quotient');
+    expect(result.solveBadges).toContain('Same-Base Equality');
+    expect(result.equations[0]).toBe('\\frac{x+1}{x}=2');
+    expect(result.diagnostics?.family).toBe('log-quotient');
+  });
+
+  it('matches bounded mixed-base log families when change-of-base yields rational coefficients', () => {
+    const result = matchSubstitutionSolve('\\log_{2}\\left(x\\right)+\\log_{4}\\left(x\\right)=3', 'deg');
+    expect(result.kind).toBe('branches');
+    if (result.kind !== 'branches') {
+      throw new Error('Expected bounded mixed-base branch');
+    }
+    expect(result.solveBadges).toContain('Log Base Normalize');
+    expect(result.equations[0]).toBe('\\log_{2}\\left(x\\right)=2');
+    expect(result.diagnostics?.family).toBe('log-mixed-base-rational');
+  });
+
+  it('matches bounded mixed-base log differences when change-of-base yields rational coefficients', () => {
+    const result = matchSubstitutionSolve('\\log_{9}\\left(x\\right)-\\log_{3}\\left(x\\right)=-1', 'deg');
+    expect(result.kind).toBe('branches');
+    if (result.kind !== 'branches') {
+      throw new Error('Expected bounded mixed-base branch');
+    }
+    expect(result.solveBadges).toContain('Log Base Normalize');
+    expect(result.equations[0]).toBe('\\log_{9}\\left(x\\right)=1');
+    expect(result.diagnostics?.family).toBe('log-mixed-base-rational');
+  });
+
   it('recognizes mixed-base log families and normalizes by change-of-base', () => {
     const result = matchSubstitutionSolve('\\log_{4}\\left(4x\\right)+\\log\\left(6x\\right)=5', 'deg');
     expect(result.kind).toBe('branches');
@@ -137,6 +198,10 @@ describe('matchSubstitutionSolve', () => {
 
   it('keeps unsupported logarithmic difference forms out of bounded substitution matching', () => {
     const result = matchSubstitutionSolve('\\ln\\left(x\\right)-\\ln\\left(x+1\\right)=2', 'deg');
-    expect(result.kind).toBe('none');
+    expect(result.kind).toBe('branches');
+    if (result.kind !== 'branches') {
+      throw new Error('Expected log-quotient branch');
+    }
+    expect(result.solveBadges).toContain('Log Quotient');
   });
 });

@@ -943,12 +943,22 @@ Delivered:
 - added Equation preprocessing for notational variants that map into already-supported solver carriers without broadening solve scope
 
 ### Stage 5 - `PRL4` Bounded Solve Expansion
-Only after the earlier stages, broaden solve behavior for power/root/log equations.
+Status: shipped on 2026-04-03.
 
-Goals:
-- more isolated exponential/logarithmic/root equations in `Equation > Symbolic`
-- bounded recursive transforms through the existing guarded solver
-- explicit numeric fallback when symbolic stages stop short
+Broaden solve behavior for power/root/log equations on top of the earlier PRL stages.
+
+Delivered:
+- added bounded same-base equality solving for exponential, natural-log, and explicit-base log families
+- added bounded equation-side same-base log quotient preprocessing
+- added aggressive-but-bounded mixed-base log solving when change-of-base yields exact rational coefficient structure
+- added bounded two-sided radical/rational-power isolation with one safe lift before guarded recursion
+- preserved explicit numeric guidance for recognized mixed-base families that still fall outside bounded exact symbolic support
+
+Policy retained:
+- still real-domain only
+- still Equation-first
+- broader `Calculate` log difference/quotient simplify remains deferred
+- no Lambert W, variable log bases, unrestricted log identities, or general nested-radical solving
 
 ### Guiding Principle
 For this whole roadmap:

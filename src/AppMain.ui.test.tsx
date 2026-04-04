@@ -354,6 +354,43 @@ describe('AppMain UI automation flows', () => {
     expectMathStaticLatex(screen.getByTestId('display-outcome-exact'), 'x=9');
   });
 
+  it('solves PRL4 same-base equality families with visible provenance and conditions', async () => {
+    const { user } = await renderAppMain();
+
+    await openEquationSymbolic(user);
+    setMathFieldLatex('main-editor', '\\ln\\left(x+1\\right)=\\ln\\left(2x-3\\right)');
+    await user.click(screen.getByTestId('soft-action-solve'));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expectMathStaticLatex(screen.getByTestId('display-outcome-exact'), 'x=4');
+    expectMathStaticLatex(screen.getByTestId('display-outcome-supplement-0'), /2x-3>0/);
+    expect(screen.getByText('Same-Base Equality')).toBeInTheDocument();
+  });
+
+  it('solves PRL4 bounded mixed-base log families exactly in Equation mode', async () => {
+    const { user } = await renderAppMain();
+
+    await openEquationSymbolic(user);
+    setMathFieldLatex('main-editor', '\\log_{2}\\left(x\\right)+\\log_{4}\\left(x\\right)=3');
+    await user.click(screen.getByTestId('soft-action-solve'));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expectMathStaticLatex(screen.getByTestId('display-outcome-exact'), 'x=4');
+    expect(screen.getByText('Log Base Normalize')).toBeInTheDocument();
+  });
+
+  it('solves PRL4 bounded rational-power families with power-lift provenance', async () => {
+    const { user } = await renderAppMain();
+
+    await openEquationSymbolic(user);
+    setMathFieldLatex('main-editor', 'x^{\\frac{3}{2}}=8');
+    await user.click(screen.getByTestId('soft-action-solve'));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expectMathStaticLatex(screen.getByTestId('display-outcome-exact'), 'x=4');
+    expect(screen.getByText('Power Lift')).toBeInTheDocument();
+  });
+
   it('shows the new PRL3 Equation transforms without auto-solving the rewritten equation', async () => {
     const { user } = await renderAppMain();
 

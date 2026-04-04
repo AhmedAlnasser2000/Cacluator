@@ -294,3 +294,43 @@ test('PRL3 smoke lets Equation solve preprocessed fractional-power notation thro
   await expect(page.getByTestId('display-outcome-success')).toBeVisible();
   await expect(page.getByTestId('display-outcome-exact').locator('[aria-label="x=9"]')).toBeVisible();
 });
+
+test('PRL4 smoke solves same-base logarithmic equalities with condition lines', async ({ page }) => {
+  await openEquationSymbolic(page);
+  await setMathFieldLatex(page, '\\ln(x+1)=\\ln(2x-3)');
+  await page.getByTestId('soft-action-solve').click();
+
+  await expect(page.getByTestId('display-outcome-success')).toBeVisible();
+  await expect(page.locator('.result-badges .equation-origin-badge', { hasText: 'Same-Base Equality' })).toBeVisible();
+  await expect(page.getByTestId('display-outcome-exact').locator('[aria-label="x=4"]')).toBeVisible();
+  await expect(page.getByTestId('display-outcome-supplement-0')).toContainText(/2x.?3/);
+});
+
+test('PRL4 smoke solves bounded mixed-base log equations exactly', async ({ page }) => {
+  await openEquationSymbolic(page);
+  await setMathFieldLatex(page, '\\log_{2}(x)+\\log_{4}(x)=3');
+  await page.getByTestId('soft-action-solve').click();
+
+  await expect(page.getByTestId('display-outcome-success')).toBeVisible();
+  await expect(page.locator('.result-badges .equation-origin-badge', { hasText: 'Log Base Normalize' })).toBeVisible();
+  await expect(page.getByTestId('display-outcome-exact').locator('[aria-label="x=4"]')).toBeVisible();
+});
+
+test('PRL4 smoke keeps recognized unresolved mixed-base families on explicit numeric guidance', async ({ page }) => {
+  await openEquationSymbolic(page);
+  await setMathFieldLatex(page, '\\log_{2}(x)+\\log_{3}(x)=2');
+  await page.getByTestId('soft-action-solve').click();
+
+  await expect(page.getByTestId('display-outcome-error')).toBeVisible();
+  await expect(page.getByText(/recognized mixed-base log family/i)).toBeVisible();
+});
+
+test('PRL4 smoke solves bounded rational-power equations with power-lift provenance', async ({ page }) => {
+  await openEquationSymbolic(page);
+  await setMathFieldLatex(page, 'x^{\\frac{3}{2}}=8');
+  await page.getByTestId('soft-action-solve').click();
+
+  await expect(page.getByTestId('display-outcome-success')).toBeVisible();
+  await expect(page.locator('.result-badges .equation-origin-badge', { hasText: 'Power Lift' })).toBeVisible();
+  await expect(page.getByTestId('display-outcome-exact').locator('[aria-label="x=4"]')).toBeVisible();
+});

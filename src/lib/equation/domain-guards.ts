@@ -4,6 +4,7 @@ import type {
   SolveDomainConstraint,
 } from '../../types/calculator';
 import { parseSupportedRatio } from '../trigonometry/angles';
+import { evaluateRealNumericExpression } from '../real-numeric-eval';
 
 const ce = new ComputeEngine();
 const RESIDUAL_TOLERANCE = 1e-8;
@@ -61,10 +62,17 @@ export function evaluateLatexAt(latex: string, value: number) {
   const substituted = expr.subs({ x: value });
   const evaluated = substituted.evaluate();
   const numeric = evaluated.N?.() ?? evaluated;
+  let numericValue = readNumericNode(numeric.json);
+  if (numericValue === null) {
+    const fallback = evaluateRealNumericExpression(substituted.json, substituted.latex);
+    if (fallback.kind === 'success') {
+      numericValue = fallback.value;
+    }
+  }
   return {
     latex: numeric.latex,
     json: numeric.json,
-    value: readNumericNode(numeric.json),
+    value: numericValue,
   };
 }
 

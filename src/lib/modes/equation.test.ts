@@ -370,6 +370,61 @@ describe('runEquationMode', () => {
     expect(logCarrier.resolvedInputLatex).toBe('\\ln(2x+1)=3');
   });
 
+  it('solves new PRL4 same-base and mixed-base log families exactly in symbolic mode', () => {
+    const sameBase = runEquationMode({
+      ...makeRequest(),
+      equationScreen: 'symbolic',
+      equationLatex: '\\ln\\left(x+1\\right)=\\ln\\left(2x-3\\right)',
+    });
+    const mixedBase = runEquationMode({
+      ...makeRequest(),
+      equationScreen: 'symbolic',
+      equationLatex: '\\log_{2}\\left(x\\right)+\\log_{4}\\left(x\\right)=3',
+    });
+
+    expect(sameBase.kind).toBe('success');
+    if (sameBase.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(sameBase.exactLatex).toBe('x=4');
+    expect(sameBase.solveBadges).toContain('Same-Base Equality');
+    expect(sameBase.exactSupplementLatex?.[0]).toContain('2x-3>0');
+
+    expect(mixedBase.kind).toBe('success');
+    if (mixedBase.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(mixedBase.exactLatex).toBe('x=4');
+    expect(mixedBase.solveBadges).toContain('Log Base Normalize');
+  });
+
+  it('solves PRL4 bounded rational-power isolation families in symbolic mode', () => {
+    const direct = runEquationMode({
+      ...makeRequest(),
+      equationScreen: 'symbolic',
+      equationLatex: 'x^{\\frac{3}{2}}=8',
+    });
+    const twoSided = runEquationMode({
+      ...makeRequest(),
+      equationScreen: 'symbolic',
+      equationLatex: '\\left(2x+1\\right)^{\\frac{2}{3}}=5',
+    });
+
+    expect(direct.kind).toBe('success');
+    if (direct.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(direct.exactLatex).toBe('x=4');
+    expect(direct.solveBadges).toContain('Power Lift');
+
+    expect(twoSided.kind).toBe('success');
+    if (twoSided.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(twoSided.exactLatex).toContain('x\\in');
+    expect(twoSided.solveBadges).toContain('Power Lift');
+  });
+
   it('solves bounded trig squares through exact branch splitting', () => {
     const result = runEquationMode({
       ...makeRequest(),

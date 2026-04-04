@@ -7,7 +7,6 @@ import type {
 import {
   UNSUPPORTED_FAMILY_ERROR,
   errorOutcome,
-  successOutcome,
 } from './outcome';
 
 function extractExactSolutions(exactLatex?: string) {
@@ -88,21 +87,25 @@ function mergeDisplayOutcomes(
   const warnings = dedupe(successes.flatMap((outcome) => outcome.warnings));
   const plannerBadges = dedupe(successes.flatMap((outcome) => outcome.plannerBadges ?? []));
   const badgeSet = dedupe(successes.flatMap((outcome) => outcome.solveBadges ?? []).concat(solveBadges));
+  const exactSupplementLatex = dedupe(successes.flatMap((outcome) => outcome.exactSupplementLatex ?? []));
   const rejectedCandidateCount = successes.reduce((total, outcome) => total + (outcome.rejectedCandidateCount ?? 0), 0);
   const numericMethod = dedupe(successes.map((outcome) => outcome.numericMethod).filter((method): method is string => Boolean(method))).join('; ');
 
-  return successOutcome(
-    'Solve',
-    exactValues.length > 0 ? solutionsToLatex('x', exactValues) : undefined,
-    approxValues.length > 0 ? `x ~= ${approxValues.join(', ')}` : undefined,
+  return {
+    kind: 'success',
+    title: 'Solve',
+    exactLatex: exactValues.length > 0 ? solutionsToLatex('x', exactValues) : undefined,
+    exactSupplementLatex: exactSupplementLatex.length > 0 ? exactSupplementLatex : undefined,
+    approxText: approxValues.length > 0 ? `x ~= ${approxValues.join(', ')}` : undefined,
     warnings,
+    resultOrigin: approxValues.length > 0 && exactValues.length === 0 ? 'numeric-fallback' : 'symbolic',
     plannerBadges,
-    badgeSet,
+    solveBadges: badgeSet,
     solveSummaryText,
-    rejectedCandidateCount > 0 ? rejectedCandidateCount : undefined,
-    substitutionDiagnostics ?? successes.find((outcome) => outcome.substitutionDiagnostics)?.substitutionDiagnostics,
-    numericMethod || undefined,
-  );
+    rejectedCandidateCount: rejectedCandidateCount > 0 ? rejectedCandidateCount : undefined,
+    substitutionDiagnostics: substitutionDiagnostics ?? successes.find((outcome) => outcome.substitutionDiagnostics)?.substitutionDiagnostics,
+    numericMethod: numericMethod || undefined,
+  };
 }
 
 export {

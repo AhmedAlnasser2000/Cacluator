@@ -6,6 +6,7 @@ import { normalizeExactRationalNode } from '../../symbolic-engine/rational';
 import { detectRealRangeImpossibility } from '../range-impossibility';
 import { validateCandidateRoots } from '../candidate-validation';
 import type {
+  CandidateValidationResult,
   DisplayOutcome,
   GuardedSolveRequest,
   SolveDomainConstraint,
@@ -65,6 +66,38 @@ function formatAcceptedApproximations(values: number[]) {
 
   const parts = values.map((value) => value.toFixed(6).replace(/0+$/, '').replace(/\.$/, ''));
   return parts.length === 1 ? `x ~= ${parts[0]}` : `x ~= ${parts.join(', ')}`;
+}
+
+function candidateRejectionMessage(
+  constraints: SolveDomainConstraint[] = [],
+  rejected: CandidateValidationResult[] = [],
+) {
+  const rejectedReasons = rejected.map((entry) => entry.reason.toLowerCase());
+
+  if (rejectedReasons.some((reason) => reason.includes('denominator zero'))) {
+    return 'No valid real symbolic solution remains after applying denominator exclusions.';
+  }
+
+  if (
+    rejectedReasons.some((reason) =>
+      reason.includes('non-positive')
+      || reason.includes('even root negative')
+      || reason.includes('undefined or non-real substitution')
+      || reason.includes('outside the permitted interval')
+      || reason.includes('must stay positive'))
+  ) {
+    return 'No valid real symbolic solution remains after applying preserved domain conditions.';
+  }
+
+  if (constraints.some((constraint) => constraint.kind === 'nonzero')) {
+    return 'No valid real symbolic solution remains after applying denominator exclusions.';
+  }
+
+  if (constraints.length > 0) {
+    return 'No valid real symbolic solution remains after applying preserved domain conditions.';
+  }
+
+  return 'No valid real symbolic solution remains after candidate checking.';
 }
 
 function hasNonFiniteRawSolutions(symbolic: ReturnType<typeof runExpressionAction>) {
@@ -209,7 +242,7 @@ function validateDirectSymbolicOutcome(
   if (validation.accepted.length === 0) {
     return errorOutcome(
       'Solve',
-      'No valid symbolic solution remains after applying denominator exclusions.',
+      candidateRejectionMessage(request.domainConstraints, validation.rejected),
       symbolic.warnings,
       [],
       ['Candidate Checked'],
@@ -291,15 +324,6 @@ function runGuardedEquationSolve(
       rangeImpossibility.summaryText,
     ), request.resolvedLatex, preparedRequest);
   }
-  if (!symbolic.error && symbolic.exactLatex && !hasNonFiniteRawSolutions(symbolic)) {
-    const validated = validateDirectSymbolicOutcome(preparedRequest, symbolic);
-    return attachAlgebraMetadata(validated ?? successOutcome(
-      'Solve',
-      symbolic.exactLatex,
-      symbolic.approxText,
-      symbolic.warnings,
-    ), request.resolvedLatex, preparedRequest);
-  }
   if (algebraTransformed?.kind === 'error') {
     return attachAlgebraMetadata(algebraTransformed, request.resolvedLatex, preparedRequest);
   }
@@ -329,6 +353,16 @@ function runGuardedEquationSolve(
   }
   if (substituted?.kind === 'error') {
     return attachAlgebraMetadata(substituted, request.resolvedLatex, preparedRequest);
+  }
+
+  if (!symbolic.error && symbolic.exactLatex && !hasNonFiniteRawSolutions(symbolic)) {
+    const validated = validateDirectSymbolicOutcome(preparedRequest, symbolic);
+    return attachAlgebraMetadata(validated ?? successOutcome(
+      'Solve',
+      symbolic.exactLatex,
+      symbolic.approxText,
+      symbolic.warnings,
+    ), request.resolvedLatex, preparedRequest);
   }
 
   const numeric = numericIntervalSolve(preparedRequest);

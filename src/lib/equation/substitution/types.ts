@@ -30,7 +30,7 @@ export type ExpCarrier = {
 
 export type InverseCarrier =
   | { kind: 'ln'; inner: unknown; innerLatex: string; carrierLatex: string }
-  | { kind: 'log'; inner: unknown; innerLatex: string; carrierLatex: string }
+  | { kind: 'log'; inner: unknown; innerLatex: string; carrierLatex: string; baseLatex: string; baseNumeric: number }
   | { kind: 'exp'; inner: unknown; innerLatex: string; carrierLatex: string }
   | { kind: 'power'; inner: unknown; innerLatex: string; carrierLatex: string; baseLatex: string };
 
