@@ -8,7 +8,7 @@ export function parseSignedNumberInput(value: string) {
     return null;
   }
 
-  if (!/^[+-]?(?:\d+\.?\d*|\.\d+)$/.test(trimmed)) {
+  if (!/^[+-]?(?:(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)$/.test(trimmed)) {
     return null;
   }
 

@@ -11,11 +11,19 @@ describe('signed number input helpers', () => {
     expect(parseSignedNumberInput('+0.75')).toBe(0.75);
   });
 
+  it('parses scientific notation for large and small values', () => {
+    expect(parseSignedNumberInput('3e19')).toBe(3e19);
+    expect(parseSignedNumberInput('3.4e19')).toBe(3.4e19);
+    expect(parseSignedNumberInput('-5E-2')).toBe(-5e-2);
+  });
+
   it('allows intermediate typing without committing invalid partial values', () => {
     expect(parseSignedNumberInput('-')).toBeNull();
     expect(parseSignedNumberInput('+')).toBeNull();
     expect(parseSignedNumberInput('-.')).toBeNull();
     expect(parseSignedNumberInput('')).toBeNull();
+    expect(parseSignedNumberInput('3e')).toBeNull();
+    expect(parseSignedNumberInput('3e+')).toBeNull();
   });
 
   it('normalizes negative zero on formatting and parsing', () => {

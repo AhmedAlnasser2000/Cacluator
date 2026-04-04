@@ -162,6 +162,166 @@ describe('AppMain UI automation flows', () => {
     expect(screen.getByTestId('display-outcome-approx')).toHaveTextContent('0.987688');
   });
 
+  it('respects the selected angle unit when running Equation numeric interval solve', async () => {
+    const { user } = await renderAppMain();
+
+    await openEquationSymbolic(user);
+    setMathFieldLatex('main-editor', '\\sin\\left(x\\right)=\\frac{1}{2}');
+    await user.click(screen.getByRole('button', { name: 'Numeric Solve' }));
+
+    const startInput = screen.getByLabelText('Start');
+    const endInput = screen.getByLabelText('End');
+    const subdivisionsInput = screen.getByLabelText('Subdivisions');
+
+    await user.clear(startInput);
+    await user.type(startInput, '20');
+    fireEvent.blur(startInput);
+    await user.clear(endInput);
+    await user.type(endInput, '40');
+    fireEvent.blur(endInput);
+    await user.clear(subdivisionsInput);
+    await user.type(subdivisionsInput, '256');
+    await user.click(screen.getByRole('button', { name: 'Run Numeric Solve' }));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expect(screen.getByTestId('display-outcome-approx')).toHaveTextContent('x ~= 30');
+
+    await user.click(screen.getByTestId('settings-toggle'));
+    await screen.findByTestId('settings-panel');
+    await user.click(screen.getByTestId('settings-angle-unit-rad'));
+    await user.click(screen.getByTestId('settings-toggle'));
+    await waitFor(() => expect(screen.queryByTestId('settings-panel')).not.toBeInTheDocument());
+
+    await user.clear(startInput);
+    await user.type(startInput, '0');
+    fireEvent.blur(startInput);
+    await user.clear(endInput);
+    await user.type(endInput, '1');
+    fireEvent.blur(endInput);
+    await user.click(screen.getByRole('button', { name: 'Run Numeric Solve' }));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expect(screen.getByTestId('display-outcome-approx')).toHaveTextContent('x ~= 0.523599');
+
+    await user.click(screen.getByTestId('settings-toggle'));
+    await screen.findByTestId('settings-panel');
+    await user.click(screen.getByTestId('settings-angle-unit-grad'));
+    await user.click(screen.getByTestId('settings-toggle'));
+    await waitFor(() => expect(screen.queryByTestId('settings-panel')).not.toBeInTheDocument());
+
+    await user.clear(startInput);
+    await user.type(startInput, '30');
+    fireEvent.blur(startInput);
+    await user.clear(endInput);
+    await user.type(endInput, '40');
+    fireEvent.blur(endInput);
+    await user.click(screen.getByRole('button', { name: 'Run Numeric Solve' }));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expect(screen.getByTestId('display-outcome-approx')).toHaveTextContent('x ~= 33.3333');
+  }, 10000);
+
+  it('lets Equation numeric interval solve continue past unresolved composition guidance when a valid interval is provided', async () => {
+    const { user } = await renderAppMain();
+
+    await user.click(screen.getByTestId('settings-toggle'));
+    await screen.findByTestId('settings-panel');
+    await user.click(screen.getByTestId('settings-angle-unit-rad'));
+    await user.click(screen.getByTestId('settings-toggle'));
+    await waitFor(() => expect(screen.queryByTestId('settings-panel')).not.toBeInTheDocument());
+
+    await openEquationSymbolic(user);
+    setMathFieldLatex('main-editor', '\\tan\\left(\\ln\\left(x+1\\right)\\right)=1');
+    await user.click(screen.getByRole('button', { name: 'Numeric Solve' }));
+
+    const startInput = screen.getByLabelText('Start');
+    const endInput = screen.getByLabelText('End');
+    const subdivisionsInput = screen.getByLabelText('Subdivisions');
+
+    await user.clear(startInput);
+    await user.type(startInput, '1');
+    fireEvent.blur(startInput);
+    await user.clear(endInput);
+    await user.type(endInput, '2');
+    fireEvent.blur(endInput);
+    await user.clear(subdivisionsInput);
+    await user.type(subdivisionsInput, '512');
+    await user.click(screen.getByRole('button', { name: 'Run Numeric Solve' }));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expect(screen.getByTestId('display-outcome-approx')).toHaveTextContent('x ~= 1.19328');
+    expect(screen.getAllByText(/Bracket-first bisection \+ local-minimum recovery/i).length).toBeGreaterThan(0);
+  });
+
+  it('shows unit-aware branch guidance when Equation numeric interval solve misses a trig-composition branch', async () => {
+    const { user } = await renderAppMain();
+
+    await user.click(screen.getByTestId('settings-toggle'));
+    await screen.findByTestId('settings-panel');
+    await user.click(screen.getByTestId('settings-angle-unit-deg'));
+    await user.click(screen.getByTestId('settings-toggle'));
+    await waitFor(() => expect(screen.queryByTestId('settings-panel')).not.toBeInTheDocument());
+
+    await openEquationSymbolic(user);
+    setMathFieldLatex('main-editor', '\\tan\\left(\\ln\\left(x+1\\right)\\right)=1');
+    await user.click(screen.getByRole('button', { name: 'Numeric Solve' }));
+
+    const startInput = screen.getByLabelText('Start');
+    const endInput = screen.getByLabelText('End');
+    const subdivisionsInput = screen.getByLabelText('Subdivisions');
+
+    await user.clear(startInput);
+    await user.type(startInput, '0');
+    fireEvent.blur(startInput);
+    await user.clear(endInput);
+    await user.type(endInput, '10');
+    fireEvent.blur(endInput);
+    await user.clear(subdivisionsInput);
+    await user.type(subdivisionsInput, '512');
+    await user.click(screen.getByRole('button', { name: 'Run Numeric Solve' }));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-error')).toBeInTheDocument());
+    expect(screen.getByTestId('display-outcome-error')).toHaveTextContent('ln(x+1) stays about in');
+    expect(screen.getByTestId('display-outcome-error')).toHaveTextContent('45 deg + 180 deg * k');
+  }, 10000);
+
+  it('accepts scientific notation in Equation numeric interval inputs', async () => {
+    const { user } = await renderAppMain();
+
+    await user.click(screen.getByTestId('settings-toggle'));
+    await screen.findByTestId('settings-panel');
+    await user.click(screen.getByTestId('settings-angle-unit-deg'));
+    await user.click(screen.getByTestId('settings-toggle'));
+    await waitFor(() => expect(screen.queryByTestId('settings-panel')).not.toBeInTheDocument());
+
+    await openEquationSymbolic(user);
+    setMathFieldLatex('main-editor', '\\tan\\left(\\ln\\left(x+1\\right)\\right)=1');
+    await user.click(screen.getByRole('button', { name: 'Numeric Solve' }));
+
+    const startInput = screen.getByLabelText('Start');
+    const endInput = screen.getByLabelText('End');
+    const subdivisionsInput = screen.getByLabelText('Subdivisions');
+
+    await user.clear(startInput);
+    await user.type(startInput, '3e19');
+    fireEvent.blur(startInput);
+    await user.clear(endInput);
+    await user.type(endInput, '4e19');
+    fireEvent.blur(endInput);
+    await user.clear(subdivisionsInput);
+    await user.type(subdivisionsInput, '512');
+
+    await user.click(screen.getByRole('button', { name: 'Run Numeric Solve' }));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expect(
+      screen.getByText(
+        /Numeric solve on \[30000000000000000000, 40000000000000000000\] with 512 subdivisions/i,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('display-outcome-approx')).toHaveTextContent('3493427');
+  }, 10000);
+
   it('updates the symbolic-display preview live from settings controls', async () => {
     const { user } = await renderAppMain();
 
