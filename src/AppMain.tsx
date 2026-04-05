@@ -8796,6 +8796,60 @@ export default function App() {
                     </div>
                   </div>
                 ) : null}
+                {displayOutcome.periodicFamily.principalRangeLatex ? (
+                  <div className="result-summary-block" data-testid="display-outcome-periodic-principal-range">
+                    <div className="result-summary-label">Principal Range</div>
+                    <MathStatic
+                      className="result-math result-math-supplement"
+                      latex={displayOutcome.periodicFamily.principalRangeLatex}
+                      displayPrefs={symbolicDisplayPrefs}
+                    />
+                  </div>
+                ) : null}
+                {displayOutcome.periodicFamily.piecewiseBranches?.length ? (
+                  <div className="result-summary-block" data-testid="display-outcome-periodic-piecewise">
+                    <div className="result-summary-label">Piecewise Exact Branches</div>
+                    <div className="result-detail-lines">
+                      {displayOutcome.periodicFamily.piecewiseBranches.map((branch, index) => (
+                        <div key={`${branch.conditionLatex}-${branch.resultLatex}-${index}`} className="result-detail-line">
+                          <MathStatic
+                            className="result-math result-math-supplement"
+                            latex={`\\text{if } ${branch.conditionLatex}`}
+                            displayPrefs={symbolicDisplayPrefs}
+                          />
+                          <MathStatic
+                            className="result-math result-math-supplement"
+                            latex={branch.resultLatex}
+                            displayPrefs={symbolicDisplayPrefs}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                {displayOutcome.periodicFamily.reducedCarrierLatex || displayOutcome.periodicFamily.structuredStopReason ? (
+                  <div className="result-summary-block" data-testid="display-outcome-periodic-structured-stop">
+                    <div className="result-summary-label">Reduction Notes</div>
+                    <div className="result-detail-lines">
+                      {displayOutcome.periodicFamily.reducedCarrierLatex ? (
+                        <MathStatic
+                          className="result-math result-math-supplement"
+                          latex={`\\text{Reduced carrier: } ${displayOutcome.periodicFamily.reducedCarrierLatex}`}
+                          displayPrefs={symbolicDisplayPrefs}
+                        />
+                      ) : null}
+                      {displayOutcome.periodicFamily.structuredStopReason ? (
+                        <div className="result-detail-line result-summary-text">
+                          {displayOutcome.periodicFamily.structuredStopReason === 'second-periodic-parameter'
+                            ? 'Exact closure stops here because the next reduction would require a second independent periodic parameter.'
+                            : displayOutcome.periodicFamily.structuredStopReason === 'outside-principal-range'
+                              ? 'Exact closure stops here because the remaining branches fall outside the usable principal range.'
+                              : 'Exact closure stops here because finishing the identity would require broader sawtooth-style reduction than this bounded milestone allows.'}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
                 {displayOutcome.periodicFamily.suggestedIntervals?.length ? (
                   <div className="result-summary-block" data-testid="display-outcome-periodic-intervals">
                     <div className="result-summary-label">Suggested Intervals</div>

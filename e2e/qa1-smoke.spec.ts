@@ -613,6 +613,80 @@ test('COMP4 smoke solves bounded inverse-trig handoff through one supported foll
   await expect(page.getByTestId('display-outcome-exact')).toContainText(/e/);
 });
 
+test('COMP5 smoke shows unit-aware inverse-trig nested periodic guidance in degree mode', async ({ page }) => {
+  await openSettingsPanel(page);
+  await page.getByTestId('settings-angle-unit-deg').click();
+  await page.getByTestId('side-surface-overlay-backdrop').click();
+
+  await openEquationSymbolic(page);
+  await setMathFieldLatex(page, '\\arcsin\\left(\\cos\\left(\\arcsin\\left(\\sin\\left(x\\right)\\right)\\right)\\right)=30');
+  await page.getByTestId('soft-action-solve').click();
+
+  await expect(page.locator('.result-badges .equation-origin-badge', { hasText: 'Outer Inversion' })).toBeVisible();
+  await expect(page.locator('.result-badges .equation-origin-badge', { hasText: 'Periodic Family' })).toBeVisible();
+  await expect(page.locator('.result-badges .equation-origin-badge', { hasText: 'Nested Recursion' })).toBeVisible();
+
+  const exactOutcome = page.getByTestId('display-outcome-exact');
+  const errorOutcome = page.getByTestId('display-outcome-error');
+  const hasExactOutcome = await exactOutcome.count().then(async (count) => count > 0 && await exactOutcome.first().isVisible());
+
+  if (hasExactOutcome) {
+    await expect(exactOutcome).toContainText(/360k\+60/);
+    await expect(page.getByTestId('display-outcome-periodic-representatives')).toContainText(/x=60/);
+  } else {
+    await expect(errorOutcome).toBeVisible();
+    await expect(errorOutcome).toContainText(/unsupported exact solving/i);
+    await expect(page.getByTestId('display-outcome-periodic-representatives')).toContainText(/k=0/);
+    await expect(page.getByTestId('display-outcome-periodic-representatives')).toContainText(/=60/);
+  }
+});
+
+test('COMP5 smoke keeps deep nested periodic carriers on structured multi-parameter guidance', async ({ page }) => {
+  await openSettingsPanel(page);
+  await page.getByTestId('settings-angle-unit-deg').click();
+  await page.getByTestId('side-surface-overlay-backdrop').click();
+
+  await openEquationSymbolic(page);
+  await setMathFieldLatex(page, '\\sin\\left(\\cos\\left(\\tan\\left(x\\right)\\right)\\right)=0.00002');
+  await page.getByTestId('soft-action-solve').click();
+
+  await expect(page.getByTestId('display-outcome-error')).toBeVisible();
+  await expect(page.locator('.result-badges .equation-origin-badge', { hasText: 'Periodic Family' })).toBeVisible();
+  await expect(page.locator('.result-badges .equation-origin-badge', { hasText: 'Nested Recursion' })).toBeVisible();
+  await expect(page.getByTestId('display-outcome-error')).toContainText(/(second independent periodic parameter|unsupported exact solving)/i);
+  await expect(page.getByTestId('display-outcome-periodic-family')).toContainText(/tan\(x\)/i);
+});
+
+test('COMP6 smoke renders principal-range reductions with piecewise details in degree mode', async ({ page }) => {
+  await openSettingsPanel(page);
+  await page.getByTestId('settings-angle-unit-deg').click();
+  await page.getByTestId('side-surface-overlay-backdrop').click();
+
+  await openEquationSymbolic(page);
+  await setMathFieldLatex(page, '\\arctan\\left(\\tan\\left(\\cos\\left(x\\right)\\right)\\right)=1');
+  await page.getByTestId('soft-action-solve').click();
+
+  await expect(page.getByTestId('display-outcome-success')).toBeVisible();
+  await expect(page.locator('.result-badges .equation-origin-badge', { hasText: 'Principal Range' })).toBeVisible();
+  await expect(page.getByTestId('display-outcome-periodic-principal-range')).toContainText(/90/);
+  await expect(page.getByTestId('display-outcome-periodic-piecewise')).toContainText(/arctan/);
+});
+
+test('COMP6 smoke keeps inverse-direct trig reductions on structured second-parameter guidance', async ({ page }) => {
+  await openSettingsPanel(page);
+  await page.getByTestId('settings-angle-unit-rad').click();
+  await page.getByTestId('side-surface-overlay-backdrop').click();
+
+  await openEquationSymbolic(page);
+  await setMathFieldLatex(page, '\\arcsin\\left(\\sin\\left(\\tan\\left(x\\right)\\right)\\right)=\\frac{1}{2}');
+  await page.getByTestId('soft-action-solve').click();
+
+  await expect(page.getByTestId('display-outcome-error')).toBeVisible();
+  await expect(page.locator('.result-badges .equation-origin-badge', { hasText: 'Periodic Family' })).toBeVisible();
+  await expect(page.getByTestId('display-outcome-periodic-structured-stop')).toContainText(/second independent periodic parameter/i);
+  await expect(page.getByTestId('display-outcome-periodic-family')).toContainText(/tan\(x\)/i);
+});
+
 test('Equation numeric interval smoke can follow up unresolved composition guidance with a valid interval', async ({ page }) => {
   await openSettingsPanel(page);
   await page.getByTestId('settings-angle-unit-rad').click();

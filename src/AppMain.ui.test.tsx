@@ -854,6 +854,146 @@ describe('AppMain UI automation flows', () => {
     expect(screen.getByTestId('display-outcome-exact')).toHaveTextContent(/e/);
   });
 
+  it('renders COMP5 deeper periodic reductions through inverse-trig carriers as symbolic families', async () => {
+    const { user } = await renderAppMain();
+
+    await user.click(screen.getByTestId('settings-toggle'));
+    await screen.findByTestId('settings-panel');
+    await user.click(screen.getByTestId('settings-angle-unit-rad'));
+    await user.click(screen.getByTestId('settings-toggle'));
+    await waitFor(() => expect(screen.queryByTestId('settings-panel')).not.toBeInTheDocument());
+
+    await openEquationSymbolic(user);
+    setMathFieldLatex('main-editor', '\\cos\\left(\\arcsin\\left(\\sin\\left(x\\right)\\right)\\right)=\\frac{1}{2}');
+    await user.click(screen.getByTestId('soft-action-solve'));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expect(screen.getByText('Periodic Family')).toBeInTheDocument();
+    expect(screen.getByText('Nested Recursion')).toBeInTheDocument();
+    expect(screen.getByTestId('display-outcome-exact')).toHaveTextContent(/π/);
+    expect(screen.getByTestId('display-outcome-periodic-representatives')).toHaveTextContent(/k=0/);
+  });
+
+  it('renders COMP5 inverse-trig follow-on in degree mode with unit-aware periodic branches', async () => {
+    const { user } = await renderAppMain();
+
+    await user.click(screen.getByTestId('settings-toggle'));
+    await screen.findByTestId('settings-panel');
+    await user.click(screen.getByTestId('settings-angle-unit-deg'));
+    await user.click(screen.getByTestId('settings-toggle'));
+    await waitFor(() => expect(screen.queryByTestId('settings-panel')).not.toBeInTheDocument());
+
+    await openEquationSymbolic(user);
+    setMathFieldLatex('main-editor', '\\arcsin\\left(\\cos\\left(\\arcsin\\left(\\sin\\left(x\\right)\\right)\\right)\\right)=30');
+    await user.click(screen.getByTestId('soft-action-solve'));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expect(screen.getByText('Outer Inversion')).toBeInTheDocument();
+    expect(screen.getByText('Periodic Family')).toBeInTheDocument();
+    expect(screen.getByText('Nested Recursion')).toBeInTheDocument();
+    expect(screen.getByTestId('display-outcome-exact')).toHaveTextContent(/360k\+60/);
+  });
+
+  it('keeps COMP5 deep nested periodic carriers on structured multi-parameter guidance when exact closure would overreach', async () => {
+    const { user } = await renderAppMain();
+
+    await user.click(screen.getByTestId('settings-toggle'));
+    await screen.findByTestId('settings-panel');
+    await user.click(screen.getByTestId('settings-angle-unit-deg'));
+    await user.click(screen.getByTestId('settings-toggle'));
+    await waitFor(() => expect(screen.queryByTestId('settings-panel')).not.toBeInTheDocument());
+
+    await openEquationSymbolic(user);
+    setMathFieldLatex('main-editor', '\\sin\\left(\\cos\\left(\\tan\\left(x\\right)\\right)\\right)=0.00002');
+    await user.click(screen.getByTestId('soft-action-solve'));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-error')).toBeInTheDocument());
+    expect(screen.getByText('Periodic Family')).toBeInTheDocument();
+    expect(screen.getByText('Nested Recursion')).toBeInTheDocument();
+    expect(screen.getByTestId('display-outcome-error')).toHaveTextContent(/second independent periodic parameter/i);
+    expect(screen.getByTestId('display-outcome-periodic-family')).toHaveTextContent(/tan\(x\)/i);
+  });
+
+  it('renders COMP6 reciprocal trig rewrites as symbolic periodic families', async () => {
+    const { user } = await renderAppMain();
+
+    await user.click(screen.getByTestId('settings-toggle'));
+    await screen.findByTestId('settings-panel');
+    await user.click(screen.getByTestId('settings-angle-unit-deg'));
+    await user.click(screen.getByTestId('settings-toggle'));
+    await waitFor(() => expect(screen.queryByTestId('settings-panel')).not.toBeInTheDocument());
+
+    await openEquationSymbolic(user);
+    setMathFieldLatex('main-editor', '\\csc\\left(2x+30\\right)=2');
+    await user.click(screen.getByTestId('soft-action-solve'));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expect(screen.getByText('Periodic Family')).toBeInTheDocument();
+    expect(screen.getByText('Reciprocal Rewrite')).toBeInTheDocument();
+    expect(screen.getByTestId('display-outcome-exact')).toHaveTextContent(/180k/);
+    expect(screen.getByTestId('display-outcome-periodic-structured-stop')).toHaveTextContent(/Reduced carrier/i);
+  });
+
+  it('renders COMP6 reciprocal trig range failures with rewrite provenance', async () => {
+    const { user } = await renderAppMain();
+
+    await user.click(screen.getByTestId('settings-toggle'));
+    await screen.findByTestId('settings-panel');
+    await user.click(screen.getByTestId('settings-angle-unit-rad'));
+    await user.click(screen.getByTestId('settings-toggle'));
+    await waitFor(() => expect(screen.queryByTestId('settings-panel')).not.toBeInTheDocument());
+
+    await openEquationSymbolic(user);
+    setMathFieldLatex('main-editor', '\\sec\\left(\\sin\\left(x\\right)\\right)=2');
+    await user.click(screen.getByTestId('soft-action-solve'));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-error')).toBeInTheDocument());
+    expect(screen.getByText('Range Guard')).toBeInTheDocument();
+    expect(screen.getByText('Reciprocal Rewrite')).toBeInTheDocument();
+    expect(screen.getByTestId('display-outcome-error')).toHaveTextContent(/inner image/i);
+  });
+
+  it('renders COMP6 principal-range reductions with principal-range and piecewise details', async () => {
+    const { user } = await renderAppMain();
+
+    await user.click(screen.getByTestId('settings-toggle'));
+    await screen.findByTestId('settings-panel');
+    await user.click(screen.getByTestId('settings-angle-unit-deg'));
+    await user.click(screen.getByTestId('settings-toggle'));
+    await waitFor(() => expect(screen.queryByTestId('settings-panel')).not.toBeInTheDocument());
+
+    await openEquationSymbolic(user);
+    setMathFieldLatex('main-editor', '\\arctan\\left(\\tan\\left(\\cos\\left(x\\right)\\right)\\right)=1');
+    await user.click(screen.getByTestId('soft-action-solve'));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expect(screen.getByText('Periodic Family')).toBeInTheDocument();
+    expect(screen.getAllByText('Principal Range').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('display-outcome-exact')).toHaveTextContent(/360k/);
+    expect(screen.getByTestId('display-outcome-periodic-principal-range')).toHaveTextContent(/90/);
+    expect(screen.getByTestId('display-outcome-periodic-piecewise')).toHaveTextContent(/arctan/);
+  });
+
+  it('renders COMP6 inverse/direct trig structured stops with reduced-carrier guidance', async () => {
+    const { user } = await renderAppMain();
+
+    await user.click(screen.getByTestId('settings-toggle'));
+    await screen.findByTestId('settings-panel');
+    await user.click(screen.getByTestId('settings-angle-unit-rad'));
+    await user.click(screen.getByTestId('settings-toggle'));
+    await waitFor(() => expect(screen.queryByTestId('settings-panel')).not.toBeInTheDocument());
+
+    await openEquationSymbolic(user);
+    setMathFieldLatex('main-editor', '\\arcsin\\left(\\sin\\left(\\tan\\left(x\\right)\\right)\\right)=\\frac{1}{2}');
+    await user.click(screen.getByTestId('soft-action-solve'));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-error')).toBeInTheDocument());
+    expect(screen.getByText('Periodic Family')).toBeInTheDocument();
+    expect(screen.getByText('Nested Recursion')).toBeInTheDocument();
+    expect(screen.getByTestId('display-outcome-periodic-structured-stop')).toHaveTextContent(/second independent periodic parameter/i);
+    expect(screen.getByTestId('display-outcome-periodic-structured-stop')).toHaveTextContent(/tan/);
+  });
+
   it('shows the new PRL3 Equation transforms without auto-solving the rewritten equation', async () => {
     const { user } = await renderAppMain();
 

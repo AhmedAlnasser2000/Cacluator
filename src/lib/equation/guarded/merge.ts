@@ -48,6 +48,15 @@ function dedupe<T>(values: T[]) {
   return [...new Set(values)];
 }
 
+function mergeDetailSections(outcomes: DisplayOutcome[]) {
+  const encoded = dedupe(
+    outcomes
+      .flatMap((outcome) => outcome.kind === 'prompt' ? [] : outcome.detailSections ?? [])
+      .map((section) => JSON.stringify(section)),
+  );
+  return encoded.map((entry) => JSON.parse(entry));
+}
+
 function mergePeriodicFamilies(families: PeriodicFamilyInfo[]) {
   if (families.length === 0) {
     return undefined;
@@ -68,6 +77,18 @@ function mergePeriodicFamilies(families: PeriodicFamilyInfo[]) {
   const suggestedIntervals = dedupe(
     families.flatMap((family) => family.suggestedIntervals ?? []).map((entry) => JSON.stringify(entry)),
   ).map((entry) => JSON.parse(entry));
+  const piecewiseBranches = dedupe(
+    families.flatMap((family) => family.piecewiseBranches ?? []).map((entry) => JSON.stringify(entry)),
+  ).map((entry) => JSON.parse(entry));
+  const principalRangeLatex = dedupe(
+    families.map((family) => family.principalRangeLatex).filter((entry): entry is string => Boolean(entry)),
+  );
+  const reducedCarrierLatex = dedupe(
+    families.map((family) => family.reducedCarrierLatex).filter((entry): entry is string => Boolean(entry)),
+  );
+  const structuredStopReason = dedupe(
+    families.map((family) => family.structuredStopReason).filter((entry): entry is NonNullable<PeriodicFamilyInfo['structuredStopReason']> => Boolean(entry)),
+  );
 
   return {
     carrierLatex,
@@ -76,6 +97,10 @@ function mergePeriodicFamilies(families: PeriodicFamilyInfo[]) {
     branchesLatex: dedupe(families.flatMap((family) => family.branchesLatex)),
     representatives: representatives.length > 0 ? representatives : undefined,
     suggestedIntervals: suggestedIntervals.length > 0 ? suggestedIntervals : undefined,
+    piecewiseBranches: piecewiseBranches.length > 0 ? piecewiseBranches : undefined,
+    principalRangeLatex: principalRangeLatex.length > 0 ? principalRangeLatex[0] : undefined,
+    reducedCarrierLatex: reducedCarrierLatex.length > 0 ? reducedCarrierLatex[0] : undefined,
+    structuredStopReason: structuredStopReason.length > 0 ? structuredStopReason[0] : undefined,
   } satisfies PeriodicFamilyInfo;
 }
 
@@ -120,6 +145,7 @@ function mergeDisplayOutcomes(
   const plannerBadges = dedupe(successes.flatMap((outcome) => outcome.plannerBadges ?? []));
   const badgeSet = dedupe(successes.flatMap((outcome) => outcome.solveBadges ?? []).concat(solveBadges));
   const exactSupplementLatex = dedupe(successes.flatMap((outcome) => outcome.exactSupplementLatex ?? []));
+  const detailSections = mergeDetailSections(successes);
   const candidateValues = dedupe(successes.flatMap((outcome) => outcome.candidateValues ?? []));
   const rejectedCandidateCount = successes.reduce((total, outcome) => total + (outcome.rejectedCandidateCount ?? 0), 0);
   const numericMethod = dedupe(successes.map((outcome) => outcome.numericMethod).filter((method): method is string => Boolean(method))).join('; ');
@@ -136,6 +162,7 @@ function mergeDisplayOutcomes(
     periodicFamily,
     exactSupplementLatex: exactSupplementLatex.length > 0 ? exactSupplementLatex : undefined,
     approxText: approxValues.length > 0 ? `x ~= ${approxValues.join(', ')}` : undefined,
+    detailSections: detailSections.length > 0 ? detailSections : undefined,
     warnings,
     resultOrigin: approxValues.length > 0 && exactValues.length === 0 ? 'numeric-fallback' : 'symbolic',
     plannerBadges,

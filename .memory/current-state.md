@@ -33,6 +33,13 @@
 - Extracted `src/app/*`, `src/styles/app/*`, and decomposition facades under solver/guide/types are in-tree and passing regression.
 
 ## Most Recent Completed Milestone
+- Completed `COMP6` as the reciprocal-trig and canonical inverse/direct trig composition milestone:
+  - added bounded reciprocal trig composition support for `sec`, `csc`, and `cot` through reciprocal rewrite into the existing `sin/cos/tan` periodic-family machinery
+  - added bounded principal-range reduction for canonical inverse/direct trig forms such as `\arctan(\tan(g(x)))` when the inner carrier is provably contained in the selected unit's principal range
+  - extended periodic-family result metadata and UI rendering with principal-range details, piecewise exact branch summaries, reduced-carrier notes, and structured stop reasons
+  - kept deeper inverse/direct trig reductions honest by stopping with structured guidance when exact closure would require a second periodic parameter or broader sawtooth-style reduction
+- Regression checks:
+  - `npm run test:gate`
 - Completed `COMP3` as the periodic branch-family milestone for composition solving:
   - upgraded bounded trig follow-on from numeric-guidance-only stops to symbolic periodic-family results when the remaining carrier can still finish through bounded exact handoff
   - added structured periodic-family metadata to Equation outcomes, including general family latex, representative branches, and branch-aware numeric interval suggestions
@@ -73,6 +80,11 @@
   - `npm run test:gate`
 
 ## Recent Verified Context
+- `COMP6` reciprocal trig and principal-range composition solving is now verified in `Equation > Symbolic`:
+  - reciprocal trig composition now supports bounded `sec/csc/cot` rewrites and preserves `Reciprocal Rewrite` provenance through exact periodic-family solves or bounded range rejection
+  - canonical inverse/direct trig reductions now surface `Principal Range` provenance plus structured piecewise/principal-range metadata when a bounded identity-style reduction is mathematically safe
+  - the shared result card now renders principal-range summaries, piecewise exact branches, and structured reduced-carrier stop notes for periodic-family outcomes
+  - browser-first automation now verifies degree-mode principal-range rendering and structured inverse/direct trig guidance; reciprocal trig remains fully covered in unit/UI while real-browser reciprocal command entry remains narrower than the solver surface
 - `COMP3` periodic family solving is now verified in `Equation > Symbolic`:
   - bounded trig follow-on now yields symbolic family output instead of guidance-only stops when the remaining carrier can still finish through exact bounded handoff
   - periodic-family results now carry general family latex, representative branches, and branch-aware interval suggestions in the shared result card
@@ -279,9 +291,11 @@
   - `.memory/research/TRACK-PRL4-MANUAL-VERIFICATION-CHECKLIST.md`
 
 ## Next Recommended Task
-- The `PRL1`-`PRL4` stack plus `COMP1`-`COMP3` are now shipped end-to-end.
+- The `PRL1`-`PRL4` stack plus `COMP1`-`COMP5` are now shipped end-to-end.
 - Best next discussion point:
-  1. decide whether the next composition step should broaden parameterized nonlinear carriers beyond affine / pure power forms, or open a separate calculus-composition lane that reuses the new outer/inner structure engine
+  1. choose which explicit post-`COMP5` lane starts first:
+     - `COMP6` for reciprocal trig plus stronger bounded periodic pruning in Equation
+     - `CALC-COMP1` for bounded substitution-style antiderivatives
 
 ## Recent Verified Context
 - Equation numeric interval solving now respects `RAD` / `DEG` / `GRAD` consistently across residual checks, candidate validation, and interval search.
@@ -290,3 +304,9 @@
 - `COMP4` now finishes parameterized periodic families for bounded affine/power-form carriers such as `sin(x^2)=1/2` and `sin((2x+1)^3)=0`, while still stopping honestly on broader nonlinear carriers like `sin(x^2+x)=1/2`.
 - Inverse-trig outers now participate in bounded composition solving: cases like `arcsin(2x-1)=30` and `arctan(ln(x+1))=45` solve through unit-aware principal-range checks plus one supported follow-on handoff.
 - Compute Engine-backed inverse-trig evaluation now converts principal values into the selected angle unit explicitly, so guarded candidate validation and Equation solving stay consistent in `RAD`, `DEG`, and `GRAD`.
+- `COMP5` now allows one deeper bounded periodic reduction beyond `COMP4`, broadens inverse-trig follow-on inside composition, and returns structured guidance when deeper nesting would require a second independent periodic parameter.
+- Nested periodic cases such as `sin(cos(tan x))=0.00002` now reduce farther before stopping, preserve the last valid family, and surface branch-aware interval guidance instead of generic unsupported-family errors.
+- A nested inverse-trig periodic browser case can still land in either bounded exact closure or structured guidance depending on runtime context; the gate is green, but a later parity cleanup may still be worthwhile.
+- The composition roadmap is now explicitly split after `COMP5`:
+  - Equation lane next candidate: `COMP6` for reciprocal trig, stronger bounded periodic pruning, and cleaner inverse/direct trig canonical reductions
+  - Calculus lane first candidates: `CALC-COMP1` bounded substitution antiderivatives, `CALC-COMP2` composition-aware derivative explanation, and `CALC-COMP3` composition-aware limits/domain reasoning

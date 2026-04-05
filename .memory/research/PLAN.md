@@ -1105,6 +1105,115 @@ Expected outcome by end of `COMP4`:
 - inverse-trig outers become first-class bounded composition citizens in Equation
 - broader nonlinear carriers like `sin(x^2+x)=1/2` remain explicitly recognized but unresolved, with honest structured guidance
 
+#### `COMP5` - Deeper Periodic Nesting and Broader Bounded Inverse-Trig Follow-On
+Purpose:
+- push the Equation composition track into the next visible gap after `COMP4`: deeper nested periodic carriers and richer inverse-trig follow-on, while still staying bounded and real-domain only.
+
+Status:
+- shipped on 2026-04-05 as a bounded Equation-first milestone
+
+In scope:
+- deeper periodic composition when one periodic family feeds another structured carrier and the solver can still prune by image/range or bounded handoff
+- broader inverse-trig enhancement inside Equation composition, including:
+  - inverse-trig over already-supported trig/log/power carriers when principal-range checks stay finite and honest
+  - better principal-range pruning and branch filtering after inverse-trig inversion
+  - structured guidance plus suggested intervals when inverse-trig follow-on is recognized but still too deep to finish exactly
+- nested periodic examples where the current solver can reduce one layer but still stops before the next structured reduction
+
+Examples this milestone should target:
+- `sin(cos(tan x))=c` for small reachable `c`
+- `cos(sin(2x+1))=c` when the inner image keeps the outer target finite and bounded
+- richer inverse-trig follow-on such as `arcsin(sin((2x+1)^3))=30` when principal-range filtering keeps the branch set honest
+- clearer structured stops for cases that still exceed bounded exact closure after one or two reductions
+
+Expected outcome by end of `COMP5`:
+- more nested periodic textbook-style equations reduce further before stopping
+- inverse-trig support moves beyond first-pass handoff and becomes more useful in real mixed trig/log/power compositions
+- unresolved deep periodic cases still read as deliberate bounded stops with image/range context and practical numeric guidance
+
+### Future split after `COMP5`
+At this point the roadmap should separate clearly into two lanes:
+- further Equation-composition expansion only if the remaining bounded symbolic gaps are still product-critical
+- a dedicated calculus-composition lane for chain-rule structure, substitution-style antiderivatives, and composition-aware limits/domain behavior
+
+#### `COMP6` - Reciprocal Trig, Stronger Periodic Pruning, and Canonical Inverse/Direct Trig Reduction
+Purpose:
+- continue the Equation-composition lane only where the repo already shows a clear bounded extension surface:
+  - reciprocal trig composition (`sec`, `csc`, `cot`)
+  - stronger image/range pruning before the solver declares a second periodic parameter unavoidable
+  - cleaner canonical handling of nested inverse/direct trig identities when the bounded real-domain reduction is mathematically safe
+
+In scope:
+- reciprocal trig family generation and bounded handoff on top of the existing trig composition stage
+- stronger pruning for nested periodic cases that may still collapse to a single practical parameter after image/range filtering
+- canonical reductions such as bounded `arcsin(sin x)`, `arccos(cos x)`, and `arctan(tan x)` behavior when the principal-range story is explicit and the selected angle unit is preserved
+
+Examples this milestone should target:
+- `sec(cos x)=2`
+- `cot(\ln(x+1))=1`
+- bounded identity-style reductions such as `arctan(tan x)=45` where principal-range filtering is the real issue, not syntax
+
+Expected outcome by end of `COMP6`:
+- Equation composition gains the most natural remaining trig-family extensions without opening unrestricted multi-parameter periodic search
+- nested trig/inverse-trig cases get cleaner bounded reductions before structured guidance is shown
+- if the next step still truly needs multi-parameter periodic closure, the solver keeps stopping honestly
+
+#### `CALC-COMP1` - Bounded Substitution Antiderivatives
+Purpose:
+- start the separate calculus-composition lane with the highest-payoff textbook gap already visible in the repo: substitution-style antiderivatives.
+
+In scope:
+- detect bounded `f(g(x)) * g'(x)` patterns in the antiderivative rule engine
+- reuse the existing antiderivative families for the outer function once the inner derivative matches exactly or by a safe constant factor
+- keep output symbolic, exact, and human-readable
+
+Examples this milestone should target:
+- `\sin(x^2) \cdot 2x`
+- `e^{x^2} \cdot 2x`
+- `(x^2+1)^5 \cdot 2x`
+- `\frac{2x}{x^2+1}`
+
+Expected outcome by end of `CALC-COMP1`:
+- the calculus surface handles the first real composition family users expect from substitution
+- the repo stops failing obvious chain-rule antiderivative inputs like `\sin(x^2) \cdot 2x`
+- bounded calculus composition starts by reusing the existing symbolic rule engine instead of introducing a second unrelated subsystem
+
+#### `CALC-COMP2` - Composition-Aware Derivative Structure and Chain-Rule Explanation
+Purpose:
+- make derivative output composition-aware and teachable, not just algebraically correct.
+
+In scope:
+- outer/inner decomposition for derivative results
+- repeated chain-rule explanation for nested carriers
+- clear principal-domain notes when inverse-trig or log/ root compositions matter
+
+Examples this milestone should target:
+- `\frac{d}{dx}\sin(x^2)`
+- `\frac{d}{dx}\ln(\sqrt{x+1})`
+- `\frac{d}{dx}\arctan(e^x)`
+
+Expected outcome by end of `CALC-COMP2`:
+- derivative workflows can explain composition structure in the same deliberate way Equation now explains bounded solve structure
+- repeated chain-rule steps feel productized instead of hidden inside a final simplified expression
+
+#### `CALC-COMP3` - Composition-Aware Limits and Domain/Image Reasoning
+Purpose:
+- extend the calculus lane from derivatives/integrals into composite limits and one-sided domain reasoning.
+
+In scope:
+- inner-domain checks before numeric fallback
+- bounded image/range reasoning for common composite limit patterns
+- clearer symbolic-vs-numeric limit fallback messaging when a composite expression is recognized but not fully solvable symbolically
+
+Examples this milestone should target:
+- `\lim_{x \to 0}\frac{\sin(x^2)}{x^2}`
+- `\lim_{x \to 0}\frac{1-\cos(g(x))}{(g(x))^2}`
+- `\lim_{x \to \infty}\arctan(\ln x)`
+
+Expected outcome by end of `CALC-COMP3`:
+- composite limits become the third calculus surface to reuse the same outer/inner structural reasoning developed across the composition roadmaps
+- the calculus lane gains a coherent identity: substitution, chain-rule structure, and composition-aware limits all share one bounded composition philosophy
+
 ### Recommended boundary for the full roadmap
 This composition track should remain bounded and should **not** promise:
 - unrestricted multi-layer composition search
@@ -1116,11 +1225,13 @@ This composition track should remain bounded and should **not** promise:
 - Lambert W or `x^x`-style transcendental families
 
 ### What success looks like at the end of the roadmap
-If `COMP1`-`COMP3` land well, Calcwiz should be able to:
+If the Equation-composition lane through `COMP5` and the first calculus-composition lane (`CALC-COMP1`-`CALC-COMP3`) land well, Calcwiz should be able to:
 - solve many practical `f(g(x))=c` equations in the real domain
 - recurse through one nested carrier into already-supported solver families
 - prove impossibility for common composite cases using image/range arguments
 - preserve domain conditions and candidate validation throughout
 - stop honestly, with explicit numeric guidance, when a composite family is recognized but exceeds the current bounded symbolic depth
+- recognize and solve the first substitution-style antiderivatives built from `f(g(x)) \cdot g'(x)` patterns
+- explain derivative and limit composition structure in a way that matches the bounded, provenance-heavy style already established in Equation
 
 That would close one of the most visible remaining gaps between Calcwiz's current bounded solver and user expectations for nested textbook-style equations.

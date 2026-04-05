@@ -779,6 +779,136 @@ describe('runGuardedEquationSolve', () => {
     expect(result.error).toContain('current exact bounded solve set');
   });
 
+  it('reduces one deeper periodic layer through inverse-trig carriers when the principal range leaves a finite branch set', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      angleUnit: 'rad',
+      originalLatex: '\\cos\\left(\\arcsin\\left(\\sin\\left(x\\right)\\right)\\right)=\\frac{1}{2}',
+      resolvedLatex: '\\cos\\left(\\arcsin\\left(\\sin\\left(x\\right)\\right)\\right)=\\frac{1}{2}',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected deeper periodic inverse-trig follow-on success');
+    }
+    expect(result.solveBadges).toContain('Periodic Family');
+    expect(result.solveBadges).toContain('Nested Recursion');
+    expect(result.exactLatex ?? '').toContain('\\frac{\\pi}{3}');
+    expect(result.periodicFamily?.branchesLatex.length ?? 0).toBeGreaterThan(1);
+  });
+
+  it('solves inverse-trig wrappers over deeper periodic carriers in non-radian mode', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      angleUnit: 'deg',
+      originalLatex: '\\arcsin\\left(\\cos\\left(\\arcsin\\left(\\sin\\left(x\\right)\\right)\\right)\\right)=30',
+      resolvedLatex: '\\arcsin\\left(\\cos\\left(\\arcsin\\left(\\sin\\left(x\\right)\\right)\\right)\\right)=30',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected non-radian inverse-trig periodic follow-on success');
+    }
+    expect(result.solveBadges).toContain('Outer Inversion');
+    expect(result.solveBadges).toContain('Periodic Family');
+    expect(result.solveBadges).toContain('Nested Recursion');
+    expect(result.exactLatex ?? '').toContain('360k+60');
+  });
+
+  it('keeps deep nested periodic carriers honest when exact closure would require a second independent periodic parameter', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      angleUnit: 'deg',
+      originalLatex: '\\sin\\left(\\cos\\left(\\tan\\left(x\\right)\\right)\\right)=0.00002',
+      resolvedLatex: '\\sin\\left(\\cos\\left(\\tan\\left(x\\right)\\right)\\right)=0.00002',
+    });
+
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') {
+      throw new Error('Expected structured deep-periodic guidance');
+    }
+    expect(result.solveBadges).toContain('Periodic Family');
+    expect(result.solveBadges).toContain('Nested Recursion');
+    expect(result.error).toContain('second independent periodic parameter');
+    expect(result.exactLatex ?? '').toContain('\\tan(x)');
+  });
+
+  it('solves direct reciprocal trig equations like cot(x)=0 as symbolic periodic families', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      angleUnit: 'rad',
+      originalLatex: '\\cot\\left(x\\right)=0',
+      resolvedLatex: '\\cot\\left(x\\right)=0',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected cot periodic family success');
+    }
+    expect(result.solveBadges).toContain('Periodic Family');
+    expect(result.solveBadges).toContain('Reciprocal Rewrite');
+    expect(result.exactLatex ?? '').toContain('\\frac{\\pi}{2}');
+    expect(result.periodicFamily?.reducedCarrierLatex).toContain('\\cos');
+  });
+
+  it('rejects reciprocal trig targets outside the reachable real image after bounded rewrite', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      angleUnit: 'rad',
+      originalLatex: '\\sec\\left(\\sin\\left(x\\right)\\right)=2',
+      resolvedLatex: '\\sec\\left(\\sin\\left(x\\right)\\right)=2',
+    });
+
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') {
+      throw new Error('Expected reciprocal trig range rejection');
+    }
+    expect(result.solveBadges).toContain('Range Guard');
+    expect(result.solveBadges).toContain('Reciprocal Rewrite');
+    expect(result.solveSummaryText ?? '').toContain('Reciprocal rewrite');
+    expect(result.error).toContain('inner image');
+  });
+
+  it('reduces inverse/direct trig identities exactly when the inner carrier stays inside the principal range', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      angleUnit: 'deg',
+      originalLatex: '\\arctan\\left(\\tan\\left(\\cos\\left(x\\right)\\right)\\right)=1',
+      resolvedLatex: '\\arctan\\left(\\tan\\left(\\cos\\left(x\\right)\\right)\\right)=1',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected principal-range exact reduction');
+    }
+    expect(result.solveBadges).toContain('Periodic Family');
+    expect(result.solveBadges).toContain('Principal Range');
+    expect(result.exactLatex).toBe('x=360k');
+    expect(result.exactSupplementLatex?.join(' ') ?? '').toContain('\\text{Principal range: }');
+    expect(result.periodicFamily?.principalRangeLatex).toContain('-90');
+    expect(result.periodicFamily?.piecewiseBranches?.[0]?.resultLatex ?? '').toContain('\\cos(x)');
+  });
+
+  it('keeps inverse/direct trig reductions on structured guidance when the next exact step needs a second periodic parameter', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      angleUnit: 'rad',
+      originalLatex: '\\arcsin\\left(\\sin\\left(\\tan\\left(x\\right)\\right)\\right)=\\frac{1}{2}',
+      resolvedLatex: '\\arcsin\\left(\\sin\\left(\\tan\\left(x\\right)\\right)\\right)=\\frac{1}{2}',
+    });
+
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') {
+      throw new Error('Expected structured inverse/direct trig guidance');
+    }
+    expect(result.solveBadges).toContain('Outer Inversion');
+    expect(result.solveBadges).toContain('Periodic Family');
+    expect(result.solveBadges).toContain('Nested Recursion');
+    expect(result.periodicFamily?.structuredStopReason).toBe('second-periodic-parameter');
+    expect(result.periodicFamily?.reducedCarrierLatex).toContain('\\tan(x)');
+    expect(result.error).toContain('second independent periodic parameter');
+  });
+
   it('stops with explicit numeric guidance when a composition would exceed the two-step inversion cap', () => {
     const result = runGuardedEquationSolve({
       ...request,

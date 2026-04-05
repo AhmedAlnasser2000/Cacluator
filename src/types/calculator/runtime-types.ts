@@ -182,6 +182,8 @@ export type PlannerBadge =
   | 'Trig Solve Backend'
   | 'Hard Stop';
 export type SolveBadge =
+  | 'Reciprocal Rewrite'
+  | 'Principal Range'
   | 'Outer Inversion'
   | 'Composition Branch'
   | 'Nested Recursion'
@@ -676,6 +678,11 @@ export type PeriodicIntervalSuggestion = {
   end: string;
 };
 
+export type PeriodicPiecewiseBranch = {
+  conditionLatex: string;
+  resultLatex: string;
+};
+
 export type PeriodicFamilyInfo = {
   carrierLatex: string;
   parameterLatex: string;
@@ -683,6 +690,10 @@ export type PeriodicFamilyInfo = {
   branchesLatex: string[];
   representatives?: PeriodicFamilyRepresentative[];
   suggestedIntervals?: PeriodicIntervalSuggestion[];
+  piecewiseBranches?: PeriodicPiecewiseBranch[];
+  principalRangeLatex?: string;
+  reducedCarrierLatex?: string;
+  structuredStopReason?: 'second-periodic-parameter' | 'outside-principal-range' | 'unsupported-sawtooth-closure';
 };
 
 export type DisplayOutcome =

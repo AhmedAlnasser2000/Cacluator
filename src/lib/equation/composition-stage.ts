@@ -25,9 +25,11 @@ import { matchAffineVariableArgument } from '../trigonometry/normalize';
 import type {
   AngleUnit,
   CandidateValidationResult,
+  DisplayDetailSection,
   DisplayOutcome,
   GuardedSolveRequest,
   PeriodicFamilyInfo,
+  PeriodicPiecewiseBranch,
   PeriodicFamilyRepresentative,
   PeriodicIntervalSuggestion,
   SolveBadge,
@@ -60,6 +62,9 @@ type NonPeriodicTransform = {
   solveBadges: SolveBadge[];
   solveSummaryText: string;
   unresolvedError: string;
+  exactSupplementLatex?: string[];
+  detailSections?: DisplayDetailSection[];
+  periodicFamilyExtras?: Partial<PeriodicFamilyInfo>;
 };
 
 type TrigBranchResult =
@@ -67,16 +72,19 @@ type TrigBranchResult =
       kind: 'impossible';
       error: string;
       summaryText: string;
+      solveBadges?: SolveBadge[];
     }
   | {
       kind: 'branches';
       equations: string[];
       summaryText: string;
+      solveBadges?: SolveBadge[];
     }
   | {
       kind: 'unresolved';
       error: string;
       summaryText: string;
+      solveBadges?: SolveBadge[];
     };
 
 type SymbolicFamilyBranch = {
@@ -590,6 +598,61 @@ function buildInverseTrigPrincipalRangeMessage(
   return `${opener}${formatAngleUnitValueText(range.min, angleUnit)}, ${formatAngleUnitValueText(range.max, angleUnit)}${closer}`;
 }
 
+function formatAngleUnitValueLatex(value: number, angleUnit: AngleUnit) {
+  return formatDegreesAsUnitLatex(convertAngle(value, angleUnit, 'deg'), angleUnit);
+}
+
+function buildInverseTrigPrincipalRangeLatex(
+  kind: 'asin' | 'acos' | 'atan',
+  angleUnit: AngleUnit,
+) {
+  const range = inverseTrigPrincipalRange(kind, angleUnit);
+  const opener = range.minInclusive ? '\\left[' : '\\left(';
+  const closer = range.maxInclusive ? '\\right]' : '\\right)';
+  return `${opener}${formatAngleUnitValueLatex(range.min, angleUnit)}, ${formatAngleUnitValueLatex(range.max, angleUnit)}${closer}`;
+}
+
+function intervalWithinPrincipalRange(
+  interval: { min: number; max: number; minInclusive: boolean; maxInclusive: boolean },
+  principalRange: { min: number; max: number; minInclusive: boolean; maxInclusive: boolean },
+) {
+  const minOkay = principalRange.minInclusive
+    ? interval.min >= principalRange.min - EPSILON
+    : interval.min > principalRange.min + EPSILON;
+  const maxOkay = principalRange.maxInclusive
+    ? interval.max <= principalRange.max + EPSILON
+    : interval.max < principalRange.max - EPSILON;
+  return minOkay && maxOkay;
+}
+
+function mergeDetailSections(
+  left: DisplayDetailSection[] = [],
+  right: DisplayDetailSection[] = [],
+) {
+  const encoded = dedupe([...left, ...right].map((section) => JSON.stringify(section)));
+  return encoded.map((entry) => JSON.parse(entry));
+}
+
+function mergePeriodicFamilyExtras(
+  family: PeriodicFamilyInfo | undefined,
+  extras: Partial<PeriodicFamilyInfo> | undefined,
+) {
+  if (!family || !extras) {
+    return family;
+  }
+
+  return {
+    ...family,
+    piecewiseBranches: dedupe(
+      [...(family.piecewiseBranches ?? []), ...(extras.piecewiseBranches ?? [])]
+        .map((entry) => JSON.stringify(entry)),
+    ).map((entry) => JSON.parse(entry)),
+    principalRangeLatex: extras.principalRangeLatex ?? family.principalRangeLatex,
+    reducedCarrierLatex: extras.reducedCarrierLatex ?? family.reducedCarrierLatex,
+    structuredStopReason: extras.structuredStopReason ?? family.structuredStopReason,
+  } satisfies PeriodicFamilyInfo;
+}
+
 function buildNumericTargetFromNode(node: unknown, fallbackValue?: number): NumericTarget | null {
   const normalized = normalizeAst(node);
   const parsed = parseNumericTarget(normalized);
@@ -643,6 +706,18 @@ function buildSymbolicFamilyBranch(branch: TrigPeriodicBranch): SymbolicFamilyBr
   };
 }
 
+function buildSymbolicFamilyBranchFromNode(node: unknown, representativeValue?: number): SymbolicFamilyBranch {
+  const normalized = normalizeAst(node);
+  return {
+    node: normalized,
+    latex: boxLatex(normalized),
+    representativeValue:
+      representativeValue
+      ?? evaluateRealNode(normalized)
+      ?? Number.NaN,
+  };
+}
+
 function dedupeSymbolicFamilyBranches(branches: SymbolicFamilyBranch[]) {
   const seen = new Set<string>();
   return branches.filter((branch) => {
@@ -674,6 +749,101 @@ function evaluateFamilyBranchAt(branch: SymbolicFamilyBranch, kValue: number) {
   } catch {
     return null;
   }
+}
+
+function branchDependsOnParameter(branch: SymbolicFamilyBranch) {
+  return dependsOnVariable(branch.node, 'k');
+}
+
+function enumerateParameterizedBranchValuesOnInterval(
+  branch: SymbolicFamilyBranch,
+  intervalMin: number,
+  intervalMax: number,
+) {
+  const atZero = evaluateFamilyBranchAt(branch, 0);
+  const atOne = evaluateFamilyBranchAt(branch, 1);
+  if (atZero === null || atOne === null || !Number.isFinite(atZero) || !Number.isFinite(atOne)) {
+    return null;
+  }
+
+  const step = atOne - atZero;
+  if (Math.abs(step) <= EPSILON) {
+    return atZero >= intervalMin - EPSILON && atZero <= intervalMax + EPSILON
+      ? [0]
+      : [];
+  }
+
+  const rawStart = (intervalMin - atZero) / step;
+  const rawEnd = (intervalMax - atZero) / step;
+  const startK = Math.ceil(Math.min(rawStart, rawEnd) - EPSILON);
+  const endK = Math.floor(Math.max(rawStart, rawEnd) + EPSILON);
+  if (endK < startK) {
+    return [];
+  }
+
+  if (endK - startK + 1 > MAX_TRIG_BRANCHES) {
+    return null;
+  }
+
+  const values: number[] = [];
+  for (let k = startK; k <= endK; k += 1) {
+    values.push(k);
+  }
+  return values;
+}
+
+function expandBranchesWithinInterval(
+  branches: SymbolicFamilyBranch[],
+  intervalMin: number,
+  intervalMax: number,
+) {
+  const expanded: SymbolicFamilyBranch[] = [];
+
+  for (const branch of branches) {
+    if (!branchDependsOnParameter(branch)) {
+      const target = buildNumericTargetFromNode(branch.node, branch.representativeValue);
+      if (!target || target.value < intervalMin - EPSILON || target.value > intervalMax + EPSILON) {
+        continue;
+      }
+      expanded.push({
+        node: target.node,
+        latex: target.latex,
+        representativeValue: target.value,
+      });
+      continue;
+    }
+
+    const parameterValues = enumerateParameterizedBranchValuesOnInterval(branch, intervalMin, intervalMax);
+    if (parameterValues === null) {
+      return null;
+    }
+
+    for (const kValue of parameterValues) {
+      const latex = substituteFamilyBranchLatex(branch.latex, kValue);
+      const node = ce.parse(latex).json;
+      const target = buildNumericTargetFromNode(node, evaluateFamilyBranchAt(branch, kValue) ?? undefined);
+      if (!target || target.value < intervalMin - EPSILON || target.value > intervalMax + EPSILON) {
+        continue;
+      }
+      expanded.push({
+        node: target.node,
+        latex: target.latex,
+        representativeValue: target.value,
+      });
+    }
+  }
+
+  return dedupeSymbolicFamilyBranches(expanded);
+}
+
+function appendPeriodicSolveBadges(
+  result: PeriodicFamilySolveResult,
+  badges: SolveBadge[],
+): PeriodicFamilySolveResult {
+  return {
+    ...result,
+    solveBadges: dedupe<SolveBadge>([...(result.solveBadges ?? []), ...badges]),
+  };
 }
 
 function numericAffineCarrier(node: unknown) {
@@ -1111,7 +1281,58 @@ function matchNonPeriodicTransform(
       : null;
 
   if (inverseTrigKind && isNodeArray(normalized)) {
+    const directInner =
+      isNodeArray(normalized[1])
+      && normalized[1].length === 2
+      && typeof normalized[1][0] === 'string'
+      && (
+        (inverseTrigKind === 'asin' && normalized[1][0] === 'Sin')
+        || (inverseTrigKind === 'acos' && normalized[1][0] === 'Cos')
+        || (inverseTrigKind === 'atan' && normalized[1][0] === 'Tan')
+      )
+        ? normalized[1]
+        : null;
     const principalRange = inverseTrigPrincipalRange(inverseTrigKind, angleUnit);
+    const principalRangeLatex = buildInverseTrigPrincipalRangeLatex(inverseTrigKind, angleUnit);
+    if (directInner) {
+      const directInnerRange = proveRealRange(directInner[1]);
+      if (
+        directInnerRange.kind === 'exact'
+        && intervalWithinPrincipalRange(directInnerRange.interval, principalRange)
+      ) {
+        const outerLatex = boxLatex(normalized);
+        const reducedCarrierLatex = boxLatex(directInner[1]);
+        return {
+          equations: [buildEquationLatex(directInner[1], target.node)],
+          solveBadges: ['Principal Range'],
+          solveSummaryText: `Principal range: ${reducedCarrierLatex} stays in ${formatRangeInterval(directInnerRange.interval)}, so ${outerLatex} reduces to ${reducedCarrierLatex}=${target.latex}.`,
+          unresolvedError: 'This recognized inverse/direct trig identity is outside the current exact bounded solve set. Use Numeric Solve with an interval in Equation mode.',
+          exactSupplementLatex: [
+            `\\text{Principal range: } ${principalRangeLatex}`,
+            `\\text{Canonical reduction: } ${outerLatex}=${reducedCarrierLatex}`,
+          ],
+          detailSections: [
+            {
+              title: 'Piecewise Exact',
+              lines: [
+                `${outerLatex} = ${reducedCarrierLatex} when ${reducedCarrierLatex} stays in ${buildInverseTrigPrincipalRangeMessage(inverseTrigKind, angleUnit)}.`,
+              ],
+            },
+          ],
+          periodicFamilyExtras: {
+            principalRangeLatex,
+            reducedCarrierLatex,
+            piecewiseBranches: [
+              {
+                conditionLatex: `${reducedCarrierLatex}\\in${principalRangeLatex}`,
+                resultLatex: `${outerLatex}=${reducedCarrierLatex}`,
+              },
+            ] as PeriodicPiecewiseBranch[],
+          },
+        };
+      }
+    }
+
     if (!isWithinPrincipalRange(target.value, principalRange)) {
       const label =
         inverseTrigKind === 'asin'
@@ -1318,6 +1539,116 @@ function matchNonPeriodicTransform(
   return null;
 }
 
+type NormalizedTrigComposite =
+  | {
+      kind: 'normalized';
+      trigKind: 'sin' | 'cos' | 'tan';
+      target: NumericTarget;
+      inner: unknown;
+      innerLatex: string;
+      outerLatex: string;
+      reducedCarrierLatex?: string;
+      solveBadges?: SolveBadge[];
+      summaryPrefix?: string;
+    }
+  | {
+      kind: 'impossible';
+      error: string;
+      summaryText: string;
+      solveBadges?: SolveBadge[];
+      reducedCarrierLatex?: string;
+      structuredStopReason?: PeriodicFamilyInfo['structuredStopReason'];
+    };
+
+function buildReciprocalTarget(target: NumericTarget): NumericTarget {
+  const node = normalizeAst(['Divide', 1, target.node]);
+  return {
+    node,
+    latex: boxLatex(node),
+    value: 1 / target.value,
+  };
+}
+
+function normalizeTrigComposite(
+  node: unknown,
+  target: NumericTarget,
+): NormalizedTrigComposite | null {
+  const normalized = normalizeAst(node);
+  if (!isNodeArray(normalized) || normalized.length !== 2 || typeof normalized[0] !== 'string') {
+    return null;
+  }
+
+  const operator = normalized[0];
+  const inner = normalized[1];
+  if (!dependsOnVariable(inner, 'x')) {
+    return null;
+  }
+
+  const innerLatex = boxLatex(inner);
+  const outerLatex = boxLatex(normalized);
+
+  if (operator === 'Sin' || operator === 'Cos' || operator === 'Tan') {
+    return {
+      kind: 'normalized',
+      trigKind: operator === 'Sin' ? 'sin' : operator === 'Cos' ? 'cos' : 'tan',
+      target,
+      inner,
+      innerLatex,
+      outerLatex,
+    };
+  }
+
+  if (operator === 'Sec' || operator === 'Csc') {
+    if (Math.abs(target.value) <= EPSILON || Math.abs(target.value) < 1 - EPSILON) {
+      return {
+        kind: 'impossible',
+        error: `No real solutions because ${operator === 'Sec' ? '\\sec' : '\\csc'} only takes values with |y|\\ge1 and never 0.`,
+        summaryText: `Reciprocal rewrite: ${outerLatex}=${target.latex} would require ${operator === 'Sec' ? '\\cos' : '\\sin'}\\left(${innerLatex}\\right)=${boxLatex(['Divide', 1, target.node])}, but reciprocal trig targets must satisfy |${target.latex}|\\ge1 and ${target.latex}\\ne0.`,
+        solveBadges: ['Reciprocal Rewrite'],
+        reducedCarrierLatex: `${operator === 'Sec' ? '\\cos' : '\\sin'}\\left(${innerLatex}\\right)`,
+      };
+    }
+
+    const reciprocalTarget = buildReciprocalTarget(target);
+    const reducedCarrierLatex = `${operator === 'Sec' ? '\\cos' : '\\sin'}\\left(${innerLatex}\\right)`;
+    return {
+      kind: 'normalized',
+      trigKind: operator === 'Sec' ? 'cos' : 'sin',
+      target: reciprocalTarget,
+      inner,
+      innerLatex,
+      outerLatex,
+      reducedCarrierLatex,
+      solveBadges: ['Reciprocal Rewrite'],
+      summaryPrefix: `Reciprocal rewrite: ${outerLatex}=${target.latex} reduces to ${reducedCarrierLatex}=${reciprocalTarget.latex}.`,
+    };
+  }
+
+  if (operator === 'Cot') {
+    const cotTarget = Math.abs(target.value) <= EPSILON
+      ? {
+          node: 0 as unknown,
+          latex: '0',
+          value: 0,
+        } satisfies NumericTarget
+      : buildReciprocalTarget(target);
+    const reducedCarrierLatex = `${Math.abs(target.value) <= EPSILON ? '\\cos' : '\\tan'}\\left(${innerLatex}\\right)`;
+    return {
+      kind: 'normalized',
+      trigKind: Math.abs(target.value) <= EPSILON ? 'cos' : 'tan',
+      target: cotTarget,
+      inner,
+      innerLatex,
+      outerLatex,
+      reducedCarrierLatex,
+      solveBadges: ['Reciprocal Rewrite'],
+      summaryPrefix: `Reciprocal rewrite: ${outerLatex}=${target.latex} reduces to ${reducedCarrierLatex}=${cotTarget.latex}.`,
+    };
+  }
+
+  return null;
+}
+
 function solveTrigOnInterval(
   kind: 'sin' | 'cos' | 'tan',
   target: number,
@@ -1426,39 +1757,36 @@ function composeTrigImage(kind: 'sin' | 'cos' | 'tan', intervalMin: number, inte
 }
 
 function matchTrigBranches(node: unknown, target: NumericTarget, angleUnit: AngleUnit): TrigBranchResult | null {
-  const normalized = normalizeAst(node);
-  if (!isNodeArray(normalized) || normalized.length !== 2 || typeof normalized[0] !== 'string') {
+  const normalizedTrig = normalizeTrigComposite(node, target);
+  if (!normalizedTrig) {
     return null;
   }
 
-  const operator = normalized[0];
-  const kind =
-    operator === 'Sin'
-      ? 'sin'
-      : operator === 'Cos'
-        ? 'cos'
-        : operator === 'Tan'
-          ? 'tan'
-          : null;
+  if (normalizedTrig.kind === 'impossible') {
+    return normalizedTrig;
+  }
 
-  if (!kind || !dependsOnVariable(normalized[1], 'x') || isDirectAffineInner(normalized[1])) {
+  if (isDirectAffineInner(normalizedTrig.inner)) {
     return null;
   }
 
-  const innerLatex = boxLatex(normalized[1]);
-  const innerProof: ReturnType<typeof proveRealRange> = proveRealRange(normalized[1]);
+  const { trigKind: kind, target: effectiveTarget, inner, innerLatex, outerLatex, summaryPrefix } = normalizedTrig;
+  const innerProof: ReturnType<typeof proveRealRange> = proveRealRange(inner);
 
   if (innerProof.kind !== 'exact') {
     return {
       kind: 'unresolved',
       error: 'This recognized composition family leaves infinitely many or currently unsupported inverse branches. Use Numeric Solve with a chosen interval.',
-      summaryText: `Composition branch: ${innerLatex} does not yet have a finite proven image that supports bounded symbolic inversion.`,
+      summaryText: summaryPrefix
+        ? `${summaryPrefix} Composition branch: ${innerLatex} does not yet have a finite proven image that supports bounded symbolic inversion.`
+        : `Composition branch: ${innerLatex} does not yet have a finite proven image that supports bounded symbolic inversion.`,
+      solveBadges: normalizedTrig.solveBadges,
     };
   }
 
   const branchValues = solveTrigOnInterval(
     kind,
-    target.value,
+    effectiveTarget.value,
     innerProof.interval.min,
     innerProof.interval.max,
     angleUnit,
@@ -1468,7 +1796,10 @@ function matchTrigBranches(node: unknown, target: NumericTarget, angleUnit: Angl
     return {
       kind: 'unresolved',
       error: 'This recognized composition family leaves too many inverse branches for the current bounded symbolic solve set. Use Numeric Solve with a chosen interval.',
-      summaryText: `Composition branch: ${innerLatex} stays in ${formatRangeInterval(innerProof.interval)}, but that interval still yields too many admissible ${kind} inverse branches.`,
+      summaryText: summaryPrefix
+        ? `${summaryPrefix} Composition branch: ${innerLatex} stays in ${formatRangeInterval(innerProof.interval)}, but that interval still yields too many admissible ${kind} inverse branches.`
+        : `Composition branch: ${innerLatex} stays in ${formatRangeInterval(innerProof.interval)}, but that interval still yields too many admissible ${kind} inverse branches.`,
+      solveBadges: normalizedTrig.solveBadges,
     };
   }
 
@@ -1478,8 +1809,13 @@ function matchTrigBranches(node: unknown, target: NumericTarget, angleUnit: Angl
       kind: 'impossible',
       error: 'No real solutions because the proven inner image makes the outer trig target unreachable.',
       summaryText: outerImage
-        ? `Range guard: ${innerLatex} stays in ${formatRangeInterval(innerProof.interval)}, so ${boxLatex(normalized)} stays in ${formatRangeInterval(outerImage)} and cannot equal ${target.latex}.`
-        : `Range guard: ${innerLatex} stays in ${formatRangeInterval(innerProof.interval)}, so ${boxLatex(normalized)} cannot equal ${target.latex}.`,
+        ? summaryPrefix
+          ? `${summaryPrefix} Range guard: ${innerLatex} stays in ${formatRangeInterval(innerProof.interval)}, so ${normalizedTrig.reducedCarrierLatex ?? outerLatex} stays in ${formatRangeInterval(outerImage)} and cannot equal ${effectiveTarget.latex}.`
+          : `Range guard: ${innerLatex} stays in ${formatRangeInterval(innerProof.interval)}, so ${outerLatex} stays in ${formatRangeInterval(outerImage)} and cannot equal ${effectiveTarget.latex}.`
+        : summaryPrefix
+          ? `${summaryPrefix} Range guard: ${innerLatex} stays in ${formatRangeInterval(innerProof.interval)}, so ${normalizedTrig.reducedCarrierLatex ?? outerLatex} cannot equal ${effectiveTarget.latex}.`
+          : `Range guard: ${innerLatex} stays in ${formatRangeInterval(innerProof.interval)}, so ${outerLatex} cannot equal ${effectiveTarget.latex}.`,
+      solveBadges: normalizedTrig.solveBadges,
     };
   }
 
@@ -1487,7 +1823,10 @@ function matchTrigBranches(node: unknown, target: NumericTarget, angleUnit: Angl
   return {
     kind: 'branches',
     equations: dedupe(branchEquations),
-    summaryText: `Composition branch: ${innerLatex} stays in ${formatRangeInterval(innerProof.interval)}, so ${boxLatex(normalized)}=${target.latex} reduces to ${dedupe(branchEquations).join(',\\;')}.`,
+    summaryText: summaryPrefix
+      ? `${summaryPrefix} Composition branch: ${innerLatex} stays in ${formatRangeInterval(innerProof.interval)}, so ${normalizedTrig.reducedCarrierLatex ?? outerLatex}=${effectiveTarget.latex} reduces to ${dedupe(branchEquations).join(',\\;')}.`
+      : `Composition branch: ${innerLatex} stays in ${formatRangeInterval(innerProof.interval)}, so ${outerLatex}=${effectiveTarget.latex} reduces to ${dedupe(branchEquations).join(',\\;')}.`,
+    solveBadges: normalizedTrig.solveBadges,
   };
 }
 
@@ -1524,12 +1863,243 @@ function transformLnFamilyBranches(branches: SymbolicFamilyBranch[]) {
   });
 }
 
+function trigCarrierRange(kind: 'sin' | 'cos' | 'tan') {
+  if (kind === 'tan') {
+    return null;
+  }
+
+  return {
+    min: -1,
+    max: 1,
+  };
+}
+
+function solveNestedTrigCarrierPeriodicFamily(
+  normalized: unknown[],
+  kind: 'sin' | 'cos' | 'tan',
+  branches: SymbolicFamilyBranch[],
+  angleUnit: AngleUnit,
+  constraints: SolveDomainConstraint[],
+  supplementLatex: string[],
+  periodicNestingDepth: number,
+): PeriodicFamilySolveResult {
+  const inner = normalized[1];
+  const family: PeriodicFamilyInfo = {
+    ...buildPeriodicFamilyInfo(boxLatex(normalized), branches, constraints, angleUnit, normalized),
+    reducedCarrierLatex: boxLatex(normalized),
+  };
+
+  if (periodicNestingDepth >= 1) {
+    return {
+      kind: 'guided',
+      family: {
+        ...family,
+        structuredStopReason: 'second-periodic-parameter',
+      },
+      error: 'This recognized periodic family would require a second independent periodic parameter to continue exactly. Use Numeric Solve with one of the suggested intervals.',
+      domainConstraints: constraints,
+      supplementLatex: supplementLatex.length > 0 ? supplementLatex : undefined,
+      summaryText: `Further reducing ${boxLatex(normalized)} would introduce another periodic branch parameter beyond the current bounded exact solve set.`,
+      solveBadges: ['Nested Recursion'],
+    };
+  }
+
+  let constantBranches = branches;
+  if (branches.some(branchDependsOnParameter)) {
+    const range = trigCarrierRange(kind);
+    if (!range) {
+      return {
+        kind: 'guided',
+        family: {
+          ...family,
+          structuredStopReason: 'second-periodic-parameter',
+        },
+        error: 'This recognized periodic family would require a second independent periodic parameter to continue exactly. Use Numeric Solve with one of the suggested intervals.',
+        domainConstraints: constraints,
+        supplementLatex: supplementLatex.length > 0 ? supplementLatex : undefined,
+        summaryText: `Further reducing ${boxLatex(normalized)} would introduce another periodic branch parameter beyond the current bounded exact solve set.`,
+        solveBadges: ['Nested Recursion'],
+      };
+    }
+
+    const expanded = expandBranchesWithinInterval(branches, range.min, range.max);
+    if (expanded === null) {
+      return {
+        kind: 'guided',
+        family: {
+          ...family,
+          structuredStopReason: 'unsupported-sawtooth-closure',
+        },
+        error: 'This recognized periodic family leaves too many bounded follow-on trig branches for the current exact solve set. Use Numeric Solve with one of the suggested intervals.',
+        domainConstraints: constraints,
+        supplementLatex: supplementLatex.length > 0 ? supplementLatex : undefined,
+        summaryText: `Further reducing ${boxLatex(normalized)} would require bounded trig branch pruning beyond the current exact solve set.`,
+        solveBadges: ['Nested Recursion'],
+      };
+    }
+
+    if (expanded.length === 0) {
+      return {
+        kind: 'guided',
+        family,
+        error: `No real solutions remain because this periodic family never enters the real range of ${kind}.`,
+        domainConstraints: constraints,
+        supplementLatex: supplementLatex.length > 0 ? supplementLatex : undefined,
+        summaryText: `All periodic targets for ${boxLatex(normalized)} stay outside the real range of ${kind}.`,
+        solveBadges: ['Nested Recursion'],
+      };
+    }
+
+    constantBranches = expanded;
+  }
+
+  const transformedBranches: SymbolicFamilyBranch[] = [];
+  for (const branch of constantBranches) {
+    const target = buildNumericTargetFromNode(branch.node, branch.representativeValue);
+    if (!target) {
+      continue;
+    }
+
+    const template = buildTrigPeriodicTemplate(kind, target.value, target.latex, angleUnit);
+    if (!template) {
+      continue;
+    }
+
+    transformedBranches.push(...template.branches.map(buildSymbolicFamilyBranch));
+  }
+
+  if (transformedBranches.length === 0) {
+    return {
+      kind: 'guided',
+      family,
+      error: 'No real solutions remain after reducing this nested periodic carrier in the real domain.',
+      domainConstraints: constraints,
+      supplementLatex: supplementLatex.length > 0 ? supplementLatex : undefined,
+      summaryText: `Reducing ${boxLatex(normalized)} left no real bounded branch targets to continue exactly.`,
+      solveBadges: ['Nested Recursion'],
+    };
+  }
+
+  return appendPeriodicSolveBadges(
+    resolveCarrierPeriodicFamily(
+      inner,
+      dedupeSymbolicFamilyBranches(transformedBranches),
+      angleUnit,
+      constraints,
+      supplementLatex,
+      periodicNestingDepth + 1,
+    ),
+    ['Nested Recursion'],
+  );
+}
+
+function solveNestedInverseTrigCarrierPeriodicFamily(
+  normalized: unknown[],
+  kind: 'asin' | 'acos' | 'atan',
+  branches: SymbolicFamilyBranch[],
+  angleUnit: AngleUnit,
+  constraints: SolveDomainConstraint[],
+  supplementLatex: string[],
+  periodicNestingDepth: number,
+): PeriodicFamilySolveResult {
+  const inner = normalized[1];
+  const inverseTrigLatex =
+    kind === 'asin'
+      ? '\\arcsin'
+      : kind === 'acos'
+        ? '\\arccos'
+        : '\\arctan';
+  const principalRangeLatex = buildInverseTrigPrincipalRangeLatex(kind, angleUnit);
+  const family: PeriodicFamilyInfo = {
+    ...buildPeriodicFamilyInfo(boxLatex(normalized), branches, constraints, angleUnit, normalized),
+    reducedCarrierLatex: boxLatex(normalized),
+    principalRangeLatex,
+  };
+  const range = inverseTrigPrincipalRange(kind, angleUnit);
+  const expanded = expandBranchesWithinInterval(branches, range.min, range.max);
+
+  if (expanded === null) {
+    return {
+      kind: 'guided',
+      family: {
+        ...family,
+        structuredStopReason: 'unsupported-sawtooth-closure',
+      },
+      error: 'This recognized inverse-trig periodic family still needs broader branch pruning than the current bounded exact solve set supports. Use Numeric Solve with one of the suggested intervals.',
+      domainConstraints: constraints,
+      supplementLatex: supplementLatex.length > 0 ? supplementLatex : undefined,
+      summaryText: `Further reducing ${boxLatex(normalized)} would require broader principal-range branch pruning than the current exact solve set supports.`,
+      solveBadges: ['Nested Recursion', 'Principal Range'],
+    };
+  }
+
+  if (expanded.length === 0) {
+    return {
+      kind: 'guided',
+      family: {
+        ...family,
+        structuredStopReason: 'outside-principal-range',
+      },
+      error: `No real solutions remain because this periodic family never enters the principal range ${buildInverseTrigPrincipalRangeMessage(kind, angleUnit)} of ${inverseTrigLatex}.`,
+      domainConstraints: constraints,
+      supplementLatex: supplementLatex.length > 0 ? supplementLatex : undefined,
+      summaryText: `All periodic targets for ${boxLatex(normalized)} fall outside its principal range ${buildInverseTrigPrincipalRangeMessage(kind, angleUnit)}.`,
+      solveBadges: ['Nested Recursion', 'Principal Range'],
+    };
+  }
+
+  const mappedKind =
+    kind === 'asin'
+      ? 'sin'
+      : kind === 'acos'
+        ? 'cos'
+        : 'tan';
+
+  const transformedBranches = expanded.flatMap((branch) => {
+    const target = buildNumericTargetFromNode(branch.node, branch.representativeValue);
+    if (!target) {
+      return [];
+    }
+
+    const valueTarget = buildInverseTrigValueTarget(mappedKind, target, angleUnit);
+    if (!valueTarget) {
+      return [];
+    }
+    return [buildSymbolicFamilyBranchFromNode(valueTarget.node, valueTarget.value)];
+  });
+
+  if (transformedBranches.length === 0) {
+    return {
+      kind: 'guided',
+      family,
+      error: 'No real solutions remain after bounded inverse-trig branch reduction.',
+      domainConstraints: constraints,
+      supplementLatex: supplementLatex.length > 0 ? supplementLatex : undefined,
+      summaryText: `Reducing ${boxLatex(normalized)} left no real branch targets to continue exactly.`,
+      solveBadges: ['Nested Recursion', 'Principal Range'],
+    };
+  }
+
+  return appendPeriodicSolveBadges(
+    resolveCarrierPeriodicFamily(
+      inner,
+      dedupeSymbolicFamilyBranches(transformedBranches),
+      angleUnit,
+      constraints,
+      supplementLatex,
+      periodicNestingDepth,
+    ),
+    ['Nested Recursion', 'Principal Range'],
+  );
+}
+
 function resolveCarrierPeriodicFamily(
   carrierNode: unknown,
   branches: SymbolicFamilyBranch[],
   angleUnit: AngleUnit,
   constraints: SolveDomainConstraint[] = [],
   supplementLatex: string[] = [],
+  periodicNestingDepth = 0,
 ): PeriodicFamilySolveResult {
   const normalized = normalizeAst(carrierNode);
   const affine = numericAffineCarrier(normalized);
@@ -1550,11 +2120,11 @@ function resolveCarrierPeriodicFamily(
     if (transformed.branches.length === 0) {
       return {
         kind: 'guided',
-        family: buildPeriodicFamilyInfo('x', [], constraints, angleUnit, 'x'),
-        error: 'No real solutions remain because this even-power periodic family requires a negative branch target in the real domain.',
-        domainConstraints: constraints,
-        supplementLatex,
-        summaryText: '',
+      family: buildPeriodicFamilyInfo('x', [], constraints, angleUnit, 'x'),
+      error: 'No real solutions remain because this even-power periodic family requires a negative branch target in the real domain.',
+      domainConstraints: constraints,
+      supplementLatex,
+      summaryText: '',
         solveBadges: ['Parameterized Family'],
       };
     }
@@ -1576,6 +2146,48 @@ function resolveCarrierPeriodicFamily(
     };
   }
 
+  if (isNodeArray(normalized) && normalized.length === 2 && typeof normalized[0] === 'string') {
+    const directTrigKind =
+      normalized[0] === 'Sin'
+        ? 'sin'
+        : normalized[0] === 'Cos'
+          ? 'cos'
+          : normalized[0] === 'Tan'
+            ? 'tan'
+            : null;
+    if (directTrigKind && dependsOnVariable(normalized[1], 'x')) {
+      return solveNestedTrigCarrierPeriodicFamily(
+        normalized,
+        directTrigKind,
+        branches,
+        angleUnit,
+        constraints,
+        supplementLatex,
+        periodicNestingDepth,
+      );
+    }
+
+    const inverseTrigKind =
+      normalized[0] === 'Arcsin'
+        ? 'asin'
+        : normalized[0] === 'Arccos'
+          ? 'acos'
+          : normalized[0] === 'Arctan'
+            ? 'atan'
+            : null;
+    if (inverseTrigKind && dependsOnVariable(normalized[1], 'x')) {
+      return solveNestedInverseTrigCarrierPeriodicFamily(
+        normalized,
+        inverseTrigKind,
+        branches,
+        angleUnit,
+        constraints,
+        supplementLatex,
+        periodicNestingDepth,
+      );
+    }
+  }
+
   if (isNodeArray(normalized) && normalized[0] === 'Ln' && normalized.length === 2) {
     return resolveCarrierPeriodicFamily(
       normalized[1],
@@ -1583,6 +2195,7 @@ function resolveCarrierPeriodicFamily(
       angleUnit,
       mergeConstraints(constraints, [{ kind: 'positive', expressionLatex: boxLatex(normalized[1]) }]),
       supplementLatex,
+      periodicNestingDepth,
     );
   }
 
@@ -1593,6 +2206,7 @@ function resolveCarrierPeriodicFamily(
       angleUnit,
       mergeConstraints(constraints, [{ kind: 'positive', expressionLatex: boxLatex(normalized[1]) }]),
       supplementLatex,
+      periodicNestingDepth,
     );
   }
 
@@ -1605,6 +2219,7 @@ function resolveCarrierPeriodicFamily(
         angleUnit,
         mergeConstraints(constraints, [{ kind: 'positive', expressionLatex: boxLatex(normalized[1]) }]),
         supplementLatex,
+        periodicNestingDepth,
       );
     }
   }
@@ -1626,6 +2241,7 @@ function resolveCarrierPeriodicFamily(
         buildPeriodicBranchConditionSupplement(
           branches.map((branch) => `${branch.latex}>0`),
         ),
+        periodicNestingDepth,
       );
     }
   }
@@ -1645,30 +2261,34 @@ function solveTrigPeriodicFamily(
   target: NumericTarget,
   request: GuardedSolveRequest,
 ): PeriodicFamilySolveResult | null {
-  const normalized = normalizeAst(node);
-  if (!isNodeArray(normalized) || normalized.length !== 2 || typeof normalized[0] !== 'string') {
+  const normalizedTrig = normalizeTrigComposite(node, target);
+  if (!normalizedTrig) {
     return null;
   }
 
-  const kind =
-    normalized[0] === 'Sin'
-      ? 'sin'
-      : normalized[0] === 'Cos'
-        ? 'cos'
-        : normalized[0] === 'Tan'
-          ? 'tan'
-          : null;
-  if (!kind || !dependsOnVariable(normalized[1], 'x')) {
-    return null;
+  if (normalizedTrig.kind === 'impossible') {
+    return {
+      kind: 'guided',
+      family: {
+        carrierLatex: normalizedTrig.reducedCarrierLatex ?? normalizedTrig.summaryText,
+        parameterLatex: 'k\\in\\mathbb{Z}',
+        branchesLatex: [],
+        reducedCarrierLatex: normalizedTrig.reducedCarrierLatex,
+        structuredStopReason: normalizedTrig.structuredStopReason,
+      },
+      error: normalizedTrig.error,
+      summaryText: normalizedTrig.summaryText,
+      solveBadges: normalizedTrig.solveBadges,
+    };
   }
 
-  const inner = normalized[1];
+  const { trigKind: kind, target: effectiveTarget, inner, reducedCarrierLatex, solveBadges, summaryPrefix } = normalizedTrig;
   const innerIsDirect = Boolean(numericAffineCarrier(inner));
-  if ((request.compositionInversionDepth ?? 0) === 0 && innerIsDirect) {
+  if ((request.compositionInversionDepth ?? 0) === 0 && innerIsDirect && !(solveBadges?.length)) {
     return null;
   }
 
-  const template = buildTrigPeriodicTemplate(kind, target.value, target.latex, request.angleUnit);
+  const template = buildTrigPeriodicTemplate(kind, effectiveTarget.value, effectiveTarget.latex, request.angleUnit);
   if (!template) {
     return {
       kind: 'guided',
@@ -1676,17 +2296,36 @@ function solveTrigPeriodicFamily(
         carrierLatex: boxLatex(inner),
         parameterLatex: 'k\\in\\mathbb{Z}',
         branchesLatex: [],
+        reducedCarrierLatex,
       },
       error: 'No real solutions because this trig target lies outside the real range of the carrier.',
-      summaryText: '',
+      summaryText: summaryPrefix ?? '',
+      solveBadges,
     };
   }
 
-  return resolveCarrierPeriodicFamily(
+  const resolved = resolveCarrierPeriodicFamily(
     inner,
     template.branches.map(buildSymbolicFamilyBranch),
     request.angleUnit,
   );
+  if (!summaryPrefix && !reducedCarrierLatex && !(solveBadges?.length)) {
+    return resolved;
+  }
+
+  return {
+    ...resolved,
+    family: {
+      ...resolved.family,
+      reducedCarrierLatex: reducedCarrierLatex ?? resolved.family.reducedCarrierLatex,
+    },
+    summaryText: summaryPrefix
+      ? resolved.summaryText
+        ? `${summaryPrefix} ${resolved.summaryText}`
+        : summaryPrefix
+      : resolved.summaryText,
+    solveBadges: dedupe([...(resolved.solveBadges ?? []), ...(solveBadges ?? [])]),
+  };
 }
 
 function periodicFamilyBadges(
@@ -1713,6 +2352,18 @@ function buildPeriodicOutcomeSupplements(periodic: PeriodicFamilySolveResult) {
   ]);
 }
 
+function buildPeriodicSolveSummary(
+  expressionLatex: string,
+  targetLatex: string,
+  periodic: PeriodicFamilySolveResult,
+  verb: 'yields' | 'reduces to',
+) {
+  const base = `Periodic family: ${expressionLatex}=${targetLatex} ${verb} ${periodicFamilyToExactLatex(periodic.family)}.`;
+  return periodic.summaryText
+    ? `${base} ${periodic.summaryText}`
+    : base;
+}
+
 function recurseComposition(
   request: GuardedSolveRequest,
   equations: string[],
@@ -1724,6 +2375,9 @@ function recurseComposition(
   summaryText: string,
   domainConstraints: SolveDomainConstraint[] = [],
   unresolvedError?: string,
+  extraSupplementLatex: string[] = [],
+  extraDetailSections: DisplayDetailSection[] = [],
+  periodicFamilyExtras?: Partial<PeriodicFamilyInfo>,
 ): DisplayOutcome | null {
   const nextCompositionDepth = (request.compositionInversionDepth ?? 0) + 1;
   if (nextCompositionDepth > MAX_COMPOSITION_INVERSION_DEPTH) {
@@ -1791,11 +2445,15 @@ function recurseComposition(
   if (validationCandidates.length === 0) {
     const supplements = dedupe([
       ...(merged.exactSupplementLatex ?? []),
+      ...extraSupplementLatex,
       ...buildConstraintSupplementLatex(domainConstraints),
     ]);
+    const detailSections = mergeDetailSections(merged.detailSections, extraDetailSections);
     return appendSolveMetadata({
       ...merged,
+      periodicFamily: mergePeriodicFamilyExtras(merged.periodicFamily, periodicFamilyExtras),
       exactSupplementLatex: supplements.length > 0 ? supplements : undefined,
+      detailSections: detailSections.length > 0 ? detailSections : undefined,
     }, effectiveBadges, summaryText);
   }
 
@@ -1807,17 +2465,29 @@ function recurseComposition(
   );
 
   if (validation.accepted.length === 0) {
-    return errorOutcome(
-      'Solve',
-      compositionRejectionMessage(validation.rejected, domainConstraints),
-      merged.warnings,
-      merged.plannerBadges ?? [],
-      dedupe<SolveBadge>([...(merged.solveBadges ?? []), ...effectiveBadges, 'Candidate Checked']),
-      summaryText,
-      validation.rejected.length,
-      merged.substitutionDiagnostics,
-      merged.numericMethod,
-    );
+    const supplements = dedupe([
+      ...(merged.exactSupplementLatex ?? []),
+      ...extraSupplementLatex,
+      ...buildConstraintSupplementLatex(domainConstraints),
+    ]);
+    const detailSections = mergeDetailSections(merged.detailSections, extraDetailSections);
+    return {
+      kind: 'error',
+      title: 'Solve',
+      error: compositionRejectionMessage(validation.rejected, domainConstraints),
+      exactLatex: merged.exactLatex,
+      periodicFamily: mergePeriodicFamilyExtras(merged.periodicFamily, periodicFamilyExtras),
+      exactSupplementLatex: supplements.length > 0 ? supplements : undefined,
+      approxText: merged.approxText,
+      detailSections: detailSections.length > 0 ? detailSections : undefined,
+      warnings: merged.warnings,
+      plannerBadges: merged.plannerBadges ?? [],
+      solveBadges: dedupe<SolveBadge>([...(merged.solveBadges ?? []), ...effectiveBadges, 'Candidate Checked']),
+      solveSummaryText: summaryText,
+      rejectedCandidateCount: validation.rejected.length,
+      substitutionDiagnostics: merged.substitutionDiagnostics,
+      numericMethod: merged.numericMethod,
+    };
   }
 
   const acceptedExactLatex = matchAcceptedExactSolutions(merged.exactLatex, validation.accepted);
@@ -1829,15 +2499,19 @@ function recurseComposition(
 
   const supplements = dedupe([
     ...(merged.exactSupplementLatex ?? []),
+    ...extraSupplementLatex,
     ...buildConstraintSupplementLatex(domainConstraints),
   ]);
+  const detailSections = mergeDetailSections(merged.detailSections, extraDetailSections);
 
   return {
     kind: 'success',
     title: 'Solve',
     exactLatex,
+    periodicFamily: mergePeriodicFamilyExtras(merged.periodicFamily, periodicFamilyExtras),
     exactSupplementLatex: supplements.length > 0 ? supplements : undefined,
     approxText: `x ~= ${validation.accepted.map((value) => formatApproxNumber(value)).join(', ')}`,
+    detailSections: detailSections.length > 0 ? detailSections : undefined,
     warnings: merged.warnings,
     resultOrigin: 'symbolic',
     plannerBadges: merged.plannerBadges ?? [],
@@ -1891,7 +2565,7 @@ function compositionSolve(
         trigBranches.error,
         [],
         [],
-        dedupe<SolveBadge>(['Range Guard', ...nestedContextBadges]),
+        dedupe<SolveBadge>(['Range Guard', ...(trigBranches.solveBadges ?? []), ...nestedContextBadges]),
         trigBranches.summaryText,
       );
     }
@@ -1910,7 +2584,12 @@ function compositionSolve(
           resultOrigin: 'symbolic',
           plannerBadges: [],
           solveBadges: badges,
-          solveSummaryText: `Periodic family: ${boxLatex(normalizeAst(attempt.composite))}=${target.latex} yields ${periodicFamilyToExactLatex(periodic.family)}.`,
+          solveSummaryText: buildPeriodicSolveSummary(
+            boxLatex(normalizeAst(attempt.composite)),
+            target.latex,
+            periodic,
+            'yields',
+          ),
         };
       }
       if (periodic?.kind === 'guided') {
@@ -1926,7 +2605,12 @@ function compositionSolve(
           warnings: [],
           plannerBadges: [],
           solveBadges: badges,
-          solveSummaryText: `Periodic family: ${boxLatex(normalizeAst(attempt.composite))}=${target.latex} reduces to ${periodicFamilyToExactLatex(periodic.family)}.`,
+          solveSummaryText: buildPeriodicSolveSummary(
+            boxLatex(normalizeAst(attempt.composite)),
+            target.latex,
+            periodic,
+            'reduces to',
+          ),
         };
       }
 
@@ -1935,22 +2619,22 @@ function compositionSolve(
         trigBranches.error,
         [],
         [],
-        dedupe<SolveBadge>(['Composition Branch', ...nestedContextBadges]),
+        dedupe<SolveBadge>(['Composition Branch', ...(trigBranches.solveBadges ?? []), ...nestedContextBadges]),
         trigBranches.summaryText,
       );
     }
     if (trigBranches?.kind === 'branches') {
-      const recursive = recurseComposition(
-        request,
-        trigBranches.equations,
+    const recursive = recurseComposition(
+      request,
+      trigBranches.equations,
         depth,
         trail,
         maxRecursionDepth,
-        runGuardedEquationSolve,
-        ['Composition Branch'],
-        trigBranches.summaryText,
-        [],
-        'This recognized composition family leaves infinitely many or currently unsupported inverse branches. Use Numeric Solve with a chosen interval.',
+      runGuardedEquationSolve,
+      dedupe<SolveBadge>(['Composition Branch', ...(trigBranches.solveBadges ?? [])]),
+      trigBranches.summaryText,
+      [],
+      'This recognized composition family leaves infinitely many or currently unsupported inverse branches. Use Numeric Solve with a chosen interval.',
       );
       if (recursive) {
         return recursive;
@@ -1971,7 +2655,12 @@ function compositionSolve(
         resultOrigin: 'symbolic',
         plannerBadges: [],
         solveBadges: badges,
-        solveSummaryText: `Periodic family: ${boxLatex(normalizeAst(attempt.composite))}=${target.latex} yields ${periodicFamilyToExactLatex(periodic.family)}.`,
+        solveSummaryText: buildPeriodicSolveSummary(
+          boxLatex(normalizeAst(attempt.composite)),
+          target.latex,
+          periodic,
+          'yields',
+        ),
       };
     }
     if (periodic?.kind === 'guided') {
@@ -1987,7 +2676,12 @@ function compositionSolve(
         warnings: [],
         plannerBadges: [],
         solveBadges: badges,
-        solveSummaryText: `Periodic family: ${boxLatex(normalizeAst(attempt.composite))}=${target.latex} reduces to ${periodicFamilyToExactLatex(periodic.family)}.`,
+        solveSummaryText: buildPeriodicSolveSummary(
+          boxLatex(normalizeAst(attempt.composite)),
+          target.latex,
+          periodic,
+          'reduces to',
+        ),
       };
     }
 
@@ -2018,6 +2712,9 @@ function compositionSolve(
       transform.solveSummaryText,
       transform.domainConstraints,
       transform.unresolvedError,
+      transform.exactSupplementLatex,
+      transform.detailSections,
+      transform.periodicFamilyExtras,
     );
     if (recursive) {
       return recursive;
