@@ -345,12 +345,23 @@
 
 ## Next Recommended Task
 - The `PRL1`-`PRL4` stack plus `COMP1`-`COMP10` are now shipped end-to-end.
-- Best next discussion point:
-  1. choose whether the next milestone stays in the Equation composition lane:
-     - `COMP11` for the next bounded post-`COMP10` carrier/closure step
-     - `CALC-COMP1` for bounded substitution-style antiderivatives
+- Strongest current architecture recommendation before more composition breadth:
+  1. pause the Equation-composition lane temporarily
+  2. strengthen the polynomial/radical foundation in this order:
+     - `POLY1` shared exact polynomial core
+     - `POLY2` bounded exact cubic/quartic factor-and-solve support
+     - `RAD1` broader bounded radical normalization
+     - `RAD2` sequential radical isolation
+     - `POLY-RAD1` polynomialized radical follow-on solving
+- Reason:
+  - composition-stage now contains stronger polynomial carrier logic than the shared algebra foundation
+  - continuing directly into `COMP11` would likely duplicate more algebra capability inside composition instead of strengthening reusable substrate first
 
 ## Recent Verified Context
+- Rust numeric ODE evaluation no longer depends on `meval` / `nom v1`:
+  - the Tauri backend now parses and compiles ODE RHS expressions with `mathexpr`
+  - supported numeric IVP expressions still cover the current frontend-emitted surface (`sin`, `cos`, `tan`, `exp`, `pow`, `ln`/`log`, `sqrt`, `abs`) with `x` and `y` variables
+  - the old future-incompat warning about `nom v1.2.4` is gone, and Rust-side ODE regression tests now cover compile/eval of the supported math surface plus non-finite-step rejection
 - Post-`COMP10` cleanup is now verified:
   - guarded Equation solve no longer eagerly calls Compute Engine symbolic solve before bounded stages, and unsupported direct-trig variable-target equations no longer trigger the old stderr rule-check noise during test/runtime handoff flows
   - the History side panel now renders stored expression math in readable panel text color instead of inheriting the darker LCD-ink styling
