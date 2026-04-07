@@ -33,6 +33,13 @@
 - Extracted `src/app/*`, `src/styles/app/*`, and decomposition facades under solver/guide/types are in-tree and passing regression.
 
 ## Most Recent Completed Milestone
+- Completed `COMP7` as the periodic-heavy nested family reduction and structured deep-stop milestone:
+  - added explicit `periodicReductionDepth` tracking so nested periodic composition may reduce one structured layer farther before stopping
+  - strengthened bounded nested periodic pruning and preserved discovered-family trails through deep trig-over-trig and reciprocal-over-trig reductions
+  - extended Equation periodic-family metadata and result rendering with discovered families, reduced-carrier notes, and specific structured stop reasons for multi-parameter, depth-cap, and unmerged-branch cases
+  - kept exact closure honest by stopping when the next step would require a second independent periodic parameter instead of faking symbolic completion
+- Regression checks:
+  - `npm run test:gate`
 - Completed `COMP6` as the reciprocal-trig and canonical inverse/direct trig composition milestone:
   - added bounded reciprocal trig composition support for `sec`, `csc`, and `cot` through reciprocal rewrite into the existing `sin/cos/tan` periodic-family machinery
   - added bounded principal-range reduction for canonical inverse/direct trig forms such as `\arctan(\tan(g(x)))` when the inner carrier is provably contained in the selected unit's principal range
@@ -80,6 +87,10 @@
   - `npm run test:gate`
 
 ## Recent Verified Context
+- `COMP7` periodic-heavy nested family reduction is now verified in `Equation > Symbolic`:
+  - nested periodic cases may now reduce one structured step farther through explicit `periodicReductionDepth` before stopping
+  - deep periodic stops now preserve discovered family trails, reduced-carrier notes, and specific structured stop reasons instead of collapsing into generic unsupported-family messaging
+  - browser/UI coverage now verifies both exact nested periodic reductions and representative deep structured stops such as `sin(cos(tan x)) = 0.00002`
 - `COMP6` reciprocal trig and principal-range composition solving is now verified in `Equation > Symbolic`:
   - reciprocal trig composition now supports bounded `sec/csc/cot` rewrites and preserves `Reciprocal Rewrite` provenance through exact periodic-family solves or bounded range rejection
   - canonical inverse/direct trig reductions now surface `Principal Range` provenance plus structured piecewise/principal-range metadata when a bounded identity-style reduction is mathematically safe
@@ -291,10 +302,10 @@
   - `.memory/research/TRACK-PRL4-MANUAL-VERIFICATION-CHECKLIST.md`
 
 ## Next Recommended Task
-- The `PRL1`-`PRL4` stack plus `COMP1`-`COMP5` are now shipped end-to-end.
+- The `PRL1`-`PRL4` stack plus `COMP1`-`COMP7` are now shipped end-to-end.
 - Best next discussion point:
   1. choose which explicit post-`COMP5` lane starts first:
-     - `COMP6` for reciprocal trig plus stronger bounded periodic pruning in Equation
+     - `COMP8` for affine inverse/direct trig sawtooth closure in Equation
      - `CALC-COMP1` for bounded substitution-style antiderivatives
 
 ## Recent Verified Context

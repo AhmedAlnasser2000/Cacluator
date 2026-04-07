@@ -655,6 +655,8 @@ test('COMP5 smoke keeps deep nested periodic carriers on structured multi-parame
   await expect(page.locator('.result-badges .equation-origin-badge', { hasText: 'Nested Recursion' })).toBeVisible();
   await expect(page.getByTestId('display-outcome-error')).toContainText(/(second independent periodic parameter|unsupported exact solving)/i);
   await expect(page.getByTestId('display-outcome-periodic-family')).toContainText(/tan\(x\)/i);
+  await expect(page.getByTestId('display-outcome-periodic-discovered-families')).toContainText(/cos/i);
+  await expect(page.getByTestId('display-outcome-periodic-discovered-families')).toContainText(/tan/i);
 });
 
 test('COMP6 smoke renders principal-range reductions with piecewise details in degree mode', async ({ page }) => {
@@ -683,7 +685,7 @@ test('COMP6 smoke keeps inverse-direct trig reductions on structured second-para
 
   await expect(page.getByTestId('display-outcome-error')).toBeVisible();
   await expect(page.locator('.result-badges .equation-origin-badge', { hasText: 'Periodic Family' })).toBeVisible();
-  await expect(page.getByTestId('display-outcome-periodic-structured-stop')).toContainText(/second independent periodic parameter/i);
+  await expect(page.getByTestId('display-outcome-periodic-structured-stop')).toContainText(/multiple independent periodic parameters/i);
   await expect(page.getByTestId('display-outcome-periodic-family')).toContainText(/tan\(x\)/i);
 });
 

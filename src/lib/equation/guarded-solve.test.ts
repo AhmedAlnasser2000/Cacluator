@@ -904,9 +904,82 @@ describe('runGuardedEquationSolve', () => {
     expect(result.solveBadges).toContain('Outer Inversion');
     expect(result.solveBadges).toContain('Periodic Family');
     expect(result.solveBadges).toContain('Nested Recursion');
-    expect(result.periodicFamily?.structuredStopReason).toBe('second-periodic-parameter');
+    expect(result.periodicFamily?.structuredStopReason).toBe('multi-parameter-periodic-family');
     expect(result.periodicFamily?.reducedCarrierLatex).toContain('\\tan(x)');
     expect(result.error).toContain('second independent periodic parameter');
+  });
+
+  it('keeps bounded nested periodic reductions exact for sin(cos(x))=0', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      angleUnit: 'deg',
+      originalLatex: '\\sin\\left(\\cos\\left(x\\right)\\right)=0',
+      resolvedLatex: '\\sin\\left(\\cos\\left(x\\right)\\right)=0',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected bounded nested periodic exact success');
+    }
+    expect(result.solveBadges).toContain('Periodic Family');
+    expect(result.solveBadges).toContain('Nested Recursion');
+    expect(result.exactLatex ?? '').toContain('90');
+    expect(result.periodicFamily?.discoveredFamilies?.length ?? 0).toBeGreaterThan(0);
+  });
+
+  it('keeps reciprocal nested periodic reductions exact for sec(cos(x))=1', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      angleUnit: 'deg',
+      originalLatex: '\\sec\\left(\\cos\\left(x\\right)\\right)=1',
+      resolvedLatex: '\\sec\\left(\\cos\\left(x\\right)\\right)=1',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected reciprocal nested periodic exact success');
+    }
+    expect(result.solveBadges).toContain('Periodic Family');
+    expect(result.solveBadges).toContain('Reciprocal Rewrite');
+    expect(result.exactLatex ?? '').toContain('90');
+    expect(result.periodicFamily?.discoveredFamilies?.some((family) => family.includes('\\cos'))).toBe(true);
+  });
+
+  it('tracks discovered periodic families before stopping on multi-parameter nested trig families', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      angleUnit: 'deg',
+      originalLatex: '\\sin\\left(\\cos\\left(\\tan\\left(x\\right)\\right)\\right)=0.00002',
+      resolvedLatex: '\\sin\\left(\\cos\\left(\\tan\\left(x\\right)\\right)\\right)=0.00002',
+    });
+
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') {
+      throw new Error('Expected structured deep-periodic guidance');
+    }
+    expect(result.solveBadges).toContain('Periodic Family');
+    expect(result.solveBadges).toContain('Nested Recursion');
+    expect(result.periodicFamily?.structuredStopReason).toBe('multi-parameter-periodic-family');
+    expect(result.periodicFamily?.discoveredFamilies?.length ?? 0).toBeGreaterThan(1);
+    expect(result.periodicFamily?.discoveredFamilies?.some((family) => family.includes('\\tan'))).toBe(true);
+  });
+
+  it('stops on the bounded periodic depth cap before attempting a third periodic reduction', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      angleUnit: 'rad',
+      periodicReductionDepth: 2,
+      originalLatex: '\\sin\\left(\\tan\\left(x\\right)\\right)=\\frac{1}{2}',
+      resolvedLatex: '\\sin\\left(\\tan\\left(x\\right)\\right)=\\frac{1}{2}',
+    });
+
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') {
+      throw new Error('Expected periodic depth-cap guidance');
+    }
+    expect(result.solveBadges).toContain('Periodic Family');
+    expect(result.periodicFamily?.structuredStopReason).toBe('periodic-depth-cap');
+    expect(result.error).toContain('depth cap');
   });
 
   it('stops with explicit numeric guidance when a composition would exceed the two-step inversion cap', () => {

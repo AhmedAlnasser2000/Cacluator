@@ -62,10 +62,16 @@ function mergePeriodicFamilies(families: PeriodicFamilyInfo[]) {
     return undefined;
   }
 
+  const discoveredFamilies = dedupe(
+    families.flatMap((family) => family.discoveredFamilies ?? []),
+  );
   const carrierLatex = families[0].carrierLatex;
   const parameterLatex = families[0].parameterLatex;
   if (families.some((family) => family.carrierLatex !== carrierLatex || family.parameterLatex !== parameterLatex)) {
-    return families[0];
+    return {
+      ...families[0],
+      discoveredFamilies: discoveredFamilies.length > 0 ? discoveredFamilies : families[0].discoveredFamilies,
+    };
   }
 
   const representatives = dedupe(
@@ -95,6 +101,7 @@ function mergePeriodicFamilies(families: PeriodicFamilyInfo[]) {
     parameterLatex,
     parameterConstraintLatex: parameterConstraintLatex.length > 0 ? parameterConstraintLatex : undefined,
     branchesLatex: dedupe(families.flatMap((family) => family.branchesLatex)),
+    discoveredFamilies: discoveredFamilies.length > 0 ? discoveredFamilies : undefined,
     representatives: representatives.length > 0 ? representatives : undefined,
     suggestedIntervals: suggestedIntervals.length > 0 ? suggestedIntervals : undefined,
     piecewiseBranches: piecewiseBranches.length > 0 ? piecewiseBranches : undefined,

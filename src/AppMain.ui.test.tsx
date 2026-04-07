@@ -872,6 +872,7 @@ describe('AppMain UI automation flows', () => {
     expect(screen.getByText('Nested Recursion')).toBeInTheDocument();
     expect(screen.getByTestId('display-outcome-exact')).toHaveTextContent(/π/);
     expect(screen.getByTestId('display-outcome-periodic-representatives')).toHaveTextContent(/k=0/);
+    expect(screen.getByTestId('display-outcome-periodic-discovered-families')).toBeInTheDocument();
   });
 
   it('renders COMP5 inverse-trig follow-on in degree mode with unit-aware periodic branches', async () => {
@@ -894,7 +895,7 @@ describe('AppMain UI automation flows', () => {
     expect(screen.getByTestId('display-outcome-exact')).toHaveTextContent(/360k\+60/);
   });
 
-  it('keeps COMP5 deep nested periodic carriers on structured multi-parameter guidance when exact closure would overreach', async () => {
+  it('keeps COMP7 deep nested periodic carriers on structured multi-parameter guidance when exact closure would overreach', async () => {
     const { user } = await renderAppMain();
 
     await user.click(screen.getByTestId('settings-toggle'));
@@ -912,6 +913,8 @@ describe('AppMain UI automation flows', () => {
     expect(screen.getByText('Nested Recursion')).toBeInTheDocument();
     expect(screen.getByTestId('display-outcome-error')).toHaveTextContent(/second independent periodic parameter/i);
     expect(screen.getByTestId('display-outcome-periodic-family')).toHaveTextContent(/tan\(x\)/i);
+    expect(screen.getByTestId('display-outcome-periodic-discovered-families')).toHaveTextContent(/cos/i);
+    expect(screen.getByTestId('display-outcome-periodic-discovered-families')).toHaveTextContent(/tan/i);
   });
 
   it('renders COMP6 reciprocal trig rewrites as symbolic periodic families', async () => {
@@ -990,7 +993,7 @@ describe('AppMain UI automation flows', () => {
     await waitFor(() => expect(screen.getByTestId('display-outcome-error')).toBeInTheDocument());
     expect(screen.getByText('Periodic Family')).toBeInTheDocument();
     expect(screen.getByText('Nested Recursion')).toBeInTheDocument();
-    expect(screen.getByTestId('display-outcome-periodic-structured-stop')).toHaveTextContent(/second independent periodic parameter/i);
+    expect(screen.getByTestId('display-outcome-periodic-structured-stop')).toHaveTextContent(/multiple independent periodic parameters/i);
     expect(screen.getByTestId('display-outcome-periodic-structured-stop')).toHaveTextContent(/tan/);
   });
 

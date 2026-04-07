@@ -688,12 +688,19 @@ export type PeriodicFamilyInfo = {
   parameterLatex: string;
   parameterConstraintLatex?: string[];
   branchesLatex: string[];
+  discoveredFamilies?: string[];
   representatives?: PeriodicFamilyRepresentative[];
   suggestedIntervals?: PeriodicIntervalSuggestion[];
   piecewiseBranches?: PeriodicPiecewiseBranch[];
   principalRangeLatex?: string;
   reducedCarrierLatex?: string;
-  structuredStopReason?: 'second-periodic-parameter' | 'outside-principal-range' | 'unsupported-sawtooth-closure';
+  structuredStopReason?:
+    | 'second-periodic-parameter'
+    | 'outside-principal-range'
+    | 'unsupported-sawtooth-closure'
+    | 'multi-parameter-periodic-family'
+    | 'periodic-depth-cap'
+    | 'unmerged-periodic-branches';
 };
 
 export type DisplayOutcome =
@@ -1190,6 +1197,7 @@ export type GuardedSolveRequest = {
   resolvedLatex: string;
   validationLatex?: string;
   compositionInversionDepth?: number;
+  periodicReductionDepth?: number;
   angleUnit: AngleUnit;
   outputStyle: OutputStyle;
   ansLatex: string;

@@ -41,6 +41,7 @@ const EPSILON = 1e-9;
 const RESIDUAL_TOLERANCE = 1e-6;
 const MAX_TRIG_BRANCHES = 12;
 const MAX_COMPOSITION_INVERSION_DEPTH = 2;
+const MAX_PERIODIC_REDUCTION_DEPTH = 2;
 const DIRECT_TRIG_OPERATORS = new Set(['Sin', 'Cos', 'Tan', 'Sec', 'Csc', 'Cot']);
 const INVERSE_TRIG_OPERATORS = new Set(['Arcsin', 'Arccos', 'Arctan']);
 
@@ -643,6 +644,13 @@ function mergePeriodicFamilyExtras(
 
   return {
     ...family,
+    discoveredFamilies: (() => {
+      const merged = dedupe([
+        ...(family.discoveredFamilies ?? []),
+        ...(extras.discoveredFamilies ?? []),
+      ]);
+      return merged.length > 0 ? merged : undefined;
+    })(),
     piecewiseBranches: dedupe(
       [...(family.piecewiseBranches ?? []), ...(extras.piecewiseBranches ?? [])]
         .map((entry) => JSON.stringify(entry)),
@@ -651,6 +659,35 @@ function mergePeriodicFamilyExtras(
     reducedCarrierLatex: extras.reducedCarrierLatex ?? family.reducedCarrierLatex,
     structuredStopReason: extras.structuredStopReason ?? family.structuredStopReason,
   } satisfies PeriodicFamilyInfo;
+}
+
+function appendDiscoveredFamilies(
+  family: PeriodicFamilyInfo,
+  discoveredFamilies: string[] = [],
+) {
+  const merged = dedupe([
+    ...(family.discoveredFamilies ?? []),
+    ...discoveredFamilies,
+  ].filter(Boolean));
+
+  return {
+    ...family,
+    discoveredFamilies: merged.length > 0 ? merged : undefined,
+  } satisfies PeriodicFamilyInfo;
+}
+
+function appendDiscoveredFamiliesToResult(
+  result: PeriodicFamilySolveResult,
+  discoveredFamilies: string[] = [],
+): PeriodicFamilySolveResult {
+  if (discoveredFamilies.length === 0) {
+    return result;
+  }
+
+  return {
+    ...result,
+    family: appendDiscoveredFamilies(result.family, discoveredFamilies),
+  };
 }
 
 function buildNumericTargetFromNode(node: unknown, fallbackValue?: number): NumericTarget | null {
@@ -1888,18 +1925,19 @@ function solveNestedTrigCarrierPeriodicFamily(
     ...buildPeriodicFamilyInfo(boxLatex(normalized), branches, constraints, angleUnit, normalized),
     reducedCarrierLatex: boxLatex(normalized),
   };
+  const discoveredFamilies = [periodicFamilyToExactLatex(family)];
 
-  if (periodicNestingDepth >= 1) {
+  if (periodicNestingDepth >= MAX_PERIODIC_REDUCTION_DEPTH) {
     return {
       kind: 'guided',
-      family: {
+      family: appendDiscoveredFamilies({
         ...family,
-        structuredStopReason: 'second-periodic-parameter',
-      },
-      error: 'This recognized periodic family would require a second independent periodic parameter to continue exactly. Use Numeric Solve with one of the suggested intervals.',
+        structuredStopReason: 'periodic-depth-cap',
+      }, discoveredFamilies),
+      error: 'This recognized periodic family reaches the current bounded periodic-reduction depth cap before exact closure. Use Numeric Solve with one of the suggested intervals.',
       domainConstraints: constraints,
       supplementLatex: supplementLatex.length > 0 ? supplementLatex : undefined,
-      summaryText: `Further reducing ${boxLatex(normalized)} would introduce another periodic branch parameter beyond the current bounded exact solve set.`,
+      summaryText: `Further reducing ${boxLatex(normalized)} would exceed the current bounded two-step periodic reduction cap.`,
       solveBadges: ['Nested Recursion'],
     };
   }
@@ -1910,10 +1948,10 @@ function solveNestedTrigCarrierPeriodicFamily(
     if (!range) {
       return {
         kind: 'guided',
-        family: {
+        family: appendDiscoveredFamilies({
           ...family,
-          structuredStopReason: 'second-periodic-parameter',
-        },
+          structuredStopReason: 'multi-parameter-periodic-family',
+        }, discoveredFamilies),
         error: 'This recognized periodic family would require a second independent periodic parameter to continue exactly. Use Numeric Solve with one of the suggested intervals.',
         domainConstraints: constraints,
         supplementLatex: supplementLatex.length > 0 ? supplementLatex : undefined,
@@ -1926,14 +1964,14 @@ function solveNestedTrigCarrierPeriodicFamily(
     if (expanded === null) {
       return {
         kind: 'guided',
-        family: {
+        family: appendDiscoveredFamilies({
           ...family,
-          structuredStopReason: 'unsupported-sawtooth-closure',
-        },
-        error: 'This recognized periodic family leaves too many bounded follow-on trig branches for the current exact solve set. Use Numeric Solve with one of the suggested intervals.',
+          structuredStopReason: 'unmerged-periodic-branches',
+        }, discoveredFamilies),
+        error: 'This recognized periodic family leaves too many bounded follow-on trig branches to merge into a single exact family. Use Numeric Solve with one of the suggested intervals.',
         domainConstraints: constraints,
         supplementLatex: supplementLatex.length > 0 ? supplementLatex : undefined,
-        summaryText: `Further reducing ${boxLatex(normalized)} would require bounded trig branch pruning beyond the current exact solve set.`,
+        summaryText: `Further reducing ${boxLatex(normalized)} would require bounded periodic branch merging beyond the current exact solve set.`,
         solveBadges: ['Nested Recursion'],
       };
     }
@@ -1941,7 +1979,7 @@ function solveNestedTrigCarrierPeriodicFamily(
     if (expanded.length === 0) {
       return {
         kind: 'guided',
-        family,
+        family: appendDiscoveredFamilies(family, discoveredFamilies),
         error: `No real solutions remain because this periodic family never enters the real range of ${kind}.`,
         domainConstraints: constraints,
         supplementLatex: supplementLatex.length > 0 ? supplementLatex : undefined,
@@ -1968,10 +2006,11 @@ function solveNestedTrigCarrierPeriodicFamily(
     transformedBranches.push(...template.branches.map(buildSymbolicFamilyBranch));
   }
 
-  if (transformedBranches.length === 0) {
+  const dedupedTransformedBranches = dedupeSymbolicFamilyBranches(transformedBranches);
+  if (dedupedTransformedBranches.length === 0) {
     return {
       kind: 'guided',
-      family,
+      family: appendDiscoveredFamilies(family, discoveredFamilies),
       error: 'No real solutions remain after reducing this nested periodic carrier in the real domain.',
       domainConstraints: constraints,
       supplementLatex: supplementLatex.length > 0 ? supplementLatex : undefined,
@@ -1980,16 +2019,27 @@ function solveNestedTrigCarrierPeriodicFamily(
     };
   }
 
-  return appendPeriodicSolveBadges(
+  const nextFamily = buildPeriodicFamilyInfo(
+    boxLatex(inner),
+    dedupedTransformedBranches,
+    constraints,
+    angleUnit,
+    inner,
+  );
+  const recursive = appendPeriodicSolveBadges(
     resolveCarrierPeriodicFamily(
       inner,
-      dedupeSymbolicFamilyBranches(transformedBranches),
+      dedupedTransformedBranches,
       angleUnit,
       constraints,
       supplementLatex,
       periodicNestingDepth + 1,
     ),
     ['Nested Recursion'],
+  );
+  return appendDiscoveredFamiliesToResult(
+    recursive,
+    dedupe([...discoveredFamilies, periodicFamilyToExactLatex(nextFamily)]),
   );
 }
 
@@ -2015,16 +2065,32 @@ function solveNestedInverseTrigCarrierPeriodicFamily(
     reducedCarrierLatex: boxLatex(normalized),
     principalRangeLatex,
   };
+  const discoveredFamilies = [periodicFamilyToExactLatex(family)];
+
+  if (periodicNestingDepth >= MAX_PERIODIC_REDUCTION_DEPTH) {
+    return {
+      kind: 'guided',
+      family: appendDiscoveredFamilies({
+        ...family,
+        structuredStopReason: 'periodic-depth-cap',
+      }, discoveredFamilies),
+      error: 'This recognized inverse-trig periodic family reaches the current bounded periodic-reduction depth cap before exact closure. Use Numeric Solve with one of the suggested intervals.',
+      domainConstraints: constraints,
+      supplementLatex: supplementLatex.length > 0 ? supplementLatex : undefined,
+      summaryText: `Further reducing ${boxLatex(normalized)} would exceed the current bounded two-step periodic reduction cap.`,
+      solveBadges: ['Nested Recursion', 'Principal Range'],
+    };
+  }
   const range = inverseTrigPrincipalRange(kind, angleUnit);
   const expanded = expandBranchesWithinInterval(branches, range.min, range.max);
 
   if (expanded === null) {
     return {
       kind: 'guided',
-      family: {
+      family: appendDiscoveredFamilies({
         ...family,
         structuredStopReason: 'unsupported-sawtooth-closure',
-      },
+      }, discoveredFamilies),
       error: 'This recognized inverse-trig periodic family still needs broader branch pruning than the current bounded exact solve set supports. Use Numeric Solve with one of the suggested intervals.',
       domainConstraints: constraints,
       supplementLatex: supplementLatex.length > 0 ? supplementLatex : undefined,
@@ -2036,10 +2102,10 @@ function solveNestedInverseTrigCarrierPeriodicFamily(
   if (expanded.length === 0) {
     return {
       kind: 'guided',
-      family: {
+      family: appendDiscoveredFamilies({
         ...family,
         structuredStopReason: 'outside-principal-range',
-      },
+      }, discoveredFamilies),
       error: `No real solutions remain because this periodic family never enters the principal range ${buildInverseTrigPrincipalRangeMessage(kind, angleUnit)} of ${inverseTrigLatex}.`,
       domainConstraints: constraints,
       supplementLatex: supplementLatex.length > 0 ? supplementLatex : undefined,
@@ -2068,10 +2134,11 @@ function solveNestedInverseTrigCarrierPeriodicFamily(
     return [buildSymbolicFamilyBranchFromNode(valueTarget.node, valueTarget.value)];
   });
 
-  if (transformedBranches.length === 0) {
+  const dedupedTransformedBranches = dedupeSymbolicFamilyBranches(transformedBranches);
+  if (dedupedTransformedBranches.length === 0) {
     return {
       kind: 'guided',
-      family,
+      family: appendDiscoveredFamilies(family, discoveredFamilies),
       error: 'No real solutions remain after bounded inverse-trig branch reduction.',
       domainConstraints: constraints,
       supplementLatex: supplementLatex.length > 0 ? supplementLatex : undefined,
@@ -2080,16 +2147,27 @@ function solveNestedInverseTrigCarrierPeriodicFamily(
     };
   }
 
-  return appendPeriodicSolveBadges(
+  const nextFamily = buildPeriodicFamilyInfo(
+    boxLatex(inner),
+    dedupedTransformedBranches,
+    constraints,
+    angleUnit,
+    inner,
+  );
+  const recursive = appendPeriodicSolveBadges(
     resolveCarrierPeriodicFamily(
       inner,
-      dedupeSymbolicFamilyBranches(transformedBranches),
+      dedupedTransformedBranches,
       angleUnit,
       constraints,
       supplementLatex,
       periodicNestingDepth,
     ),
     ['Nested Recursion', 'Principal Range'],
+  );
+  return appendDiscoveredFamiliesToResult(
+    recursive,
+    dedupe([...discoveredFamilies, periodicFamilyToExactLatex(nextFamily)]),
   );
 }
 
@@ -2246,9 +2324,10 @@ function resolveCarrierPeriodicFamily(
     }
   }
 
+  const family = buildPeriodicFamilyInfo(boxLatex(normalized), branches, constraints, angleUnit, normalized);
   return {
     kind: 'guided',
-    family: buildPeriodicFamilyInfo(boxLatex(normalized), branches, constraints, angleUnit, normalized),
+    family: appendDiscoveredFamilies(family, [periodicFamilyToExactLatex(family)]),
     error: 'This recognized periodic family still requires parameterized nonlinear or currently unsupported exact solving. Use Numeric Solve with one of the suggested intervals.',
     domainConstraints: constraints,
     supplementLatex: supplementLatex.length > 0 ? supplementLatex : undefined,
@@ -2308,6 +2387,9 @@ function solveTrigPeriodicFamily(
     inner,
     template.branches.map(buildSymbolicFamilyBranch),
     request.angleUnit,
+    undefined,
+    undefined,
+    request.periodicReductionDepth ?? 0,
   );
   if (!summaryPrefix && !reducedCarrierLatex && !(solveBadges?.length)) {
     return resolved;
@@ -2437,7 +2519,22 @@ function recurseComposition(
     );
   }
 
-  if (merged.kind !== 'success') {
+  if (merged.kind === 'error') {
+    const supplements = dedupe([
+      ...(merged.exactSupplementLatex ?? []),
+      ...extraSupplementLatex,
+      ...buildConstraintSupplementLatex(domainConstraints),
+    ]);
+    const detailSections = mergeDetailSections(merged.detailSections, extraDetailSections);
+    return appendSolveMetadata({
+      ...merged,
+      periodicFamily: mergePeriodicFamilyExtras(merged.periodicFamily, periodicFamilyExtras),
+      exactSupplementLatex: supplements.length > 0 ? supplements : undefined,
+      detailSections: detailSections.length > 0 ? detailSections : undefined,
+    }, effectiveBadges, summaryText);
+  }
+
+  if (merged.kind === 'prompt') {
     return appendSolveMetadata(merged, effectiveBadges, summaryText);
   }
 
@@ -2624,17 +2721,21 @@ function compositionSolve(
       );
     }
     if (trigBranches?.kind === 'branches') {
-    const recursive = recurseComposition(
-      request,
-      trigBranches.equations,
+      const discoveredFamilies = dedupe(trigBranches.equations);
+      const recursive = recurseComposition(
+        request,
+        trigBranches.equations,
         depth,
         trail,
         maxRecursionDepth,
-      runGuardedEquationSolve,
-      dedupe<SolveBadge>(['Composition Branch', ...(trigBranches.solveBadges ?? [])]),
-      trigBranches.summaryText,
-      [],
-      'This recognized composition family leaves infinitely many or currently unsupported inverse branches. Use Numeric Solve with a chosen interval.',
+        runGuardedEquationSolve,
+        dedupe<SolveBadge>(['Composition Branch', ...(trigBranches.solveBadges ?? [])]),
+        trigBranches.summaryText,
+        [],
+        'This recognized composition family leaves infinitely many or currently unsupported inverse branches. Use Numeric Solve with a chosen interval.',
+        [],
+        [],
+        { discoveredFamilies },
       );
       if (recursive) {
         return recursive;

@@ -8827,6 +8827,21 @@ export default function App() {
                     </div>
                   </div>
                 ) : null}
+                {displayOutcome.periodicFamily.discoveredFamilies?.length ? (
+                  <div className="result-summary-block" data-testid="display-outcome-periodic-discovered-families">
+                    <div className="result-summary-label">Discovered Families</div>
+                    <div className="result-detail-lines">
+                      {displayOutcome.periodicFamily.discoveredFamilies.map((familyLatex, index) => (
+                        <MathStatic
+                          key={`${familyLatex}-${index}`}
+                          className="result-math result-math-supplement"
+                          latex={familyLatex}
+                          displayPrefs={symbolicDisplayPrefs}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
                 {displayOutcome.periodicFamily.reducedCarrierLatex || displayOutcome.periodicFamily.structuredStopReason ? (
                   <div className="result-summary-block" data-testid="display-outcome-periodic-structured-stop">
                     <div className="result-summary-label">Reduction Notes</div>
@@ -8842,6 +8857,12 @@ export default function App() {
                         <div className="result-detail-line result-summary-text">
                           {displayOutcome.periodicFamily.structuredStopReason === 'second-periodic-parameter'
                             ? 'Exact closure stops here because the next reduction would require a second independent periodic parameter.'
+                            : displayOutcome.periodicFamily.structuredStopReason === 'multi-parameter-periodic-family'
+                              ? 'Exact closure stops here because the remaining nested periodic reduction would require multiple independent periodic parameters.'
+                              : displayOutcome.periodicFamily.structuredStopReason === 'periodic-depth-cap'
+                                ? 'Exact closure stops here because this bounded milestone only allows two periodic reduction steps.'
+                                : displayOutcome.periodicFamily.structuredStopReason === 'unmerged-periodic-branches'
+                                  ? 'Exact closure stops here because the remaining bounded periodic branches could not be merged into a single exact family.'
                             : displayOutcome.periodicFamily.structuredStopReason === 'outside-principal-range'
                               ? 'Exact closure stops here because the remaining branches fall outside the usable principal range.'
                               : 'Exact closure stops here because finishing the identity would require broader sawtooth-style reduction than this bounded milestone allows.'}
