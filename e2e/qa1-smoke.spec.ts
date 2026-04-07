@@ -696,19 +696,35 @@ test('COMP6 smoke renders principal-range reductions with piecewise details in d
   await expect(page.getByTestId('display-outcome-periodic-piecewise')).toContainText(/arctan/);
 });
 
-test('COMP6 smoke keeps inverse-direct trig reductions on structured second-parameter guidance', async ({ page }) => {
+test('COMP8 smoke renders affine sawtooth closure with exact families in degree mode', async ({ page }) => {
+  await openSettingsPanel(page);
+  await page.getByTestId('settings-angle-unit-deg').click();
+  await page.getByTestId('side-surface-overlay-backdrop').click();
+
+  await openEquationSymbolic(page);
+  await setMathFieldLatex(page, '\\arcsin\\left(\\sin\\left(2x+10\\right)\\right)=30');
+  await page.getByTestId('soft-action-solve').click();
+
+  await expect(page.getByTestId('display-outcome-success')).toBeVisible();
+  await expect(page.locator('.result-badges .equation-origin-badge', { hasText: 'Principal Range' })).toBeVisible();
+  await expect(page.locator('.result-badges .equation-origin-badge', { hasText: 'Periodic Family' })).toBeVisible();
+  await expect(page.getByTestId('display-outcome-exact')).toContainText(/360k/);
+  await expect(page.getByTestId('display-outcome-periodic-piecewise')).toContainText(/arcsin/);
+});
+
+test('COMP8 smoke keeps non-affine sawtooth identities on structured guidance', async ({ page }) => {
   await openSettingsPanel(page);
   await page.getByTestId('settings-angle-unit-rad').click();
   await page.getByTestId('side-surface-overlay-backdrop').click();
 
   await openEquationSymbolic(page);
-  await setMathFieldLatex(page, '\\arcsin\\left(\\sin\\left(\\tan\\left(x\\right)\\right)\\right)=\\frac{1}{2}');
+  await setMathFieldLatex(page, '\\arcsin\\left(\\sin\\left(x^2\\right)\\right)=\\frac{1}{2}');
   await page.getByTestId('soft-action-solve').click();
 
   await expect(page.getByTestId('display-outcome-error')).toBeVisible();
-  await expect(page.locator('.result-badges .equation-origin-badge', { hasText: 'Periodic Family' })).toBeVisible();
-  await expect(page.getByTestId('display-outcome-periodic-structured-stop')).toContainText(/multiple independent periodic parameters/i);
-  await expect(page.getByTestId('display-outcome-periodic-family')).toContainText(/tan\(x\)/i);
+  await expect(page.locator('.result-badges .equation-origin-badge', { hasText: 'Principal Range' })).toBeVisible();
+  await expect(page.getByTestId('display-outcome-periodic-structured-stop')).toContainText(/sawtooth-style reduction/i);
+  await expect(page.getByTestId('display-outcome-periodic-structured-stop')).toContainText(/x/);
 });
 
 test('Equation numeric interval smoke can follow up unresolved composition guidance with a valid interval', async ({ page }) => {

@@ -10,3 +10,14 @@
   - https://edu.casio.com/content/dam/casio/global/support/manuals/calculators/pdf/004-en/c/ClassPadII_UG_EN.pdf
 - 2026-03-07: Casio ClassPad overview confirming CAS positioning:
   - https://edu.casio.com/intl/software/apps/classpad/
+- 2026-04-07: External reference PDF, `Comparative Software Analysis of GeoGebra, Desmos, Casio Graphing Software, TI Graphing Software, and Wolfram as Auxiliary`
+  - Local file: `C:\Users\ahmed\Downloads\Comparative Software Analysis of GeoGebra, Desmos, Casio Graphing Software, TI Graphing Software, an.pdf`
+  - Use as an ecosystem/positioning reference for GeoGebra, Desmos, Casio, TI, and Wolfram.
+  - Do not treat it as direct empirical evidence for symbolic composition-depth limits or nested trig/inverse-trig solve behavior.
+- 2026-04-07: External vision PDF, `Calcwiz Vision`
+  - Local file: `C:\Users\ahmed\Downloads\Calcwiz Vision.pdf`
+  - Use as the long-term product and architecture vision reference for modularity, Rust-first migration, progressive solving, compute profiles, graphing, and symbolic-depth philosophy.
+- 2026-04-07: External composition design note, `codex_symbolic_composition_limits_spec.md`
+  - Local file: `C:\Users\ahmed\Downloads\codex_symbolic_composition_limits_spec.md`
+  - Use as a future design reference for semantic stop reasons and solver-budget policy.
+  - Do not treat it as current Calcwiz behavior; the shipped solver still uses bounded milestone-specific composition policies today.

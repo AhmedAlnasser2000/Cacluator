@@ -33,6 +33,13 @@
 - Extracted `src/app/*`, `src/styles/app/*`, and decomposition facades under solver/guide/types are in-tree and passing regression.
 
 ## Most Recent Completed Milestone
+- Completed `COMP8` as the affine inverse/direct trig sawtooth-closure milestone:
+  - added bounded sawtooth-style closure for `\arcsin(\sin(g(x)))`, `\arccos(\cos(g(x)))`, and `\arctan(\tan(g(x)))` when the reduced carrier normalizes to `x`, `ax+b`, or a sign-flipped/reordered affine equivalent
+  - preserved the existing principal-range exact collapse when the carrier is already inside the selected unit's principal range, and otherwise emitted structured piecewise exact branch windows plus the final single-parameter family when affine closure stays honest
+  - allowed one safe outer-inversion handoff into the same affine sawtooth closure surface, including cases like `\ln(\arctan(\tan(x+100)))=\ln(30)`
+  - kept nonlinear carriers such as `\arcsin(\sin(x^2))=\frac{1}{2}` on structured guidance with reduced-carrier metadata and explicit sawtooth stop reasons instead of fake exact closure
+- Regression checks:
+  - `npm run test:gate`
 - Completed `ND1` as the notation consistency and user-controlled read-only math format milestone:
   - added a persisted `mathNotationDisplay` setting with `Rendered`, `Plain Text`, and `LaTeX` modes
   - routed read-only math display through a shared notation-aware presentation path so result cards, periodic-family sections, history replay, and guide/read-only math follow the same notation preference
@@ -94,6 +101,11 @@
   - `npm run test:gate`
 
 ## Recent Verified Context
+- `COMP8` affine inverse/direct trig sawtooth closure is now verified in `Equation > Symbolic`:
+  - affine carriers (`x`, `ax+b`, and sign-flipped/reordered affine equivalents) now close bounded `arcsin(sin(...))`, `arccos(cos(...))`, and `arctan(tan(...))` identities with exact piecewise branch metadata plus a final single-parameter family when mathematically valid
+  - one safe outer-inversion handoff into the same affine closure surface now works, so bounded follow-ons like `\ln(\arctan(\tan(x+100)))=\ln(30)` finish symbolically instead of stopping early
+  - non-affine sawtooth cases now stay honest with reduced-carrier notes, principal-range metadata, and structured `unsupported-sawtooth-closure` guidance instead of drifting into fake exact output
+  - the full repo gate is green after a fresh build, unit/UI/browser coverage, lint, and `cargo check`
 - `ND1` notation consistency is now verified across the app's read-only math surfaces:
   - settings now persist `Rendered`, `Plain Text`, and `LaTeX` notation modes through the shared frontend schema and Tauri persistence layer
   - read-only result exact lines, periodic-family sections, discovered families, reduction notes, and other display-only math surfaces now follow one notation-aware rendering path instead of leaking mixed raw LaTeX

@@ -473,6 +473,24 @@ function evaluateRealNode(node: unknown) {
   }
 }
 
+function substituteVariableNode(node: unknown, value: number) {
+  try {
+    const substituted = ce.box(normalizeAst(node) as Parameters<typeof ce.box>[0]).subs({ x: value });
+    const simplified = substituted.simplify?.() ?? substituted;
+    const normalized = normalizeAst(simplified.json);
+    const numericValue = evaluateRealNode(normalized);
+    if (numericValue === null || !Number.isFinite(numericValue)) {
+      return null;
+    }
+    return {
+      node: normalized,
+      value: numericValue,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function readExactScalar(node: unknown): { numerator: number; denominator: number } | null {
   if (typeof node === 'number' && Number.isFinite(node) && Number.isInteger(node)) {
     return { numerator: node, denominator: 1 };
@@ -638,8 +656,28 @@ function mergePeriodicFamilyExtras(
   family: PeriodicFamilyInfo | undefined,
   extras: Partial<PeriodicFamilyInfo> | undefined,
 ) {
-  if (!family || !extras) {
+  if (!extras) {
     return family;
+  }
+
+  if (!family) {
+    if (!extras.carrierLatex) {
+      return family;
+    }
+
+    return {
+      carrierLatex: extras.carrierLatex,
+      parameterLatex: extras.parameterLatex ?? 'k\\in\\mathbb{Z}',
+      branchesLatex: extras.branchesLatex ?? [],
+      parameterConstraintLatex: extras.parameterConstraintLatex,
+      discoveredFamilies: extras.discoveredFamilies,
+      representatives: extras.representatives,
+      suggestedIntervals: extras.suggestedIntervals,
+      piecewiseBranches: extras.piecewiseBranches,
+      principalRangeLatex: extras.principalRangeLatex,
+      reducedCarrierLatex: extras.reducedCarrierLatex,
+      structuredStopReason: extras.structuredStopReason,
+    } satisfies PeriodicFamilyInfo;
   }
 
   return {
@@ -884,7 +922,8 @@ function appendPeriodicSolveBadges(
 }
 
 function numericAffineCarrier(node: unknown) {
-  if (isBareVariable(node)) {
+  const normalized = normalizeAst(node);
+  if (isBareVariable(normalized)) {
     return {
       coefficient: 1,
       offsetNode: 0 as unknown,
@@ -892,9 +931,37 @@ function numericAffineCarrier(node: unknown) {
     };
   }
 
-  const affine = matchAffineVariableArgument(node);
+  const affine = matchAffineVariableArgument(normalized);
   if (!affine) {
-    return null;
+    if (!dependsOnVariable(normalized, 'x')) {
+      return null;
+    }
+
+    const atNegOne = substituteVariableNode(normalized, -1);
+    const atZero = substituteVariableNode(normalized, 0);
+    const atOne = substituteVariableNode(normalized, 1);
+    const atTwo = substituteVariableNode(normalized, 2);
+
+    if (!atNegOne || !atZero || !atOne || !atTwo) {
+      return null;
+    }
+
+    const coefficientEstimate = atOne.value - atZero.value;
+    const roundedCoefficient = Math.round(coefficientEstimate);
+    if (
+      Math.abs(coefficientEstimate - roundedCoefficient) > EPSILON
+      || roundedCoefficient === 0
+      || Math.abs((atTwo.value - atOne.value) - roundedCoefficient) > EPSILON
+      || Math.abs((atZero.value - atNegOne.value) - roundedCoefficient) > EPSILON
+    ) {
+      return null;
+    }
+
+    return {
+      coefficient: roundedCoefficient,
+      offsetNode: atZero.node,
+      offsetValue: atZero.value,
+    };
   }
 
   const offsetValue = evaluateRealNode(affine.offsetNode);
@@ -1331,14 +1398,14 @@ function matchNonPeriodicTransform(
         : null;
     const principalRange = inverseTrigPrincipalRange(inverseTrigKind, angleUnit);
     const principalRangeLatex = buildInverseTrigPrincipalRangeLatex(inverseTrigKind, angleUnit);
+    const outerLatex = boxLatex(normalized);
     if (directInner) {
+      const reducedCarrierLatex = boxLatex(directInner[1]);
       const directInnerRange = proveRealRange(directInner[1]);
       if (
         directInnerRange.kind === 'exact'
         && intervalWithinPrincipalRange(directInnerRange.interval, principalRange)
       ) {
-        const outerLatex = boxLatex(normalized);
-        const reducedCarrierLatex = boxLatex(directInner[1]);
         return {
           equations: [buildEquationLatex(directInner[1], target.node)],
           solveBadges: ['Principal Range'],
@@ -1368,6 +1435,99 @@ function matchNonPeriodicTransform(
           },
         };
       }
+
+      if (!isWithinPrincipalRange(target.value, principalRange)) {
+        const label =
+          inverseTrigKind === 'asin'
+            ? 'arcsin'
+            : inverseTrigKind === 'acos'
+              ? 'arccos'
+              : 'arctan';
+        return {
+          equations: [],
+          solveBadges: ['Principal Range'],
+          solveSummaryText: `Principal range: ${outerLatex} cannot equal ${target.latex} because ${label} only returns values on ${buildInverseTrigPrincipalRangeMessage(inverseTrigKind, angleUnit)}.`,
+          unresolvedError: `No real solutions because ${label} returns principal values only on ${buildInverseTrigPrincipalRangeMessage(inverseTrigKind, angleUnit)}.`,
+          exactSupplementLatex: [`\\text{Principal range: } ${principalRangeLatex}`],
+          periodicFamilyExtras: {
+            carrierLatex: reducedCarrierLatex,
+            parameterLatex: 'k\\in\\mathbb{Z}',
+            branchesLatex: [],
+            principalRangeLatex,
+            reducedCarrierLatex,
+            structuredStopReason: 'outside-principal-range',
+          },
+        };
+      }
+
+      const affineCarrier = numericAffineCarrier(directInner[1]);
+      if (!affineCarrier) {
+        return {
+          equations: [],
+          solveBadges: ['Principal Range'],
+          solveSummaryText: `Affine sawtooth closure: ${outerLatex} crosses principal-range folds, but ${reducedCarrierLatex} is not an affine carrier in x.`,
+          unresolvedError: 'This recognized inverse/direct trig identity leaves a non-affine carrier outside the current bounded affine sawtooth-closure set. Use Numeric Solve with a chosen interval in Equation mode.',
+          exactSupplementLatex: [`\\text{Principal range: } ${principalRangeLatex}`],
+          detailSections: [
+            {
+              title: 'Piecewise Exact',
+              lines: [
+                `${outerLatex} only closes exactly in this milestone when ${reducedCarrierLatex} is affine and the sawtooth branches stay single-parameter.`,
+              ],
+            },
+          ],
+          periodicFamilyExtras: {
+            carrierLatex: reducedCarrierLatex,
+            parameterLatex: 'k\\in\\mathbb{Z}',
+            branchesLatex: [],
+            principalRangeLatex,
+            reducedCarrierLatex,
+            structuredStopReason: 'unsupported-sawtooth-closure',
+          },
+        };
+      }
+
+      const mappedKind =
+        inverseTrigKind === 'asin'
+          ? 'sin'
+          : inverseTrigKind === 'acos'
+            ? 'cos'
+            : 'tan';
+      const invertedTarget = buildInverseTrigValueTarget(mappedKind, target, angleUnit);
+      if (!invertedTarget) {
+        return null;
+      }
+      const template = buildTrigPeriodicTemplate(mappedKind, invertedTarget.value, invertedTarget.latex, angleUnit);
+      const piecewiseBranches = template
+        ? template.branches.map((branch) => ({
+            conditionLatex: `${reducedCarrierLatex}=${branch.latex}`,
+            resultLatex: `${outerLatex}=${target.latex}`,
+          }))
+        : [];
+
+      return {
+        equations: [buildEquationLatex(directInner, invertedTarget.node)],
+        solveBadges: ['Outer Inversion', 'Principal Range'],
+        solveSummaryText: `Affine sawtooth closure: ${outerLatex}=${target.latex} reduces to ${boxLatex(directInner)}=${invertedTarget.latex} on bounded principal-range branches.`,
+        unresolvedError: 'This recognized affine inverse/direct trig identity is outside the current exact bounded sawtooth-closure set. Use Numeric Solve with a chosen interval in Equation mode.',
+        exactSupplementLatex: [`\\text{Principal range: } ${principalRangeLatex}`],
+        detailSections: [
+          {
+            title: 'Piecewise Exact',
+            lines: [
+              `${outerLatex} matches ${target.latex} on the bounded affine sawtooth branches of ${reducedCarrierLatex}.`,
+            ],
+          },
+        ],
+        periodicFamilyExtras: {
+          carrierLatex: reducedCarrierLatex,
+          parameterLatex: 'k\\in\\mathbb{Z}',
+          branchesLatex: [],
+          principalRangeLatex,
+          reducedCarrierLatex,
+          piecewiseBranches,
+        },
+      };
     }
 
     if (!isWithinPrincipalRange(target.value, principalRange)) {
@@ -2792,7 +2952,7 @@ function compositionSolve(
     }
 
     if (transform.equations.length === 0) {
-      return errorOutcome(
+      const blocked = errorOutcome(
         'Solve',
         transform.unresolvedError,
         [],
@@ -2800,6 +2960,19 @@ function compositionSolve(
         dedupe<SolveBadge>([...transform.solveBadges, ...nestedContextBadges]),
         transform.solveSummaryText || undefined,
       );
+      if (blocked.kind !== 'error') {
+        return blocked;
+      }
+      const supplements = dedupe([
+        ...(transform.exactSupplementLatex ?? []),
+        ...buildConstraintSupplementLatex(transform.domainConstraints),
+      ]);
+      return {
+        ...blocked,
+        periodicFamily: mergePeriodicFamilyExtras(undefined, transform.periodicFamilyExtras),
+        exactSupplementLatex: supplements.length > 0 ? supplements : undefined,
+        detailSections: transform.detailSections?.length ? transform.detailSections : undefined,
+      };
     }
 
     const recursive = recurseComposition(

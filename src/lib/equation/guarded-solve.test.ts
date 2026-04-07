@@ -728,7 +728,7 @@ describe('runGuardedEquationSolve', () => {
     expect(result.exactLatex ?? '').toContain('e');
   });
 
-  it('can hand inverse-trig outers into periodic parameterized carrier solving', () => {
+  it('keeps inverse/direct trig outers over nonlinear carriers outside bounded affine sawtooth closure', () => {
     const result = runGuardedEquationSolve({
       ...request,
       angleUnit: 'deg',
@@ -736,14 +736,13 @@ describe('runGuardedEquationSolve', () => {
       resolvedLatex: '\\arcsin\\left(\\sin\\left(x^2\\right)\\right)=30',
     });
 
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') {
-      throw new Error('Expected inverse-trig to parameterized periodic handoff');
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') {
+      throw new Error('Expected bounded affine sawtooth guidance');
     }
-    expect(result.solveBadges).toContain('Outer Inversion');
-    expect(result.solveBadges).toContain('Periodic Family');
-    expect(result.solveBadges).toContain('Parameterized Family');
-    expect(result.exactLatex ?? '').toContain('\\sqrt');
+    expect(result.solveBadges).toContain('Principal Range');
+    expect(result.periodicFamily?.structuredStopReason).toBe('unsupported-sawtooth-closure');
+    expect(result.periodicFamily?.reducedCarrierLatex ?? '').toContain('x^2');
   });
 
   it('keeps broader nonlinear carriers like sin(x^2+x)=1/2 as recognized but unresolved', () => {
@@ -889,24 +888,78 @@ describe('runGuardedEquationSolve', () => {
     expect(result.periodicFamily?.piecewiseBranches?.[0]?.resultLatex ?? '').toContain('\\cos(x)');
   });
 
-  it('keeps inverse/direct trig reductions on structured guidance when the next exact step needs a second periodic parameter', () => {
+  it('closes affine inverse/direct trig sawtooth identities exactly', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      angleUnit: 'deg',
+      originalLatex: '\\arcsin\\left(\\sin\\left(2x+10\\right)\\right)=30',
+      resolvedLatex: '\\arcsin\\left(\\sin\\left(2x+10\\right)\\right)=30',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected affine sawtooth exact closure');
+    }
+    expect(result.solveBadges).toContain('Outer Inversion');
+    expect(result.solveBadges).toContain('Principal Range');
+    expect(result.solveBadges).toContain('Periodic Family');
+    expect(result.exactLatex ?? '').toContain('360k');
+    expect(result.periodicFamily?.piecewiseBranches?.length ?? 0).toBeGreaterThan(1);
+    expect(result.periodicFamily?.principalRangeLatex ?? '').toContain('90');
+  });
+
+  it('closes sign-flipped affine inverse/direct trig identities exactly', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      angleUnit: 'deg',
+      originalLatex: '\\arctan\\left(\\tan\\left(10-2x\\right)\\right)=30',
+      resolvedLatex: '\\arctan\\left(\\tan\\left(10-2x\\right)\\right)=30',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected sign-flipped affine sawtooth exact closure');
+    }
+    expect(result.solveBadges).toContain('Outer Inversion');
+    expect(result.solveBadges).toContain('Principal Range');
+    expect(result.exactLatex ?? '').toContain('180k');
+    expect(result.periodicFamily?.piecewiseBranches?.[0]?.resultLatex ?? '').toContain('\\arctan');
+  });
+
+  it('allows one safe outer-inversion handoff into affine sawtooth closure', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      angleUnit: 'deg',
+      originalLatex: '\\ln\\left(\\arctan\\left(\\tan\\left(x+100\\right)\\right)\\right)=\\ln\\left(30\\right)',
+      resolvedLatex: '\\ln\\left(\\arctan\\left(\\tan\\left(x+100\\right)\\right)\\right)=\\ln\\left(30\\right)',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected safe outer-inversion sawtooth handoff success');
+    }
+    expect(result.solveBadges).toContain('Outer Inversion');
+    expect(result.solveBadges).toContain('Principal Range');
+    expect(result.solveBadges).toContain('Nested Recursion');
+    expect(result.exactLatex ?? '').toContain('180k');
+  });
+
+  it('keeps non-affine inverse/direct trig identities on structured affine-sawtooth guidance', () => {
     const result = runGuardedEquationSolve({
       ...request,
       angleUnit: 'rad',
-      originalLatex: '\\arcsin\\left(\\sin\\left(\\tan\\left(x\\right)\\right)\\right)=\\frac{1}{2}',
-      resolvedLatex: '\\arcsin\\left(\\sin\\left(\\tan\\left(x\\right)\\right)\\right)=\\frac{1}{2}',
+      originalLatex: '\\arcsin\\left(\\sin\\left(x^2\\right)\\right)=\\frac{1}{2}',
+      resolvedLatex: '\\arcsin\\left(\\sin\\left(x^2\\right)\\right)=\\frac{1}{2}',
     });
 
     expect(result.kind).toBe('error');
     if (result.kind !== 'error') {
-      throw new Error('Expected structured inverse/direct trig guidance');
+      throw new Error('Expected structured affine-sawtooth guidance');
     }
-    expect(result.solveBadges).toContain('Outer Inversion');
-    expect(result.solveBadges).toContain('Periodic Family');
-    expect(result.solveBadges).toContain('Nested Recursion');
-    expect(result.periodicFamily?.structuredStopReason).toBe('multi-parameter-periodic-family');
-    expect(result.periodicFamily?.reducedCarrierLatex).toContain('\\tan(x)');
-    expect(result.error).toContain('second independent periodic parameter');
+    expect(result.solveBadges).toContain('Principal Range');
+    expect(result.periodicFamily?.structuredStopReason).toBe('unsupported-sawtooth-closure');
+    expect(result.periodicFamily?.reducedCarrierLatex).toContain('x^2');
+    expect(result.error).toContain('non-affine carrier');
   });
 
   it('keeps bounded nested periodic reductions exact for sin(cos(x))=0', () => {
