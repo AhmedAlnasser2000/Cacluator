@@ -87,6 +87,17 @@ describe('runExpressionAction', () => {
     expect(result.exactLatex).toContain('x+1')
   })
 
+  it('factors supported cubic polynomials through the bounded exact engine', () => {
+    const result = runExpressionAction(
+      { ...request, document: { latex: 'x^3-6x^2+11x-6' } },
+      'factor',
+    )
+
+    expect(result.error).toBeUndefined()
+    expect(result.resultOrigin).toBe('symbolic-engine')
+    expect(result.exactLatex).toBe('(x^2-5x+6)(x-1)')
+  })
+
   it('evaluates nCr and nPr exactly through the discrete fallback', () => {
     const combination = runExpressionAction(
       { ...request, document: { latex: '\\operatorname{nCr}(5,2)' } },

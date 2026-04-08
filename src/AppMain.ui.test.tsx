@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   expectMathStaticLatex,
+  openLauncherApp,
   openEquationSymbolic,
   openGeometrySlope,
   openTable,
@@ -1166,6 +1167,30 @@ describe('AppMain UI automation flows', () => {
     expectMathStaticLatex(screen.getByTestId('display-outcome-exact'), /\\sqrt\{5\}/);
     expectMathStaticLatex(screen.getByTestId('display-outcome-supplement-0'), /x\\ne0/);
     expect(screen.getByText('LCD Clear')).toBeInTheDocument();
+  });
+
+  it('renders POLY2 guided quartic exact roots through the bounded factor-first path', async () => {
+    const { user } = await renderAppMain();
+
+    await openLauncherApp(user, 'Core', 'Equation');
+    await user.click(await screen.findByRole('button', { name: /polynomial/i }));
+    await user.click(await screen.findByRole('button', { name: /quartic/i }));
+
+    await user.click(screen.getByTestId('soft-action-solve'));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expectMathStaticLatex(screen.getByTestId('display-outcome-exact'), /x\\in\\left\\\{.*2.*1.*1.*2.*\\right\\\}/);
+  });
+
+  it('renders POLY2 bounded cubic factorization through Calculate > Factor', async () => {
+    const { user } = await renderAppMain();
+
+    setMathFieldLatex('main-editor', 'x^3-6x^2+11x-6');
+    await user.click(screen.getByTestId('soft-action-factor'));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expectMathStaticLatex(screen.getByTestId('display-outcome-exact'), /(x-1|x\^2-5x\+6)/);
+    expect(screen.getByTestId('display-outcome-exact')).toHaveTextContent(/x/);
   });
 
   it('renders bounded conjugate solves with conditions and provenance', async () => {

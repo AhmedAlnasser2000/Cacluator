@@ -666,7 +666,6 @@ export function runExpressionAction(
 
     const factorOutcome =
       action === 'factor'
-      && (exact?.latex ?? radicalExpr.latex) === radicalExpr.latex
       && !radical
         ? runFactoringEngine(rawLatex)
         : undefined;

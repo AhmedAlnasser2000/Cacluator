@@ -5,6 +5,7 @@ import { normalizeExactRadicalNode } from '../../symbolic-engine/radical';
 import { normalizeExactRationalNode } from '../../symbolic-engine/rational';
 import { detectRealRangeImpossibility } from '../range-impossibility';
 import { validateCandidateRoots } from '../candidate-validation';
+import { recognizeBoundedPolynomialEquationAst, solveBoundedPolynomialEquationAst } from '../../polynomial-factor-solve';
 import type {
   CandidateValidationResult,
   DisplayOutcome,
@@ -351,6 +352,38 @@ function validateDirectSymbolicOutcome(
   };
 }
 
+function runBoundedPolynomialSolve(request: GuardedSolveRequest): DisplayOutcome | null {
+  try {
+    const parsed = ce.parse(request.resolvedLatex).json;
+    const recognized = recognizeBoundedPolynomialEquationAst(parsed, 'x');
+    if (!recognized) {
+      return null;
+    }
+
+    const solved = solveBoundedPolynomialEquationAst(parsed, 'x');
+    if (!solved) {
+      return errorOutcome(
+        'Solve',
+        UNSUPPORTED_FAMILY_ERROR,
+      );
+    }
+
+    return {
+      kind: 'success',
+      title: 'Solve',
+      exactLatex: solved.exactLatex,
+      approxText: solved.approxText,
+      warnings: [],
+      resultOrigin: 'symbolic',
+      plannerBadges: [],
+      solveBadges: [],
+      candidateValues: solved.approxSolutions,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function runGuardedEquationSolve(
   request: GuardedSolveRequest,
   depth = 0,
@@ -403,6 +436,11 @@ function runGuardedEquationSolve(
     if (numeric) {
       return attachAlgebraMetadata(numeric, request.resolvedLatex, preparedRequest);
     }
+  }
+
+  const boundedPolynomial = runBoundedPolynomialSolve(preparedRequest);
+  if (boundedPolynomial) {
+    return attachAlgebraMetadata(boundedPolynomial, request.resolvedLatex, preparedRequest);
   }
 
   const algebraTransformed = algebraTransformSolve(

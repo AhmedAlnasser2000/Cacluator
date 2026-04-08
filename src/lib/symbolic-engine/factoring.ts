@@ -1,5 +1,6 @@
 import type { FactoringStrategy } from '../../types/calculator';
 import { exactScalarToNumber, getExactPolynomialCoefficient, parseExactPolynomial } from '../polynomial-core';
+import { factorBoundedPolynomialAst } from '../polynomial-factor-solve';
 import {
   addTerms,
   buildTermNode,
@@ -360,6 +361,14 @@ export function factorAst(ast: unknown) {
     return {
       node: quadratic,
       strategy: 'algebraic-identity' as const,
+    };
+  }
+
+  const boundedPolynomial = factorBoundedPolynomialAst(ast);
+  if (boundedPolynomial) {
+    return {
+      node: boundedPolynomial.factorizedNode,
+      strategy: 'polynomial-factorization' as const,
     };
   }
 

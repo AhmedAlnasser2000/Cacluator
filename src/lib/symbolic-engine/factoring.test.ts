@@ -39,4 +39,22 @@ describe('symbolic-engine factoring', () => {
     expect(normalized).toContain('x-2')
     expect(normalized).toContain('x-3')
   })
+
+  it('adds bounded cubic factorization through the shared polynomial factor engine', () => {
+    const factored = factorLatex('x^3-6x^2+11x-6')
+    const normalized = factored.replaceAll('\\left', '').replaceAll('\\right', '')
+
+    expect(normalized).toContain('x-1')
+    expect(normalized).toContain('x^2-5x+6')
+  })
+
+  it('adds bounded quartic factorization for supported biquadratic and quadratic-pair families', () => {
+    const biquadratic = factorLatex('x^4-5x^2+4').replaceAll('\\left', '').replaceAll('\\right', '')
+    const quadraticPair = factorLatex('x^4+3x^3-x^2-4x+2').replaceAll('\\left', '').replaceAll('\\right', '')
+
+    expect(biquadratic).toContain('x^2-1')
+    expect(biquadratic).toContain('x^2-4')
+    expect(quadraticPair).toContain('x^2+x-1')
+    expect(quadraticPair).toContain('x^2+2x-2')
+  })
 })

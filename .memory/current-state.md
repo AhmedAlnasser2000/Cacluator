@@ -33,6 +33,14 @@
 - Extracted `src/app/*`, `src/styles/app/*`, and decomposition facades under solver/guide/types are in-tree and passing regression.
 
 ## Most Recent Completed Milestone
+- Completed `POLY2` as the bounded exact cubic/quartic factor-and-solve milestone:
+  - added `src/lib/polynomial-factor-solve.ts` as the shared bounded exact factor/solve layer on top of `POLY1`, with denominator clearing to primitive integer form, rational-root-theorem search, exact linear division, quartic biquadratic recognition, and bounded quartic factor-into-quadratics support
+  - wired the same bounded engine into guided `Equation > Polynomial`, free-form `Equation > Symbolic`, and `Calculate > Factor` so supported cubic/quartic families now resolve exactly through one shared factor-first path instead of separate feature-local logic
+  - kept unsupported cubic/quartic families honest: guided polynomial screens still fall back numerically when bounded exact factoring fails, and free-form symbolic stays limited to bounded exact families instead of widening into general Cardano/Ferrari-style solving
+  - added focused regression coverage for exact cubic/quartic solve, bounded factorization reuse, and the direct math-engine factor path
+- Regression checks:
+  - `npm run test:unit -- src/lib/math-engine.test.ts src/lib/polynomial-factor-solve.test.ts src/lib/symbolic-engine/factoring.test.ts src/lib/symbolic-engine/orchestrator.test.ts src/lib/modes/equation.test.ts src/lib/equation/guarded-solve.test.ts`
+  - `npm run test:gate`
 - Completed `POLY1` as the shared exact polynomial-core foundation milestone:
   - added `src/lib/polynomial-core.ts` as the app-owned exact one-variable polynomial substrate with exact rational scalar arithmetic, bounded parsing up to degree `4`, canonical AST/LaTeX rebuild helpers, bounded multiply, and quadratic discriminant helpers
   - refactored `src/lib/equation/composition-stage.ts` so `COMP10` polynomial-carrier parsing and exact scalar arithmetic now consume the shared core instead of private composition-local helpers
@@ -123,6 +131,11 @@
   - `npm run test:gate`
 
 ## Recent Verified Context
+- `POLY2` bounded exact cubic/quartic factor-and-solve is now verified:
+  - `src/lib/polynomial-factor-solve.ts` now owns the shared bounded exact cubic/quartic factor-first engine with rational-root search, exact linear division, quartic biquadratic recognition, and bounded quadratic-pair factorization
+  - guided `Equation > Polynomial` cubic/quartic flows now try the bounded exact engine before numeric fallback, free-form `Equation > Symbolic` now returns exact cubic/quartic answers only for the same supported bounded families, and `Calculate > Factor` now reuses the shared engine instead of staying artificially narrower
+  - supported examples such as `x^3-6x^2+11x-6=0`, `x^4-5x^2+4=0`, and `x^3-6x^2+11x-6` under `Factor` now resolve exactly, while unsupported irreducible cubic/quartic families still keep the current numeric fallback or unsupported messaging
+  - the full repo gate is green after focused unit coverage, UI/browser regression, lint, and `cargo check`
 - `POLY1` shared exact polynomial core is now verified:
   - the repo now has one shared exact bounded polynomial substrate instead of composition-stage owning a private exact polynomial parser/arithmetic surface
   - bounded polynomial parsing is currently locked to one variable, exact rational coefficients, and degree `<= 4`
@@ -261,6 +274,9 @@
   - CRLF only for Windows-native scripts
 
 ## Current Known Risks
+- `POLY2` is intentionally factor-first and bounded:
+  - exact cubic/quartic solving succeeds only when rational-root factoring, biquadratic reduction, or bounded factor-into-quadratics succeeds
+  - general Cardano/Ferrari-style closed forms, irreducible quartics in radicals, higher-degree polynomials, multivariable polynomials, and decimal-driven exact recognition remain deferred
 - `POLY1` is intentionally foundation-only:
   - one variable only
   - exact rational coefficients only
@@ -362,16 +378,15 @@
   - `.memory/research/TRACK-PRL4-MANUAL-VERIFICATION-CHECKLIST.md`
 
 ## Next Recommended Task
-- The `PRL1`-`PRL4` stack, `COMP1`-`COMP10`, and `POLY1` foundation pass are now shipped.
+- The `PRL1`-`PRL4` stack, `COMP1`-`COMP10`, and `POLY1`-`POLY2` polynomial lane are now shipped.
 - Strongest current architecture recommendation before more composition breadth:
   1. continue the polynomial/radical foundation lane
   2. next preferred order:
-     - `POLY2` bounded exact cubic/quartic factor-and-solve support
      - `RAD1` broader bounded radical normalization
      - `RAD2` sequential radical isolation
      - `POLY-RAD1` polynomialized radical follow-on solving
 - Reason:
-  - `POLY1` removed duplicated exact polynomial parsing/arithmetic from composition, but user-visible polynomial and radical breadth is still intentionally bounded
+  - `POLY1` and `POLY2` removed duplicated exact polynomial parsing/arithmetic and delivered bounded exact cubic/quartic families, but broader radical normalization and follow-on radical solving are still intentionally bounded
   - continuing directly into `COMP11` would likely duplicate more algebra capability inside composition instead of strengthening reusable substrate first
 
 ## Recent Verified Context

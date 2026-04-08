@@ -16,6 +16,7 @@ import { runSharedEquationSolve } from '../equation/shared-solve';
 import { planMathExecution } from '../semantic-planner';
 import { normalizeExactPowerLogNode } from '../symbolic-engine/power-log';
 import { solveLinearSystem } from '../matrix';
+import { solveBoundedPolynomialEquationAst } from '../polynomial-factor-solve';
 import { solvePolynomialRoots } from '../polynomial-roots';
 import type {
   AngleUnit,
@@ -261,18 +262,41 @@ function solvePolynomial(
   }
 
   const polynomialLatex = buildPolynomialEquationLatex(screen, normalized);
-  const response = runExpressionAction(
-    {
-      mode: 'equation',
-      document: { latex: polynomialLatex },
-      angleUnit,
-      outputStyle,
-      variables: { Ans: ansLatex },
-    },
-    'solve',
-  );
+  if (screen === 'cubic' || screen === 'quartic') {
+    const bounded = solveBoundedPolynomialEquationAst(ce.parse(polynomialLatex).json, 'x');
+    if (bounded) {
+      return toOutcome(
+        meta.title,
+        bounded.exactLatex,
+        undefined,
+        bounded.approxText,
+        [],
+        undefined,
+        'symbolic',
+      );
+    }
+  }
 
-  if (!response.error && response.exactLatex) {
+  const response = screen === 'quadratic'
+    ? runExpressionAction(
+      {
+        mode: 'equation',
+        document: { latex: polynomialLatex },
+        angleUnit,
+        outputStyle,
+        variables: { Ans: ansLatex },
+      },
+      'solve',
+    )
+    : {
+      exactLatex: undefined,
+      exactSupplementLatex: undefined,
+      approxText: undefined,
+      warnings: [] as string[],
+      error: 'No bounded exact symbolic solution was found.',
+    };
+
+  if (screen === 'quadratic' && !response.error && response.exactLatex) {
     return toOutcome(
       meta.title,
       response.exactLatex,

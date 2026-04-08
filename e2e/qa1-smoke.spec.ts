@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import {
   getMathFieldLatex,
+  openLauncherApp,
   openEquationSymbolic,
   openGeometrySlope,
   openSettingsPanel,
@@ -213,6 +214,28 @@ test('Equation smoke covers bounded conjugate solving', async ({ page }) => {
   await expect(page.getByTestId('display-outcome-success')).toBeVisible();
   await expect(page.getByText('Conjugate Transform')).toBeVisible();
   await expect(page.getByTestId('display-outcome-supplement-0')).toContainText('x');
+});
+
+test('POLY2 smoke renders guided quartic exact roots through the bounded factor-first path', async ({ page }) => {
+  await openLauncherApp(page, 'Core', 'Equation');
+  await page.getByRole('button', { name: /polynomial/i }).click();
+  await page.getByRole('button', { name: /quartic/i }).click();
+  await page.getByTestId('soft-action-solve').click();
+
+  await expect(page.getByTestId('display-outcome-success')).toBeVisible();
+  await expect(page.getByTestId('display-outcome-exact')).toContainText('−1');
+  await expect(page.getByTestId('display-outcome-exact')).toContainText('−2');
+  await expect(page.getByTestId('display-outcome-exact')).toContainText('1');
+  await expect(page.getByTestId('display-outcome-exact')).toContainText('2');
+});
+
+test('POLY2 smoke renders bounded cubic factorization through Calculate > Factor', async ({ page }) => {
+  await setMathFieldLatex(page, 'x^3-6x^2+11x-6');
+  await page.getByTestId('soft-action-factor').click();
+
+  await expect(page.getByTestId('display-outcome-success')).toBeVisible();
+  await expect(page.getByTestId('display-outcome-exact').locator('[aria-label*="x-1"]')).toBeVisible();
+  await expect(page.getByTestId('display-outcome-exact').locator('[aria-label*="x^2-5x+6"]')).toBeVisible();
 });
 
 test('Trigonometry smoke covers solved and handoff cases', async ({ page }) => {

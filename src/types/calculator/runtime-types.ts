@@ -333,6 +333,7 @@ export type FactoringStrategy =
   | 'symbolic-common-factor'
   | 'numeric-gcd'
   | 'algebraic-identity'
+  | 'polynomial-factorization'
   | 'none';
 export type NormalizedExpression = {
   ast: unknown;

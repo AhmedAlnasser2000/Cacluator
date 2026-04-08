@@ -166,6 +166,23 @@ describe('runEquationMode', () => {
     expect(result.exactLatex).toContain('3');
   });
 
+  it('solves quartic coefficient entry symbolically through the bounded factor-first path', () => {
+    const result = runEquationMode({
+      ...makeRequest(),
+      equationScreen: 'quartic',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.resultOrigin).toBe('symbolic');
+    expect(result.exactLatex).toContain('-2');
+    expect(result.exactLatex).toContain('-1');
+    expect(result.exactLatex).toContain('1');
+    expect(result.exactLatex).toContain('2');
+  });
+
   it('falls back numerically for guided quartic complex roots', () => {
     const result = runEquationMode({
       ...makeRequest(),
@@ -216,6 +233,37 @@ describe('runEquationMode', () => {
     expect(normalized).toContain('17');
     expect(normalized).toContain('=5');
     expect(result.plannerBadges).toContain('Reduced Derivative');
+  });
+
+  it('solves supported free-form cubic polynomial equations exactly', () => {
+    const result = runEquationMode({
+      ...makeRequest(),
+      equationScreen: 'symbolic',
+      equationLatex: 'x^3-6x^2+11x-6=0',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.exactLatex).toContain('1');
+    expect(result.exactLatex).toContain('2');
+    expect(result.exactLatex).toContain('3');
+    expect(result.resultOrigin).toBe('symbolic');
+  });
+
+  it('keeps unsupported free-form quartic polynomial equations on the current symbolic-only error path', () => {
+    const result = runEquationMode({
+      ...makeRequest(),
+      equationScreen: 'symbolic',
+      equationLatex: 'x^4+x+1=0',
+    });
+
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') {
+      throw new Error('Expected an error outcome');
+    }
+    expect(result.error).toBe('This equation is outside the supported symbolic solve families for this milestone.');
   });
 
   it('uses the shared bounded trig backend for symbolic trig equations', () => {

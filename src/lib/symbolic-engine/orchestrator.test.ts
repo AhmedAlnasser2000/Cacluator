@@ -17,6 +17,17 @@ describe('symbolic-engine orchestrator', () => {
     }
   })
 
+  it('uses the bounded polynomial strategy for supported cubic factorization', () => {
+    const result = runFactoringEngine('x^3-6x^2+11x-6')
+
+    expect(result.kind).toBe('success')
+    if (result.kind === 'success') {
+      expect(result.strategy).toBe('polynomial-factorization')
+      expect(result.exactLatex).toContain('x-1')
+      expect(result.exactLatex).toContain('x^2-5x+6')
+    }
+  })
+
   it('differentiates and integrates through the orchestrator', () => {
     const derivative = runDerivativeEngine('\\ln(3x+1)')
     const integral = runIntegralEngine('xe^x')

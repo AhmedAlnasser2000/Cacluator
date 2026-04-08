@@ -73,6 +73,43 @@ describe('runGuardedEquationSolve', () => {
     expect(result.substitutionDiagnostics?.family).toBe('inverse-isolation');
   });
 
+  it('solves bounded exact cubic polynomial equations before the generic symbolic backend', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      originalLatex: 'x^3-6x^2+11x-6=0',
+      resolvedLatex: 'x^3-6x^2+11x-6=0',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected guarded polynomial success');
+    }
+    expect(result.exactLatex).toContain('1');
+    expect(result.exactLatex).toContain('2');
+    expect(result.exactLatex).toContain('3');
+  });
+
+  it('keeps unsupported cubic/quartic polynomial equations off the generic direct symbolic solve path', () => {
+    const cubic = runGuardedEquationSolve({
+      ...request,
+      originalLatex: 'x^3+x+1=0',
+      resolvedLatex: 'x^3+x+1=0',
+    });
+    const quartic = runGuardedEquationSolve({
+      ...request,
+      originalLatex: 'x^4+x+1=0',
+      resolvedLatex: 'x^4+x+1=0',
+    });
+
+    expect(cubic.kind).toBe('error');
+    expect(quartic.kind).toBe('error');
+    if (cubic.kind !== 'error' || quartic.kind !== 'error') {
+      throw new Error('Expected guarded polynomial errors');
+    }
+    expect(cubic.error).toBe('This equation is outside the supported symbolic solve families for this milestone.');
+    expect(quartic.error).toBe('This equation is outside the supported symbolic solve families for this milestone.');
+  });
+
   it('solves same-base exponential equalities through bounded substitution before generic symbolic solve', () => {
     const result = runGuardedEquationSolve({
       ...request,
