@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type {
   DisplayOutcome,
+  EquationExecutionBudget,
   EvaluateRequest,
   GuardedSolveRequest,
   NumericSolveInterval,
   RuntimeAdvisories,
+  RuntimeExecutionProfile,
 } from '../calculator';
 
 describe('calculator runtime contract exports', () => {
@@ -44,10 +46,29 @@ describe('calculator runtime contract exports', () => {
         source: 'planner',
       },
     };
+    const equationBudget: EquationExecutionBudget = {
+      maxRecursionDepth: 4,
+      maxCompositionInversionDepth: 2,
+      maxPeriodicReductionDepth: 2,
+      maxRadicalTransformSteps: 2,
+    };
+    const runtimeProfile: RuntimeExecutionProfile = {
+      id: 'default',
+      label: 'Default Runtime Profile',
+      budget: {
+        equation: equationBudget,
+        expression: {
+          allowEvaluateRealNumericFallback: true,
+          allowSymbolicNormalizationNumericFallback: true,
+          allowInternalSolveNumericFallback: false,
+        },
+      },
+    };
 
     expect(evaluateRequest.document.latex).toBe('2+2');
     expect(guardedSolveRequest.numericInterval?.subdivisions).toBe(8);
     expect(outcome.kind).toBe('success');
     expect(advisories.stopReason?.source).toBe('planner');
+    expect(runtimeProfile.budget.equation.maxRecursionDepth).toBe(4);
   });
 });

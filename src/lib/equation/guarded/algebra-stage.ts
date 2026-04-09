@@ -17,6 +17,7 @@ import { normalizeExactRationalNode } from '../../symbolic-engine/rational';
 import { evaluateRealNumericExpression } from '../../real-numeric-eval';
 import type {
   DisplayOutcome,
+  EquationExecutionBudget,
   GuardedSolveRequest,
   SolveBadge,
   SolveDomainConstraint,
@@ -30,7 +31,6 @@ import { equationStateKey } from './state-key';
 
 const ce = new ComputeEngine();
 const PLACEHOLDER_SYMBOL = '__calcwiz_r3_u';
-const MAX_RADICAL_TRANSFORM_STEPS = 2;
 const RADICAL_STEP_BUDGET_ERROR = 'This recognized radical family would require more than two bounded radical transform steps. Use Numeric Solve with an interval in Equation mode.';
 const CONDITION_PREFIX = '\\text{Conditions: } ';
 const EXCLUSION_PREFIX = '\\text{Exclusions: } ';
@@ -1311,10 +1311,10 @@ function recurseTransform(
   transform: AlgebraTransform,
   depth: number,
   trail: Set<string>,
-  maxRecursionDepth: number,
+  executionBudget: EquationExecutionBudget,
   runGuardedEquationSolve: GuardedSolveRunner,
 ): DisplayOutcome | null {
-  if (depth >= maxRecursionDepth) {
+  if (depth >= executionBudget.maxRecursionDepth) {
     return errorOutcome(
       'Solve',
       'This equation exceeded the supported guarded-solve recursion depth for this milestone.',
@@ -1326,7 +1326,7 @@ function recurseTransform(
   }
 
   const nextRadicalTransformDepth = getRadicalTransformDepth(request) + (transform.radicalStepCost ?? 0);
-  if (nextRadicalTransformDepth > MAX_RADICAL_TRANSFORM_STEPS) {
+  if (nextRadicalTransformDepth > executionBudget.maxRadicalTransformSteps) {
     return errorOutcome(
       'Solve',
       RADICAL_STEP_BUDGET_ERROR,
@@ -1419,7 +1419,7 @@ function algebraTransformSolve(
   request: GuardedSolveRequest,
   depth: number,
   trail: Set<string>,
-  maxRecursionDepth: number,
+  executionBudget: EquationExecutionBudget,
   runGuardedEquationSolve: GuardedSolveRunner,
 ): DisplayOutcome | null {
   const rationalTransform = matchRationalTransform(request);
@@ -1429,7 +1429,7 @@ function algebraTransformSolve(
       rationalTransform,
       depth,
       trail,
-      maxRecursionDepth,
+      executionBudget,
       runGuardedEquationSolve,
     );
     if (recursive) {
@@ -1444,7 +1444,7 @@ function algebraTransformSolve(
       directPowerTransform,
       depth,
       trail,
-      maxRecursionDepth,
+      executionBudget,
       runGuardedEquationSolve,
     );
     if (recursive) {
@@ -1459,7 +1459,7 @@ function algebraTransformSolve(
       perfectSquareAbsTransform,
       depth,
       trail,
-      maxRecursionDepth,
+      executionBudget,
       runGuardedEquationSolve,
     );
     if (recursive) {
@@ -1474,7 +1474,7 @@ function algebraTransformSolve(
       radicalTransform,
       depth,
       trail,
-      maxRecursionDepth,
+      executionBudget,
       runGuardedEquationSolve,
     );
     if (recursive) {
@@ -1489,7 +1489,7 @@ function algebraTransformSolve(
       absoluteValueTransform,
       depth,
       trail,
-      maxRecursionDepth,
+      executionBudget,
       runGuardedEquationSolve,
     );
     if (recursive) {
@@ -1504,7 +1504,7 @@ function algebraTransformSolve(
       conjugateTransform,
       depth,
       trail,
-      maxRecursionDepth,
+      executionBudget,
       runGuardedEquationSolve,
     );
     if (recursive) {

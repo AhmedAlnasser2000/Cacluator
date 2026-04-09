@@ -517,3 +517,21 @@
     - `src/lib/modes/equation.test.ts`
   - verified with:
     - `npm run test:gate`
+- `ARCH5` is now verified:
+  - `src/types/calculator/runtime-profile-types.ts` defines one explicit internal default runtime execution profile plus focused Equation/Calculate budget contracts
+  - `src/lib/kernel/runtime-profile.ts` now resolves the shared default profile, exposes host-specific budget helpers, and centralizes the small numeric-fallback policy predicates used by the expression runtime
+  - Equation execution caps now flow through shared budgets instead of local constants in:
+    - `src/lib/equation/guarded/run.ts`
+    - `src/lib/equation/composition-stage.ts`
+    - `src/lib/equation/guarded/algebra-stage.ts`
+    - `src/lib/equation/guarded/substitution-stage.ts`
+  - Calculate numeric fallback permissions now flow through shared expression-budget helpers in `src/lib/math-engine.ts` instead of implicit host-local checks
+  - the profile surface stays internal-only and default-only:
+    - no user-facing profile selector
+    - no planner behavior change
+    - no public host/capability change
+  - focused ARCH5 coverage lives in:
+    - `src/lib/kernel/runtime-profile.test.ts`
+    - `src/types/calculator/runtime-contracts.test.ts`
+  - verified with:
+    - `npm run test:gate`

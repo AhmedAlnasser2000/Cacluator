@@ -9,9 +9,11 @@ import { recognizeBoundedPolynomialEquationAst, solveBoundedPolynomialEquationAs
 import type {
   CandidateValidationResult,
   DisplayOutcome,
+  EquationExecutionBudget,
   GuardedSolveRequest,
   SolveDomainConstraint,
 } from '../../../types/calculator';
+import { getEquationExecutionBudget } from '../../kernel/runtime-profile';
 import {
   UNSUPPORTED_FAMILY_ERROR,
   errorOutcome,
@@ -25,7 +27,6 @@ import { substitutionSolve } from './substitution-stage';
 import { numericIntervalSolve } from './numeric-stage';
 import { compositionSolve } from '../composition-stage';
 
-const MAX_RECURSION_DEPTH = 4;
 const ce = new ComputeEngine();
 const NUMERIC_MATCH_TOLERANCE = 1e-6;
 const DIRECT_TRIG_OPERATORS = new Set(['Sin', 'Cos', 'Tan', 'Sec', 'Csc', 'Cot']);
@@ -427,6 +428,7 @@ type GuardedEquationStageContext = {
   originalResolvedLatex: string;
   depth: number;
   trail: Set<string>;
+  executionBudget: EquationExecutionBudget;
   getSymbolic: () => SymbolicSolveResult;
 };
 
@@ -484,11 +486,11 @@ const GUARDED_EQUATION_STAGE_DESCRIPTORS: GuardedEquationStageDescriptor[] = [
     id: 'algebra-transform',
     label: 'Algebra Transform',
     canRecurse: true,
-    execute: ({ preparedRequest, depth, trail }) => algebraTransformSolve(
+    execute: ({ preparedRequest, depth, trail, executionBudget }) => algebraTransformSolve(
       preparedRequest,
       depth,
       trail,
-      MAX_RECURSION_DEPTH,
+      executionBudget,
       runGuardedEquationSolve,
     ),
   },
@@ -496,11 +498,11 @@ const GUARDED_EQUATION_STAGE_DESCRIPTORS: GuardedEquationStageDescriptor[] = [
     id: 'composition',
     label: 'Composition',
     canRecurse: true,
-    execute: ({ preparedRequest, depth, trail }) => compositionSolve(
+    execute: ({ preparedRequest, depth, trail, executionBudget }) => compositionSolve(
       preparedRequest,
       depth,
       trail,
-      MAX_RECURSION_DEPTH,
+      executionBudget,
       runGuardedEquationSolve,
     ),
   },
@@ -518,11 +520,11 @@ const GUARDED_EQUATION_STAGE_DESCRIPTORS: GuardedEquationStageDescriptor[] = [
     id: 'substitution',
     label: 'Substitution',
     canRecurse: true,
-    execute: ({ preparedRequest, depth, trail }) => substitutionSolve(
+    execute: ({ preparedRequest, depth, trail, executionBudget }) => substitutionSolve(
       preparedRequest,
       depth,
       trail,
-      MAX_RECURSION_DEPTH,
+      executionBudget,
       runGuardedEquationSolve,
     ),
   },
@@ -560,6 +562,7 @@ function runGuardedEquationSolve(
   depth = 0,
   trail = new Set<string>(),
 ): DisplayOutcome {
+  const executionBudget = getEquationExecutionBudget();
   const preparedRequest = prepareAlgebraSolveRequest(request);
   let symbolicCache: ReturnType<typeof runExpressionAction> | null = null;
   const getSymbolic = () => {
@@ -609,6 +612,7 @@ function runGuardedEquationSolve(
       originalResolvedLatex: request.resolvedLatex,
       depth,
       trail,
+      executionBudget,
       getSymbolic,
     },
   );

@@ -36,6 +36,7 @@ import type {
   CandidateValidationResult,
   DisplayDetailSection,
   DisplayOutcome,
+  EquationExecutionBudget,
   GuardedSolveRequest,
   PeriodicFamilyInfo,
   PeriodicPiecewiseBranch,
@@ -49,8 +50,6 @@ const ce = new ComputeEngine();
 const EPSILON = 1e-9;
 const RESIDUAL_TOLERANCE = 1e-6;
 const MAX_TRIG_BRANCHES = 12;
-const MAX_COMPOSITION_INVERSION_DEPTH = 2;
-const MAX_PERIODIC_REDUCTION_DEPTH = 2;
 const DIRECT_TRIG_OPERATORS = new Set(['Sin', 'Cos', 'Tan', 'Sec', 'Csc', 'Cot']);
 const INVERSE_TRIG_OPERATORS = new Set(['Arcsin', 'Arccos', 'Arctan']);
 
@@ -2342,6 +2341,7 @@ function solveNestedTrigCarrierPeriodicFamily(
   constraints: SolveDomainConstraint[],
   supplementLatex: string[],
   periodicNestingDepth: number,
+  executionBudget: EquationExecutionBudget,
 ): PeriodicFamilySolveResult {
   const inner = normalized[1];
   const family: PeriodicFamilyInfo = {
@@ -2350,7 +2350,7 @@ function solveNestedTrigCarrierPeriodicFamily(
   };
   const discoveredFamilies = [periodicFamilyToExactLatex(family)];
 
-  if (periodicNestingDepth >= MAX_PERIODIC_REDUCTION_DEPTH) {
+  if (periodicNestingDepth >= executionBudget.maxPeriodicReductionDepth) {
     return {
       kind: 'guided',
       family: appendDiscoveredFamilies({
@@ -2457,6 +2457,7 @@ function solveNestedTrigCarrierPeriodicFamily(
       constraints,
       supplementLatex,
       periodicNestingDepth + 1,
+      executionBudget,
     ),
     ['Nested Recursion'],
   );
@@ -2474,6 +2475,7 @@ function solveNestedInverseTrigCarrierPeriodicFamily(
   constraints: SolveDomainConstraint[],
   supplementLatex: string[],
   periodicNestingDepth: number,
+  executionBudget: EquationExecutionBudget,
 ): PeriodicFamilySolveResult {
   const inner = normalized[1];
   const inverseTrigLatex =
@@ -2490,7 +2492,7 @@ function solveNestedInverseTrigCarrierPeriodicFamily(
   };
   const discoveredFamilies = [periodicFamilyToExactLatex(family)];
 
-  if (periodicNestingDepth >= MAX_PERIODIC_REDUCTION_DEPTH) {
+  if (periodicNestingDepth >= executionBudget.maxPeriodicReductionDepth) {
     return {
       kind: 'guided',
       family: appendDiscoveredFamilies({
@@ -2585,6 +2587,7 @@ function solveNestedInverseTrigCarrierPeriodicFamily(
       constraints,
       supplementLatex,
       periodicNestingDepth,
+      executionBudget,
     ),
     ['Nested Recursion', 'Principal Range'],
   );
@@ -2601,6 +2604,7 @@ function resolveCarrierPeriodicFamily(
   constraints: SolveDomainConstraint[] = [],
   supplementLatex: string[] = [],
   periodicNestingDepth = 0,
+  executionBudget: EquationExecutionBudget,
 ): PeriodicFamilySolveResult {
   const normalized = normalizeAst(carrierNode);
   const affine = numericAffineCarrier(normalized);
@@ -2624,6 +2628,7 @@ function resolveCarrierPeriodicFamily(
       constraints,
       supplementLatex,
       periodicNestingDepth,
+      executionBudget,
     );
   }
 
@@ -2742,6 +2747,7 @@ function resolveCarrierPeriodicFamily(
         constraints,
         supplementLatex,
         periodicNestingDepth,
+        executionBudget,
       );
     }
 
@@ -2762,6 +2768,7 @@ function resolveCarrierPeriodicFamily(
         constraints,
         supplementLatex,
         periodicNestingDepth,
+        executionBudget,
       );
     }
   }
@@ -2774,6 +2781,7 @@ function resolveCarrierPeriodicFamily(
       mergeConstraints(constraints, [{ kind: 'positive', expressionLatex: boxLatex(normalized[1]) }]),
       supplementLatex,
       periodicNestingDepth,
+      executionBudget,
     );
   }
 
@@ -2785,6 +2793,7 @@ function resolveCarrierPeriodicFamily(
       mergeConstraints(constraints, [{ kind: 'positive', expressionLatex: boxLatex(normalized[1]) }]),
       supplementLatex,
       periodicNestingDepth,
+      executionBudget,
     );
   }
 
@@ -2798,6 +2807,7 @@ function resolveCarrierPeriodicFamily(
         mergeConstraints(constraints, [{ kind: 'positive', expressionLatex: boxLatex(normalized[1]) }]),
         supplementLatex,
         periodicNestingDepth,
+        executionBudget,
       );
     }
   }
@@ -2820,6 +2830,7 @@ function resolveCarrierPeriodicFamily(
           branches.map((branch) => `${branch.latex}>0`),
         ),
         periodicNestingDepth,
+        executionBudget,
       );
     }
   }
@@ -2839,6 +2850,7 @@ function solveTrigPeriodicFamily(
   node: unknown,
   target: NumericTarget,
   request: GuardedSolveRequest,
+  executionBudget: EquationExecutionBudget,
 ): PeriodicFamilySolveResult | null {
   const normalizedTrig = normalizeTrigComposite(node, target);
   if (!normalizedTrig) {
@@ -2890,6 +2902,7 @@ function solveTrigPeriodicFamily(
     undefined,
     undefined,
     request.periodicReductionDepth ?? 0,
+    executionBudget,
   );
   if (!summaryPrefix && !reducedCarrierLatex && !(solveBadges?.length)) {
     return resolved;
@@ -2951,7 +2964,7 @@ function recurseComposition(
   equations: string[],
   depth: number,
   trail: Set<string>,
-  maxRecursionDepth: number,
+  executionBudget: EquationExecutionBudget,
   runGuardedEquationSolve: GuardedSolveRunner,
   badges: SolveBadge[],
   summaryText: string,
@@ -2962,12 +2975,12 @@ function recurseComposition(
   periodicFamilyExtras?: Partial<PeriodicFamilyInfo>,
 ): DisplayOutcome | null {
   const nextCompositionDepth = (request.compositionInversionDepth ?? 0) + 1;
-  if (nextCompositionDepth > MAX_COMPOSITION_INVERSION_DEPTH) {
+  if (nextCompositionDepth > executionBudget.maxCompositionInversionDepth) {
     return compositionDepthLimitError(badges, summaryText);
   }
 
   const effectiveBadges = withNestedRecursionBadges(badges);
-  if (depth >= maxRecursionDepth) {
+  if (depth >= executionBudget.maxRecursionDepth) {
     return errorOutcome(
       'Solve',
       'This equation exceeded the supported guarded-solve recursion depth for this milestone.',
@@ -3145,7 +3158,7 @@ function compositionSolve(
   request: GuardedSolveRequest,
   depth: number,
   trail: Set<string>,
-  maxRecursionDepth: number,
+  executionBudget: EquationExecutionBudget,
   runGuardedEquationSolve: GuardedSolveRunner,
 ): DisplayOutcome | null {
   const nestedContextBadges = (request.compositionInversionDepth ?? 0) > 0
@@ -3185,7 +3198,7 @@ function compositionSolve(
       );
     }
     if (trigBranches?.kind === 'unresolved') {
-      const periodic = solveTrigPeriodicFamily(attempt.composite, target, request);
+      const periodic = solveTrigPeriodicFamily(attempt.composite, target, request, executionBudget);
       if (periodic?.kind === 'solved') {
         const badges = periodicFamilyBadges(attempt.composite, nestedContextBadges, periodic.solveBadges);
         const supplements = buildPeriodicOutcomeSupplements(periodic);
@@ -3245,7 +3258,7 @@ function compositionSolve(
         trigBranches.equations,
         depth,
         trail,
-        maxRecursionDepth,
+        executionBudget,
         runGuardedEquationSolve,
         dedupe<SolveBadge>(['Composition Branch', ...(trigBranches.solveBadges ?? [])]),
         trigBranches.summaryText,
@@ -3260,7 +3273,7 @@ function compositionSolve(
       }
     }
 
-    const periodic = solveTrigPeriodicFamily(attempt.composite, target, request);
+    const periodic = solveTrigPeriodicFamily(attempt.composite, target, request, executionBudget);
     if (periodic?.kind === 'solved') {
       const badges = periodicFamilyBadges(attempt.composite, nestedContextBadges, periodic.solveBadges);
       const supplements = buildPeriodicOutcomeSupplements(periodic);
@@ -3338,7 +3351,7 @@ function compositionSolve(
       transform.equations,
       depth,
       trail,
-      maxRecursionDepth,
+      executionBudget,
       runGuardedEquationSolve,
       transform.solveBadges,
       transform.solveSummaryText,

@@ -5,6 +5,7 @@ import { validateCandidateRoots } from '../candidate-validation';
 import type {
   CandidateValidationResult,
   DisplayOutcome,
+  EquationExecutionBudget,
   GuardedSolveRequest,
 } from '../../../types/calculator';
 import {
@@ -132,7 +133,7 @@ function substitutionSolve(
   request: GuardedSolveRequest,
   depth: number,
   trail: Set<string>,
-  maxRecursionDepth: number,
+  executionBudget: EquationExecutionBudget,
   runGuardedEquationSolve: GuardedSolveRunner,
 ): DisplayOutcome | null {
   const substitution = matchSubstitutionSolve(request.resolvedLatex, request.angleUnit);
@@ -144,7 +145,7 @@ function substitutionSolve(
     return errorOutcome('Solve', substitution.error);
   }
 
-  if (depth >= maxRecursionDepth) {
+  if (depth >= executionBudget.maxRecursionDepth) {
     return errorOutcome(
       'Solve',
       'This equation exceeded the supported guarded-solve recursion depth for this milestone.',

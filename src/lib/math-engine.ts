@@ -6,6 +6,7 @@ import {
 import type {
   CalculateAction,
   EquationAction,
+  ExpressionExecutionBudget,
   EvaluateRequest,
   EvaluateResponse,
   TableRequest,
@@ -16,6 +17,10 @@ import {
   latexToApproxText,
   solutionsToLatex,
 } from './format';
+import {
+  canUseExpressionNumericFallback,
+  getExpressionExecutionBudget,
+} from './kernel/runtime-profile';
 import { resolveCalculusEvaluation } from './calculus-eval';
 import { canonicalizeMathInput } from './input-canonicalization';
 import {
@@ -317,6 +322,7 @@ type PreparedExpressionRuntimeReady = Extract<PreparedExpressionRuntime, { kind:
 type ExpressionActionContext = {
   request: EvaluateRequest;
   action: SymbolicAction;
+  executionBudget: ExpressionExecutionBudget;
   preparedRequest: PreparedExpressionRequestReady;
   preparedRuntime: PreparedExpressionRuntimeReady;
 };
@@ -430,7 +436,7 @@ function prepareExpressionRuntime(
 function executePreparedExpressionAction(
   context: ExpressionActionContext,
 ): EvaluateResponse {
-  const { request, action, preparedRequest, preparedRuntime } = context;
+  const { request, action, executionBudget, preparedRequest, preparedRuntime } = context;
   const { expr, sourceLatex, warnings } = preparedRuntime;
 
   const radical =
@@ -476,7 +482,11 @@ function executePreparedExpressionAction(
         };
       }
       if (
-        action !== 'evaluate'
+        canUseExpressionNumericFallback(
+          executionBudget,
+          action,
+          'symbolic-normalization-recovery',
+        )
         && shouldUseRealNumericEvaluator(expr, sourceLatex)
         && isInvalidRealNumericApprox(approx?.latex)
       ) {
@@ -547,6 +557,12 @@ function executePreparedExpressionAction(
         };
       }
       if (
+        canUseExpressionNumericFallback(
+          executionBudget,
+          action,
+          'symbolic-normalization-recovery',
+        )
+        &&
         shouldUseRealNumericEvaluator(expr, sourceLatex)
         && isInvalidRealNumericApprox(approx?.latex)
       ) {
@@ -601,7 +617,14 @@ function executePreparedExpressionAction(
     if (action === 'simplify') {
       const powerLog = normalizeExactPowerLogNode(radicalExpr.json, 'simplify');
       if (powerLog?.handled) {
-        if (shouldUseRealNumericEvaluator(expr, sourceLatex)) {
+        if (
+          canUseExpressionNumericFallback(
+            executionBudget,
+            action,
+            'symbolic-normalization-recovery',
+          )
+          && shouldUseRealNumericEvaluator(expr, sourceLatex)
+        ) {
           const numeric = evaluateRealNumericExpression(expr.json, sourceLatex);
           if (numeric.kind === 'success') {
             const guardError = getResultGuardError(numeric.exactLatex, numeric.approxText);
@@ -713,7 +736,14 @@ function executePreparedExpressionAction(
           };
         }
 
-      if (shouldUseRealNumericEvaluator(expr, sourceLatex)) {
+      if (
+        canUseExpressionNumericFallback(
+          executionBudget,
+          action,
+          'evaluate-real-family',
+        )
+        && shouldUseRealNumericEvaluator(expr, sourceLatex)
+      ) {
         const numeric = evaluateRealNumericExpression(expr.json, sourceLatex);
         if (numeric.kind === 'success') {
           const guardError = getResultGuardError(numeric.exactLatex, numeric.approxText);
@@ -760,7 +790,11 @@ function executePreparedExpressionAction(
       ? numericExpression(exactExpr)
       : undefined;
     if (
-      action !== 'evaluate'
+      canUseExpressionNumericFallback(
+        executionBudget,
+        action,
+        'symbolic-normalization-recovery',
+      )
       && shouldUseRealNumericEvaluator(expr, sourceLatex)
       && isInvalidRealNumericApprox(approx?.latex)
     ) {
@@ -878,6 +912,7 @@ export function runExpressionAction(
   request: EvaluateRequest,
   action: SymbolicAction,
 ): EvaluateResponse {
+  const executionBudget = getExpressionExecutionBudget();
   const preparedRequest = prepareExpressionRequest(request, action);
   if (preparedRequest.kind === 'done') {
     return preparedRequest.response;
@@ -892,6 +927,7 @@ export function runExpressionAction(
     return runExpressionActionHost({
       request,
       action,
+      executionBudget,
       preparedRequest,
       preparedRuntime,
     });
