@@ -269,6 +269,16 @@ describe('runExpressionAction', () => {
     expect(result.exactLatex).toBe('x^2')
   })
 
+  it('canonicalizes direct abs readback through the shared simplify-only abs core', () => {
+    const result = runExpressionAction(
+      { ...request, document: { latex: '\\left|\\left|x+1\\right|\\right|' } },
+      'simplify',
+    )
+
+    expect(result.error).toBeUndefined()
+    expect(result.exactLatex).toBe('\\vert x+1\\vert')
+  })
+
   it('respects degree mode for direct numeric trig in Calculate', () => {
     const result = runExpressionAction(
       { ...request, mode: 'calculate', angleUnit: 'deg', document: { latex: '\\sin\\left(90\\right)' } },

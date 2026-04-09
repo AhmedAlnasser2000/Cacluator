@@ -138,6 +138,21 @@ describe('runNumericIntervalSolve', () => {
     expect(result.error).toContain('x+1=\\exponentialE^{x}');
   });
 
+  it('adds wrapped abs-branch guidance for recognized affine absolute-value families', () => {
+    const result = runNumericIntervalSolve('2\\left|x+1\\right|-3=x', {
+      start: '2',
+      end: '4',
+      subdivisions: 128,
+    });
+
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') {
+      throw new Error('Expected numeric solve error');
+    }
+    expect(result.error).toContain('absolute-value family splits into');
+    expect(result.error).toContain('x+1=\\frac{-x}{2}-\\frac{3}{2}');
+  });
+
   it('flags intervals whose recognized abs magnitude stays negative', () => {
     const result = runNumericIntervalSolve('\\left|x+1\\right|=-x-10', {
       start: '0',
@@ -151,6 +166,21 @@ describe('runNumericIntervalSolve', () => {
     }
     expect(result.error).toContain('requires');
     expect(result.error).toContain('\\ge0');
+    expect(result.error).toContain('stays negative across the chosen interval');
+  });
+
+  it('flags wrapped abs intervals whose normalized comparison stays negative', () => {
+    const result = runNumericIntervalSolve('2\\left|x+1\\right|-3=x', {
+      start: '-10',
+      end: '-5',
+      subdivisions: 128,
+    });
+
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') {
+      throw new Error('Expected numeric solve error');
+    }
+    expect(result.error).toContain('\\frac{x}{2}+\\frac{3}{2}\\ge0');
     expect(result.error).toContain('stays negative across the chosen interval');
   });
 

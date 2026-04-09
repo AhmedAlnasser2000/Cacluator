@@ -177,6 +177,27 @@ describe('runEquationMode', () => {
     });
   });
 
+  it('keeps wrapped recognized abs families numeric-follow-up eligible when a branch falls outside the bounded exact sinks', () => {
+    const result = runEquationMode({
+      ...makeRequest(),
+      equationScreen: 'symbolic',
+      equationLatex: '\\left|x^2+1\\right|+1=e^x',
+    });
+
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') {
+      throw new Error('Expected an error outcome');
+    }
+    expect(result.error).toContain('absolute-value family is outside the current exact bounded solve set');
+    expect(result.runtimeAdvisories?.stopReason).toEqual({
+      kind: 'unsupported-family',
+      source: 'host',
+    });
+    expect(result.runtimeAdvisories?.equationNumericSolve).toEqual({
+      kind: 'suggest-on-error',
+    });
+  });
+
   it('solves linear 2x2 systems', () => {
     const result = runEquationMode({
       ...makeRequest(),

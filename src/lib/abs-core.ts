@@ -2,6 +2,7 @@ import { ComputeEngine } from '@cortex-js/compute-engine';
 import type {
   AbsoluteValueEquationFamily,
   AbsoluteValueEquationFamilyKind,
+  AbsoluteValueExactScalar,
   AbsoluteValueNormalizationResult,
   AbsoluteValueTargetDescriptor,
   AngleUnit,
@@ -22,12 +23,41 @@ import { boxLatex, isNodeArray, termKey } from './symbolic-engine/patterns';
 
 const ce = new ComputeEngine();
 const ABS_NUMERIC_EPSILON = 1e-8;
+const ABS_PLACEHOLDER_SYMBOL = '__calcwiz_abs_u';
 
 function simplifyNode(node: unknown) {
   return normalizeAst(ce.box(node as Parameters<typeof ce.box>[0]).simplify().json);
 }
 
-function readExactScalar(node: unknown): { numerator: number; denominator: number } | null {
+function gcd(a: number, b: number): number {
+  a = Math.abs(a);
+  b = Math.abs(b);
+  while (b !== 0) {
+    const next = a % b;
+    a = b;
+    b = next;
+  }
+  return a === 0 ? 1 : a;
+}
+
+function normalizeScalar(numerator: number, denominator: number): AbsoluteValueExactScalar | null {
+  if (!Number.isInteger(numerator) || !Number.isInteger(denominator) || denominator === 0) {
+    return null;
+  }
+
+  if (numerator === 0) {
+    return { numerator: 0, denominator: 1 };
+  }
+
+  const sign = denominator < 0 ? -1 : 1;
+  const divisor = gcd(numerator, denominator);
+  return {
+    numerator: (sign * numerator) / divisor,
+    denominator: Math.abs(denominator) / divisor,
+  };
+}
+
+function readExactScalar(node: unknown): AbsoluteValueExactScalar | null {
   if (typeof node === 'number' && Number.isFinite(node) && Number.isInteger(node)) {
     return { numerator: node, denominator: 1 };
   }
@@ -61,7 +91,7 @@ function readExactScalar(node: unknown): { numerator: number; denominator: numbe
   return null;
 }
 
-function buildScalarNode(value: { numerator: number; denominator: number }): unknown {
+function buildScalarNode(value: AbsoluteValueExactScalar): unknown {
   if (value.denominator === 1) {
     return value.numerator;
   }
@@ -79,6 +109,79 @@ function negateNode(node: unknown) {
   }
 
   return simplifyNode(['Negate', node]);
+}
+
+function negateScalar(value: AbsoluteValueExactScalar): AbsoluteValueExactScalar {
+  return {
+    numerator: -value.numerator,
+    denominator: value.denominator,
+  };
+}
+
+function isZeroScalar(value: AbsoluteValueExactScalar) {
+  return value.numerator === 0;
+}
+
+function isUnitScalar(value: AbsoluteValueExactScalar) {
+  return value.numerator === value.denominator;
+}
+
+function multiplyScalar(
+  left: AbsoluteValueExactScalar,
+  right: AbsoluteValueExactScalar,
+): AbsoluteValueExactScalar | null {
+  return normalizeScalar(
+    left.numerator * right.numerator,
+    left.denominator * right.denominator,
+  );
+}
+
+function divideScalar(
+  left: AbsoluteValueExactScalar,
+  right: AbsoluteValueExactScalar,
+): AbsoluteValueExactScalar | null {
+  if (right.numerator === 0) {
+    return null;
+  }
+
+  return normalizeScalar(
+    left.numerator * right.denominator,
+    left.denominator * right.numerator,
+  );
+}
+
+function addScalar(
+  left: AbsoluteValueExactScalar,
+  right: AbsoluteValueExactScalar,
+): AbsoluteValueExactScalar | null {
+  return normalizeScalar(
+    left.numerator * right.denominator + right.numerator * left.denominator,
+    left.denominator * right.denominator,
+  );
+}
+
+function buildSumNode(left: unknown, right: unknown) {
+  return simplifyNode(['Add', left, right]);
+}
+
+function buildDifferenceNode(left: unknown, right: unknown) {
+  return buildSumNode(left, negateNode(right));
+}
+
+function buildQuotientNode(numerator: unknown, denominator: unknown) {
+  return simplifyNode(['Divide', numerator, denominator]);
+}
+
+function buildScaledNode(node: unknown, scalar: AbsoluteValueExactScalar) {
+  if (isZeroScalar(scalar)) {
+    return 0;
+  }
+
+  if (isUnitScalar(scalar)) {
+    return node;
+  }
+
+  return simplifyNode(['Multiply', buildScalarNode(scalar), node]);
 }
 
 function parsePositiveEvenInteger(node: unknown) {
@@ -181,6 +284,186 @@ function detectEquationVariable(...nodes: unknown[]) {
   return variables.size === 1 ? [...variables][0] : 'x';
 }
 
+function containsPlaceholder(node: unknown, placeholder: string): boolean {
+  if (node === placeholder) {
+    return true;
+  }
+
+  if (!isNodeArray(node) || node.length === 0) {
+    return false;
+  }
+
+  return node.slice(1).some((child) => containsPlaceholder(child, placeholder));
+}
+
+type PlaceholderLinearExpression = {
+  a: AbsoluteValueExactScalar;
+  remainder: unknown;
+};
+
+function parseLinearPlaceholder(node: unknown, placeholder: string): PlaceholderLinearExpression | null {
+  const normalized = normalizeAst(node);
+  if (normalized === placeholder) {
+    return {
+      a: { numerator: 1, denominator: 1 },
+      remainder: 0,
+    };
+  }
+
+  const scalar = readExactScalar(normalized);
+  if (scalar) {
+    return {
+      a: { numerator: 0, denominator: 1 },
+      remainder: buildScalarNode(scalar),
+    };
+  }
+
+  if (!containsPlaceholder(normalized, placeholder)) {
+    return {
+      a: { numerator: 0, denominator: 1 },
+      remainder: normalized,
+    };
+  }
+
+  if (!isNodeArray(normalized) || normalized.length === 0) {
+    return null;
+  }
+
+  if (normalized[0] === 'Negate' && normalized.length === 2) {
+    const child = parseLinearPlaceholder(normalized[1], placeholder);
+    if (!child) {
+      return null;
+    }
+
+    return {
+      a: negateScalar(child.a),
+      remainder: negateNode(child.remainder),
+    };
+  }
+
+  if (normalized[0] === 'Add') {
+    let coefficient: AbsoluteValueExactScalar = { numerator: 0, denominator: 1 };
+    let remainder: unknown = 0;
+
+    for (const child of normalized.slice(1)) {
+      const parsed = parseLinearPlaceholder(child, placeholder);
+      if (!parsed) {
+        return null;
+      }
+
+      const nextCoefficient = addScalar(coefficient, parsed.a);
+      if (!nextCoefficient) {
+        return null;
+      }
+      coefficient = nextCoefficient;
+      remainder = buildSumNode(remainder, parsed.remainder);
+    }
+
+    return {
+      a: coefficient,
+      remainder,
+    };
+  }
+
+  if (normalized[0] === 'Multiply') {
+    let scalarFactor: AbsoluteValueExactScalar = { numerator: 1, denominator: 1 };
+    let linearChild: PlaceholderLinearExpression | null = null;
+
+    for (const child of normalized.slice(1)) {
+      const childScalar = readExactScalar(child);
+      if (childScalar) {
+        const nextFactor = multiplyScalar(scalarFactor, childScalar);
+        if (!nextFactor) {
+          return null;
+        }
+        scalarFactor = nextFactor;
+        continue;
+      }
+
+      const parsed = parseLinearPlaceholder(child, placeholder);
+      if (!parsed || linearChild) {
+        return null;
+      }
+      linearChild = parsed;
+    }
+
+    if (!linearChild) {
+      return {
+        a: { numerator: 0, denominator: 1 },
+        remainder: buildScalarNode(scalarFactor),
+      };
+    }
+
+    const nextA = multiplyScalar(scalarFactor, linearChild.a);
+    if (!nextA) {
+      return null;
+    }
+
+    return {
+      a: nextA,
+      remainder: buildScaledNode(linearChild.remainder, scalarFactor),
+    };
+  }
+
+  if (normalized[0] === 'Divide' && normalized.length === 3) {
+    const denominatorScalar = readExactScalar(normalized[2]);
+    if (!denominatorScalar) {
+      return null;
+    }
+
+    const numeratorLinear = parseLinearPlaceholder(normalized[1], placeholder);
+    if (!numeratorLinear) {
+      return null;
+    }
+
+    const nextA = divideScalar(numeratorLinear.a, denominatorScalar);
+    if (!nextA) {
+      return null;
+    }
+
+    return {
+      a: nextA,
+      remainder: buildQuotientNode(numeratorLinear.remainder, buildScalarNode(denominatorScalar)),
+    };
+  }
+
+  return null;
+}
+
+function replaceFirstMatch(node: unknown, targetKey: string, replacement: unknown): { node: unknown; replaced: boolean } {
+  if (termKey(node) === targetKey) {
+    return {
+      node: replacement,
+      replaced: true,
+    };
+  }
+
+  if (!isNodeArray(node) || node.length === 0) {
+    return {
+      node,
+      replaced: false,
+    };
+  }
+
+  const rebuilt: unknown[] = [node[0]];
+  let replaced = false;
+  for (const child of node.slice(1)) {
+    if (replaced) {
+      rebuilt.push(child);
+      continue;
+    }
+
+    const next = replaceFirstMatch(child, targetKey, replacement);
+    rebuilt.push(next.node);
+    replaced ||= next.replaced;
+  }
+
+  return {
+    node: rebuilt,
+    replaced,
+  };
+}
+
 export function buildAbsoluteValueNode(node: unknown) {
   return simplifyNode(['Abs', node]);
 }
@@ -225,6 +508,7 @@ export function matchAbsoluteValueTarget(node: unknown, variable: string): Absol
     return {
       targetNode: normalized,
       base: normalized[1],
+      coefficient: { numerator: 1, denominator: 1 },
     };
   }
 
@@ -251,6 +535,12 @@ export function matchAbsoluteValueTarget(node: unknown, variable: string): Absol
     return {
       targetNode: normalized,
       base: absBase,
+      coefficient: normalized
+        .slice(1)
+        .filter((child) => child !== absChildren[0])
+        .map((child) => readExactScalar(child)!)
+        .reduce<AbsoluteValueExactScalar>((accumulator, child) =>
+          multiplyScalar(accumulator, child) ?? accumulator, { numerator: 1, denominator: 1 }),
     };
   }
 
@@ -269,6 +559,10 @@ export function matchAbsoluteValueTarget(node: unknown, variable: string): Absol
     return {
       targetNode: normalized,
       base: numeratorTarget.base,
+      coefficient: divideScalar(
+        numeratorTarget.coefficient,
+        denominatorScalar,
+      ) ?? numeratorTarget.coefficient,
     };
   }
 
@@ -295,6 +589,51 @@ export function collectAbsoluteValueTargets(
   }
 
   return targets;
+}
+
+type AffineAbsoluteValueSide = {
+  target: AbsoluteValueTargetDescriptor;
+  offset: AbsoluteValueExactScalar;
+};
+
+function matchAffineAbsoluteValueSide(node: unknown, variable: string): AffineAbsoluteValueSide | null {
+  const normalized = normalizeAst(node);
+  const targets = collectAbsoluteValueTargets(normalized, variable).filter(
+    (target, index, pool) => pool.findIndex((entry) => termKey(entry.targetNode) === termKey(target.targetNode)) === index,
+  );
+
+  for (const target of targets) {
+    const replaced = replaceFirstMatch(normalized, termKey(target.targetNode), ABS_PLACEHOLDER_SYMBOL);
+    if (!replaced.replaced) {
+      continue;
+    }
+
+    const linear = parseLinearPlaceholder(replaced.node, ABS_PLACEHOLDER_SYMBOL);
+    if (!linear || isZeroScalar(linear.a)) {
+      continue;
+    }
+
+    const offset = readExactScalar(linear.remainder);
+    if (!offset) {
+      continue;
+    }
+
+    const coefficient = multiplyScalar(target.coefficient, linear.a);
+    if (!coefficient || isZeroScalar(coefficient)) {
+      continue;
+    }
+
+    return {
+      target: {
+        targetNode: buildScaledNode(buildAbsoluteValueNode(target.base), coefficient),
+        base: target.base,
+        coefficient,
+      },
+      offset,
+    };
+  }
+
+  return null;
 }
 
 export function matchPerfectSquareAbsoluteValueCarrier(node: unknown, variable: string) {
@@ -335,12 +674,14 @@ export function matchPerfectSquareAbsoluteValueCarrier(node: unknown, variable: 
 }
 
 export function buildAbsoluteValueEquationFamily(
-  base: unknown,
+  target: AbsoluteValueTargetDescriptor,
   comparisonNode: unknown,
   variable: string,
 ): AbsoluteValueEquationFamily {
-  const normalizedBase = normalizeAst(base);
-  const normalizedComparison = normalizeAst(comparisonNode);
+  const normalizedBase = normalizeAst(target.base);
+  const normalizedComparison = isUnitScalar(target.coefficient)
+    ? normalizeAst(comparisonNode)
+    : buildQuotientNode(normalizeAst(comparisonNode), buildScalarNode(target.coefficient));
   const comparisonTarget = matchAbsoluteValueTarget(normalizedComparison, variable);
   const pureComparisonAbs =
     comparisonTarget && termKey(comparisonTarget.targetNode) === termKey(normalizedComparison)
@@ -353,7 +694,9 @@ export function buildAbsoluteValueEquationFamily(
       ? 'abs-equals-constant'
       : 'abs-equals-expression';
 
-  const effectiveComparison = pureComparisonAbs ? pureComparisonAbs.base : normalizedComparison;
+  const effectiveComparison = pureComparisonAbs
+    ? buildScaledNode(pureComparisonAbs.base, pureComparisonAbs.coefficient)
+    : normalizedComparison;
   const branchEquations = [...new Set([
     `${boxLatex(normalizedBase)}=${boxLatex(effectiveComparison)}`,
     `${boxLatex(normalizedBase)}=${boxLatex(negateNode(effectiveComparison))}`,
@@ -363,10 +706,11 @@ export function buildAbsoluteValueEquationFamily(
     kind,
     variable,
     target: {
-      targetNode: buildAbsoluteValueNode(normalizedBase),
+      targetNode: buildScaledNode(buildAbsoluteValueNode(normalizedBase), target.coefficient),
       base: normalizedBase,
+      coefficient: target.coefficient,
     },
-    comparisonNode: effectiveComparison,
+    comparisonNode: normalizedComparison,
     comparisonTarget: pureComparisonAbs,
     branchEquations,
     branchConstraints: pureComparisonAbs
@@ -391,16 +735,20 @@ export function matchDirectAbsoluteValueEquationNode(node: unknown): AbsoluteVal
   ];
 
   for (const attempt of attempts) {
-    const target = matchAbsoluteValueTarget(attempt.targetSide, variable);
-    if (!target || termKey(target.targetNode) !== termKey(normalizeAst(attempt.targetSide))) {
+    const target = matchAffineAbsoluteValueSide(attempt.targetSide, variable);
+    if (!target) {
       continue;
     }
 
-    if (!isSupportedAbsoluteValueExpression(attempt.otherSide, variable) && !matchAbsoluteValueTarget(attempt.otherSide, variable)) {
+    const normalizedOtherSide = normalizeAst(attempt.otherSide);
+    const pureOtherTarget = matchAbsoluteValueTarget(normalizedOtherSide, variable);
+    const isPureOtherTarget = pureOtherTarget && termKey(pureOtherTarget.targetNode) === termKey(normalizedOtherSide);
+    if (!isSupportedAbsoluteValueExpression(normalizedOtherSide, variable) && !isPureOtherTarget) {
       continue;
     }
 
-    return buildAbsoluteValueEquationFamily(target.base, attempt.otherSide, variable);
+    const isolatedComparison = buildDifferenceNode(normalizedOtherSide, buildScalarNode(target.offset));
+    return buildAbsoluteValueEquationFamily(target.target, isolatedComparison, variable);
   }
 
   return null;

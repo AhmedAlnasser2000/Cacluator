@@ -5,6 +5,7 @@ import {
   collectAbsoluteValueTargets as collectSharedAbsoluteValueTargets,
   isSupportedAbsoluteValueExpression as isSharedAbsoluteValueExpression,
   matchDirectAbsoluteValueEquationNode,
+  matchAbsoluteValueTarget as matchSharedAbsoluteValueTarget,
   matchPerfectSquareAbsoluteValueCarrier as matchSharedPerfectSquareAbsoluteValueCarrier,
 } from '../../abs-core';
 import {
@@ -372,6 +373,28 @@ function collectAbsoluteValueTargets(node: unknown, variable: string, targets: A
 
 function matchPerfectSquareRadicalCarrier(node: unknown, variable: string) {
   return matchSharedPerfectSquareAbsoluteValueCarrier(node, variable);
+}
+
+function collectPerfectSquareAbsoluteValueCarriers(
+  node: unknown,
+  variable: string,
+  targets: Array<Exclude<ReturnType<typeof matchPerfectSquareRadicalCarrier>, null>> = [],
+) {
+  const normalized = normalizeAst(node);
+  const target = matchPerfectSquareRadicalCarrier(normalized, variable);
+  if (target) {
+    targets.push(target);
+  }
+
+  if (!isNodeArray(normalized) || normalized.length === 0) {
+    return targets;
+  }
+
+  for (const child of normalized.slice(1)) {
+    collectPerfectSquareAbsoluteValueCarriers(child, variable, targets);
+  }
+
+  return targets;
 }
 
 function containsPlaceholder(node: unknown, placeholder: string): boolean {
@@ -993,7 +1016,22 @@ function buildRepeatedClearingTransform(
 function buildAbsoluteValueRadicalTransform(
   absNode: unknown,
   otherSide: unknown,
+  variable: string,
 ): AlgebraTransform {
+  const target = matchSharedAbsoluteValueTarget(absNode, variable);
+  if (target) {
+    const family = buildAbsoluteValueEquationFamily(target, otherSide, variable);
+    return {
+      equationLatex: family.branchEquations[0],
+      branchEquations: family.branchEquations,
+      domainConstraints: family.branchConstraints,
+      solveBadges: ['Radical Isolation'],
+      solveSummaryText: 'Reduced an exact square-root square into a bounded absolute-value carrier',
+      unresolvedError: 'This recognized absolute-value family is outside the current exact bounded solve set. Use Numeric Solve with an interval in Equation mode.',
+      radicalStepCost: 1,
+    };
+  }
+
   return {
     equationLatex: `${boxLatex(absNode)}=${boxLatex(otherSide)}`,
     solveBadges: ['Radical Isolation'],
@@ -1190,14 +1228,22 @@ function matchPerfectSquareAbsoluteValueTransform(request: GuardedSolveRequest):
   ];
 
   for (const attempt of attempts) {
-    const target = matchPerfectSquareRadicalCarrier(attempt.targetSide, variable);
-    if (!target || !isSupportedRightSideExpression(attempt.otherSide, variable)) {
-      continue;
-    }
+    const candidates = collectPerfectSquareAbsoluteValueCarriers(attempt.targetSide, variable);
 
-    const transform = buildAbsoluteValueRadicalTransform(target.absNode, attempt.otherSide);
-    if (equationStateKey(transform.equationLatex) !== equationStateKey(request.resolvedLatex)) {
-      return transform;
+    for (const target of candidates) {
+      const isolatedBase = buildIsolatedExpression(
+        attempt.targetSide,
+        attempt.otherSide,
+        termKey(target.targetNode),
+      );
+      if (!isolatedBase || !isSupportedRightSideExpression(isolatedBase.isolated, variable)) {
+        continue;
+      }
+
+      const transform = buildAbsoluteValueRadicalTransform(target.absNode, isolatedBase.isolated, variable);
+      if (equationStateKey(transform.equationLatex) !== equationStateKey(request.resolvedLatex)) {
+        return transform;
+      }
     }
   }
 
@@ -1522,7 +1568,7 @@ function matchBoundedAbsoluteValueTransform(request: GuardedSolveRequest): Algeb
       }
 
       const transform = buildAbsoluteValueBranchTransform(
-        buildAbsoluteValueEquationFamily(candidate.base, isolatedMagnitude.isolated, variable),
+        buildAbsoluteValueEquationFamily(candidate, isolatedMagnitude.isolated, variable),
       );
       if (equationStateKey(transform.equationLatex) !== equationStateKey(request.resolvedLatex)) {
         return transform;

@@ -1,5 +1,10 @@
 import type { SolveDomainConstraint } from './solver-types';
 
+export type AbsoluteValueExactScalar = {
+  numerator: number;
+  denominator: number;
+};
+
 export type AbsoluteValueEquationFamilyKind =
   | 'abs-equals-constant'
   | 'abs-equals-expression'
@@ -8,6 +13,7 @@ export type AbsoluteValueEquationFamilyKind =
 export type AbsoluteValueTargetDescriptor = {
   targetNode: unknown;
   base: unknown;
+  coefficient: AbsoluteValueExactScalar;
 };
 
 export type AbsoluteValueEquationFamily = {

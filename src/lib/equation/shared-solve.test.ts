@@ -397,6 +397,24 @@ describe('runSharedEquationSolve', () => {
     expect(result.exactSupplementLatex).toEqual(['\\text{Conditions: } x+3\\ge0']);
   });
 
+  it('solves wrapped absolute-value follow-ons produced by exact square-root squares', () => {
+    const result = runSharedEquationSolve({
+      ...request,
+      originalLatex: '\\sqrt{(x+1)^2}+1=6',
+      resolvedLatex: '\\sqrt{(x+1)^2}+1=6',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.exactLatex).toContain('x\\in');
+    expect(result.exactLatex).toContain('-6');
+    expect(result.exactLatex).toContain('4');
+    expect(result.solveBadges).toContain('Radical Isolation');
+    expect(result.solveBadges).toContain('Candidate Checked');
+  });
+
   it('solves direct bounded |u|=c families through the shared abs core', () => {
     const result = runSharedEquationSolve({
       ...request,
@@ -444,6 +462,42 @@ describe('runSharedEquationSolve', () => {
     expect(result.exactLatex).toContain('x\\in');
     expect(result.exactLatex).toContain('-1');
     expect(result.exactLatex).toContain('5');
+    expect(result.solveBadges).toContain('Candidate Checked');
+  });
+
+  it('solves affine-wrapped |u|=v families through the broader shared abs core', () => {
+    const result = runSharedEquationSolve({
+      ...request,
+      originalLatex: '2\\left|x+1\\right|-3=x',
+      resolvedLatex: '2\\left|x+1\\right|-3=x',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.exactLatex).toContain('x\\in');
+    expect(result.exactLatex).toContain('\\frac{-5}{3}');
+    expect(result.exactLatex).toContain('1');
+    expect(result.exactSupplementLatex).toEqual(['\\text{Conditions: } \\frac{x}{2}+\\frac{3}{2}\\ge0']);
+    expect(result.solveBadges).toContain('Candidate Checked');
+  });
+
+  it('solves affine-wrapped |u|=|v| families through repeated reuse of the same branch model', () => {
+    const result = runSharedEquationSolve({
+      ...request,
+      originalLatex: '3\\left|2x-1\\right|+4=\\left|x+5\\right|',
+      resolvedLatex: '3\\left|2x-1\\right|+4=\\left|x+5\\right|',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.exactLatex).toContain('x\\in');
+    expect(result.exactLatex).toContain('\\frac{4}{5}');
+    expect(result.exactLatex).toContain('\\frac{2}{7}');
+    expect(result.exactSupplementLatex?.[0]).toContain('\\frac{\\vert x+5\\vert}{3}-\\frac{4}{3}\\ge0');
     expect(result.solveBadges).toContain('Candidate Checked');
   });
 

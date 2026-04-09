@@ -39,6 +39,18 @@
 - Extracted `src/app/*`, `src/styles/app/*`, and decomposition facades under solver/guide/types are in-tree and passing regression.
 
 ## Most Recent Completed Milestone
+- Completed `ABS2` as the broader bounded absolute-value families and branch-aware numeric-guidance milestone:
+  - extended `src/lib/abs-core.ts` and `src/types/calculator/abs-types.ts` so the shared abs substrate now recognizes affine-wrapped direct families such as `a|u|+b=c`, `a|u|+b=v`, `a|u|+b=|v|`, plus deterministic equivalent readbacks like `|u|/a=v`
+  - rewired `src/lib/equation/guarded/algebra-stage.ts` so direct input and transform-produced perfect-square follow-ons now reuse the same broader wrapped-abs normalization path instead of stopping at the old direct-top-level abs surface
+  - preserved the same bounded `u = \pm v` branch model from `ABS1`, while widening supported carriers only when every generated branch still lands in an already-shipped bounded sink and survives original-equation validation
+  - strengthened `src/lib/equation/numeric-interval-solve.ts` so recognized but unresolved abs families now return branch-aware interval guidance that distinguishes unsupported exact closure from missed admissible branches and one-branch-only intervals
+  - kept `Calculate > Simplify` narrow in `src/lib/math-engine.ts`: direct abs canonicalization and perfect-square-to-abs normalization now share the same core, while `Factor`, inequalities, nested abs towers, and general piecewise search remain out of scope
+  - added focused coverage in `src/lib/abs-core.test.ts`, `src/lib/equation/shared-solve.test.ts`, `src/lib/equation/numeric-interval-solve.test.ts`, `src/lib/modes/equation.test.ts`, and `src/lib/math-engine.test.ts`
+  - primary_agent: `codex`
+  - primary_agent_model: `gpt-5.4`
+- Regression checks:
+  - `npm run test:memory-protocol`
+  - `npm run test:gate`
 - Completed `ABS1` as the shared absolute-value core and bounded abs-solving milestone:
   - added `src/lib/abs-core.ts` and `src/types/calculator/abs-types.ts` as the shared bounded abs substrate for direct-family recognition, canonical normalization, branch generation, branch/domain constraint extraction, and abs-aware numeric follow-up metadata
   - rewired `src/lib/equation/guarded/algebra-stage.ts` so direct abs equalities and transform-produced abs follow-ons such as `\sqrt{(u)^2}` now reuse the same bounded branch logic for `|u|=c`, `|u|=v`, and `|u|=|v|`
@@ -474,6 +486,8 @@
   - jsdom uses a stable MathEditor test stub instead of the full MathLive runtime
 
 ## Pending Verification
+- ABS2 manual checklist artifact:
+  - `.memory/research/TRACK-ABS2-MANUAL-VERIFICATION-CHECKLIST.md`
 - Optional desktop smoke pass on the current shell wiring for visual parity confidence beyond automated coverage.
 - ABS1 manual checklist artifact:
   - `.memory/research/TRACK-ABS1-MANUAL-VERIFICATION-CHECKLIST.md`
@@ -501,21 +515,29 @@
   - `.memory/research/TRACK-PRL4-MANUAL-VERIFICATION-CHECKLIST.md`
 
 ## Next Recommended Task
-- The `PRL1`-`PRL4` stack, `COMP1`-`COMP10`, `POLY1`-`POLY2`, `RAD1`-`RAD2`, `POLY-RAD1`-`POLY-RAD6`, and `ABS1` are now shipped.
+- The `PRL1`-`PRL4` stack, `COMP1`-`COMP10`, `POLY1`-`POLY2`, `RAD1`-`RAD2`, `POLY-RAD1`-`POLY-RAD6`, and `ABS1`-`ABS2` are now shipped.
 - `ARCH1` through `ARCH5` plus the agent-governance protocol pass are now in place:
   - Equation and Calculate have shared hosts, envelopes, stop policies, and default execution budgets
   - durable memory ownership and handoff rules are now enforced in-repo
   - further architecture work is no longer the blocker for the algebra lane
 - Next preferred decision:
-  1. choose whether the next algebra milestone should be `ABS2` or a neighboring bounded factor/transform follow-up
-  2. keep architecture paused unless a concrete runtime bottleneck appears
-  3. treat the abs lane as a bounded shared-core branch family, not as a general-purpose piecewise engine
+  1. choose whether the next algebra milestone should stay in the abs lane as `ABS3` or return to the composition lane
+  2. keep the abs lane branch-model-stable instead of widening into nested abs, inequalities, or general piecewise search
+  3. keep architecture paused unless a concrete runtime bottleneck appears
 - Reason:
-  - `ABS1` created a real shared abs core across direct symbolic solving, transform-produced abs follow-ons, calculate-side simplify normalization, and numeric interval guidance
-  - the repo now has a stronger shared substrate for branch generation, grouped trust supplements, and bounded abs-family messaging without reopening architecture
-  - the next move can now choose between more bounded abs breadth and a neighboring algebra-value pass instead of rebuilding fundamentals
+  - `ABS2` broadened the same shared abs substrate to affine-wrapped direct families and stronger branch-aware numeric guidance without adding search depth or reopening architecture
+  - the repo now has a cleaner base for either one more bounded abs-breadth pass or a deliberate return to the composition lane
+  - the main roadmap choice is no longer “how do we build abs at all,” but “do we keep broadening bounded abs recognition now that the core is in place”
 
 ## Recent Verified Context
+- `ABS2` is now verified:
+  - `src/lib/abs-core.ts` now recognizes affine-wrapped direct abs families and preserves exact outer scalar coefficients/offsets so the shared abs core can normalize `a|u|+b=c`, `a|u|+b=v`, and `a|u|+b=|v|` without opening a broader case engine
+  - `src/lib/equation/guarded/algebra-stage.ts` now reuses that broader normalization for both direct user input and transform-produced wrapped perfect-square follow-ons, including cases that previously stopped before the shared abs bridge could close
+  - `src/lib/equation/numeric-interval-solve.ts` now emits more specific branch-aware interval guidance for recognized wrapped abs families that remain outside exact bounded closure or whose intervals miss admissible branches
+  - `src/lib/math-engine.ts` keeps `Calculate > Simplify` on the same narrow promise while broadening direct abs canonicalization/readback through the shared abs core
+  - verified with:
+    - `npm run test:memory-protocol`
+    - `npm run test:gate`
 - `ABS1` is now verified:
   - `src/lib/abs-core.ts` centralizes bounded absolute-value family recognition for `|u|=c`, `|u|=v`, and `|u|=|v|`, along with direct abs simplification helpers and branch-aware numeric guidance
   - `src/lib/equation/guarded/algebra-stage.ts` now reuses that shared core for both direct abs equations and transform-produced abs follow-ons instead of keeping radical-to-abs logic as a narrow special case
