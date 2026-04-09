@@ -1,11 +1,18 @@
 import { ComputeEngine, expand } from '@cortex-js/compute-engine';
 import {
+  buildAbsoluteValueEquationFamily,
+  buildAbsoluteValueNonnegativeConstraint as buildSharedAbsNonnegativeConstraint,
+  collectAbsoluteValueTargets as collectSharedAbsoluteValueTargets,
+  isSupportedAbsoluteValueExpression as isSharedAbsoluteValueExpression,
+  matchDirectAbsoluteValueEquationNode,
+  matchPerfectSquareAbsoluteValueCarrier as matchSharedPerfectSquareAbsoluteValueCarrier,
+} from '../../abs-core';
+import {
   buildSquareRootConjugateProfile,
   isSupportedRadicand,
   mergeSolveDomainConstraints as mergeConstraints,
   matchSupportedRadical,
   matchSupportedRationalPower,
-  recognizePerfectSquareRadicand,
   type SupportedRadical,
   type SupportedRationalPower,
 } from '../../radical-core';
@@ -19,6 +26,7 @@ import { mergeExactSupplementLatex } from '../../exact-supplements';
 import { evaluateRealNumericExpression } from '../../real-numeric-eval';
 import { solveBoundedPolynomialCarrierEquationAst } from '../polynomial-carrier-follow-on';
 import type {
+  AbsoluteValueTargetDescriptor,
   DisplayOutcome,
   EquationExecutionBudget,
   GuardedSolveRequest,
@@ -116,11 +124,6 @@ type RadicalTarget =
       targetNode: unknown;
       power: SupportedRationalPower;
     };
-
-type AbsoluteValueTarget = {
-  targetNode: unknown;
-  base: unknown;
-};
 
 type AlgebraTransform = {
   equationLatex: string;
@@ -355,144 +358,20 @@ function buildScaledNode(node: unknown, scalar: ExactScalar) {
   return buildProductNode(buildScalarNode(scalar), node);
 }
 
-function buildAbsoluteValueNode(node: unknown) {
-  return simplifyNode(['Abs', node]);
-}
-
 function buildNonnegativeConstraint(expression: unknown): SolveDomainConstraint {
-  return {
-    kind: 'nonnegative',
-    expressionLatex: boxLatex(expression),
-  };
+  return buildSharedAbsNonnegativeConstraint(expression);
 }
 
 function isSupportedAbsoluteValueExpression(node: unknown, variable: string): boolean {
-  const normalized = normalizeAst(node);
-  if (readExactScalar(normalized)) {
-    return true;
-  }
-
-  if (parseExactPolynomial(normalized, variable, 4)) {
-    return true;
-  }
-
-  return isSupportedRightSideExpression(normalized, variable);
+  return isSharedAbsoluteValueExpression(node, variable);
 }
 
-function matchAbsoluteValueTarget(node: unknown, variable: string): AbsoluteValueTarget | null {
-  const normalized = normalizeAst(node);
-  if (isNodeArray(normalized) && normalized[0] === 'Abs' && normalized.length === 2) {
-    if (!isSupportedAbsoluteValueExpression(normalized[1], variable)) {
-      return null;
-    }
-
-    return {
-      targetNode: normalized,
-      base: normalized[1],
-    };
-  }
-
-  if (isNodeArray(normalized) && normalized[0] === 'Multiply' && normalized.length >= 3) {
-    const absChildren = normalized.slice(1).filter((child) =>
-      isNodeArray(child) && child[0] === 'Abs' && child.length === 2,
-    );
-    if (absChildren.length !== 1) {
-      return null;
-    }
-
-    const scalarChildren = normalized
-      .slice(1)
-      .filter((child) => child !== absChildren[0])
-      .every((child) => Boolean(readExactScalar(child)));
-    if (!scalarChildren) {
-      return null;
-    }
-
-    const absBase = (absChildren[0] as unknown[])[1];
-    if (!isSupportedAbsoluteValueExpression(absBase, variable)) {
-      return null;
-    }
-
-    return {
-      targetNode: normalized,
-      base: absBase,
-    };
-  }
-
-  if (isNodeArray(normalized) && normalized[0] === 'Divide' && normalized.length === 3) {
-    const numerator = normalizeAst(normalized[1]);
-    const denominatorScalar = readExactScalar(normalized[2]);
-    if (!denominatorScalar) {
-      return null;
-    }
-
-    const numeratorTarget = matchAbsoluteValueTarget(numerator, variable);
-    if (!numeratorTarget) {
-      return null;
-    }
-
-    return {
-      targetNode: normalized,
-      base: numeratorTarget.base,
-    };
-  }
-
-  return null;
-}
-
-function collectAbsoluteValueTargets(node: unknown, variable: string, targets: AbsoluteValueTarget[] = []) {
-  const normalized = normalizeAst(node);
-  const target = matchAbsoluteValueTarget(normalized, variable);
-  if (target) {
-    targets.push(target);
-  }
-
-  if (!isNodeArray(normalized) || normalized.length === 0) {
-    return targets;
-  }
-
-  for (const child of normalized.slice(1)) {
-    collectAbsoluteValueTargets(child, variable, targets);
-  }
-
-  return targets;
+function collectAbsoluteValueTargets(node: unknown, variable: string, targets: AbsoluteValueTargetDescriptor[] = []) {
+  return collectSharedAbsoluteValueTargets(node, variable, targets);
 }
 
 function matchPerfectSquareRadicalCarrier(node: unknown, variable: string) {
-  const normalized = normalizeAst(node);
-  if (
-    isNodeArray(normalized)
-    && ((normalized[0] === 'Sqrt' && normalized.length === 2)
-      || (normalized[0] === 'Root' && normalized.length === 3 && normalized[2] === 2))
-  ) {
-    const directBase =
-      isNodeArray(normalized[1])
-      && normalized[1][0] === 'Power'
-      && normalized[1].length === 3
-      && readExactScalar(normalized[1][2])?.numerator === 2
-      && readExactScalar(normalized[1][2])?.denominator === 1
-      && isSupportedAbsoluteValueExpression(normalized[1][1], variable)
-        ? normalized[1][1]
-        : null;
-    if (directBase) {
-      return {
-        targetNode: normalized,
-        absNode: buildAbsoluteValueNode(directBase),
-      };
-    }
-
-    const profile = recognizePerfectSquareRadicand(normalized[1]);
-    if (!profile || getSolveVariable(profile.absInnerNode) !== variable) {
-      return null;
-    }
-
-    return {
-      targetNode: normalized,
-      absNode: buildScaledNode(profile.absInnerNode, profile.outsideScalar),
-    };
-  }
-
-  return null;
+  return matchSharedPerfectSquareAbsoluteValueCarrier(node, variable);
 }
 
 function containsPlaceholder(node: unknown, placeholder: string): boolean {
@@ -1119,27 +998,19 @@ function buildAbsoluteValueRadicalTransform(
     equationLatex: `${boxLatex(absNode)}=${boxLatex(otherSide)}`,
     solveBadges: ['Radical Isolation'],
     solveSummaryText: 'Reduced an exact square-root square into a bounded absolute-value carrier',
-    unresolvedError: 'This recognized radical family is outside the current exact bounded solve set. Use Numeric Solve with an interval in Equation mode.',
+    unresolvedError: 'This recognized absolute-value family is outside the current exact bounded solve set. Use Numeric Solve with an interval in Equation mode.',
     radicalStepCost: 1,
   };
 }
 
-function buildAbsoluteValueBranchTransform(
-  base: unknown,
-  isolated: unknown,
-): AlgebraTransform {
-  const branchEquations = dedupe([
-    `${boxLatex(base)}=${boxLatex(isolated)}`,
-    `${boxLatex(base)}=${boxLatex(buildNegatedNode(isolated))}`,
-  ]);
-
+function buildAbsoluteValueBranchTransform(family: ReturnType<typeof buildAbsoluteValueEquationFamily>): AlgebraTransform {
   return {
-    equationLatex: branchEquations[0],
-    branchEquations,
-    domainConstraints: [buildNonnegativeConstraint(isolated)],
+    equationLatex: family.branchEquations[0],
+    branchEquations: family.branchEquations,
+    domainConstraints: family.branchConstraints,
     solveBadges: [],
-    solveSummaryText: 'Branched a bounded absolute-value carrier into exact cases',
-    unresolvedError: 'This recognized radical family is outside the current exact bounded solve set. Use Numeric Solve with an interval in Equation mode.',
+    solveSummaryText: 'Branched a bounded absolute-value family into exact cases',
+    unresolvedError: 'This recognized absolute-value family is outside the current exact bounded solve set. Use Numeric Solve with an interval in Equation mode.',
   };
 }
 
@@ -1612,13 +1483,17 @@ function canUseBoundedConjugateEquation(
 }
 
 function matchBoundedAbsoluteValueTransform(request: GuardedSolveRequest): AlgebraTransform | null {
-  if (getRadicalTransformDepth(request) <= 0) {
-    return null;
-  }
-
   const parsed = ce.parse(request.resolvedLatex).json;
   if (!isNodeArray(parsed) || parsed[0] !== 'Equal' || parsed.length !== 3) {
     return null;
+  }
+
+  const directFamily = matchDirectAbsoluteValueEquationNode(parsed);
+  if (directFamily && directFamily.branchEquations.length > 0) {
+    const transform = buildAbsoluteValueBranchTransform(directFamily);
+    if (equationStateKey(transform.equationLatex) !== equationStateKey(request.resolvedLatex)) {
+      return transform;
+    }
   }
 
   const leftNode = normalizeAst(parsed[1]);
@@ -1646,7 +1521,9 @@ function matchBoundedAbsoluteValueTransform(request: GuardedSolveRequest): Algeb
         continue;
       }
 
-      const transform = buildAbsoluteValueBranchTransform(candidate.base, isolatedMagnitude.isolated);
+      const transform = buildAbsoluteValueBranchTransform(
+        buildAbsoluteValueEquationFamily(candidate.base, isolatedMagnitude.isolated, variable),
+      );
       if (equationStateKey(transform.equationLatex) !== equationStateKey(request.resolvedLatex)) {
         return transform;
       }

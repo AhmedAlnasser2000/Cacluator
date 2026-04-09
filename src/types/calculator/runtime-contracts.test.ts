@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type {
+  AbsoluteValueEquationFamilyKind,
   DisplayOutcome,
   EquationExecutionBudget,
   EvaluateRequest,
@@ -46,6 +47,7 @@ describe('calculator runtime contract exports', () => {
         source: 'planner',
       },
     };
+    const absFamilyKind: AbsoluteValueEquationFamilyKind = 'abs-equals-abs';
     const equationBudget: EquationExecutionBudget = {
       maxRecursionDepth: 4,
       maxCompositionInversionDepth: 2,
@@ -70,6 +72,7 @@ describe('calculator runtime contract exports', () => {
     expect(guardedSolveRequest.numericInterval?.subdivisions).toBe(8);
     expect(outcome.kind).toBe('success');
     expect(advisories.stopReason?.source).toBe('planner');
+    expect(absFamilyKind).toBe('abs-equals-abs');
     expect(runtimeProfile.budget.equation.maxRecursionDepth).toBe(4);
   });
 });

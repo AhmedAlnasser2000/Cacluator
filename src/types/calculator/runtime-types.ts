@@ -34,6 +34,7 @@ export * from './execution-types';
 export * from './runtime-profile-types';
 export * from './runtime-policy-types';
 export * from './exact-supplement-types';
+export * from './abs-types';
 export * from './display-types';
 export * from './solver-types';
 export type EquationMenuEntryId =

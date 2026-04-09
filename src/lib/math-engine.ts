@@ -30,6 +30,7 @@ import {
 import { rewriteDiscreteOperators } from './discrete-eval';
 import { mergeExactSupplementLatex } from './exact-supplements';
 import { getResultGuardError } from './result-guard';
+import { normalizeExactAbsoluteValueNode } from './abs-core';
 import { factorMathJson } from './symbolic-factor';
 import { runFactoringEngine } from './symbolic-engine/orchestrator';
 import { parsePartialDerivativeLatex, resolvePartialDerivative } from './symbolic-engine/partials';
@@ -450,13 +451,25 @@ function executePreparedExpressionAction(
     ? (ce.box(radical.normalizedNode as Parameters<typeof ce.box>[0]) as BoxedLike)
     : expr;
   const radicalSupplementLatex = radical?.exactSupplementLatex ?? [];
-  const normalizedRadicalSupplementLatex = radicalSupplementLatex.length > 0
-    ? mergeExactSupplementLatex({ latex: radicalSupplementLatex, source: 'radical-domain' })
-    : undefined;
+  const absoluteValue =
+    action === 'simplify'
+      ? normalizeExactAbsoluteValueNode(radicalExpr.json)
+      : null;
+  const simplifyNormalizedExpr = absoluteValue
+    ? (ce.box(absoluteValue.normalizedNode as Parameters<typeof ce.box>[0]) as BoxedLike)
+    : radicalExpr;
+  const simplifySupplementLatex = action === 'simplify'
+    ? mergeExactSupplementLatex(
+      { latex: radicalSupplementLatex, source: 'radical-domain' },
+      { latex: absoluteValue?.exactSupplementLatex, source: 'legacy' },
+    )
+    : radicalSupplementLatex;
 
   const rational =
-    action === 'simplify' || action === 'factor'
-      ? normalizeExactRationalNode(radicalExpr.json, action)
+    action === 'simplify'
+      ? normalizeExactRationalNode(simplifyNormalizedExpr.json, action)
+      : action === 'factor'
+        ? normalizeExactRationalNode(radicalExpr.json, action)
       : null;
   if (rational) {
       const powerLog =
@@ -468,7 +481,7 @@ function executePreparedExpressionAction(
         ? numericExpression(exactExpr)
         : undefined;
       const exactSupplementLatex = mergeExactSupplementLatex(
-        { latex: radicalSupplementLatex, source: 'radical-domain' },
+        { latex: simplifySupplementLatex, source: 'legacy' },
         { latex: rational.exactSupplementLatex, source: 'denominator' },
       );
       if (powerLog?.changed) {
@@ -541,16 +554,16 @@ function executePreparedExpressionAction(
       };
     }
 
-    if (radical && action === 'simplify') {
-      const powerLog = normalizeExactPowerLogNode(radical.normalizedNode, 'simplify');
-      const approx = isNumericOnlyNode(radicalExpr.json)
-        ? numericExpression(radicalExpr)
+    if ((radical || absoluteValue) && action === 'simplify') {
+      const powerLog = normalizeExactPowerLogNode(simplifyNormalizedExpr.json, 'simplify');
+      const approx = isNumericOnlyNode(simplifyNormalizedExpr.json)
+        ? numericExpression(simplifyNormalizedExpr)
         : undefined;
       if (powerLog?.changed) {
         return {
           exactLatex: powerLog.normalizedLatex,
           exactSupplementLatex: normalizedSupplementLatex(
-              radicalSupplementLatex,
+              simplifySupplementLatex,
               powerLog.exactSupplementLatex,
             ),
           approxText: latexToApproxText(approx?.latex),
@@ -576,15 +589,15 @@ function executePreparedExpressionAction(
             return {
               warnings,
               error: guardError,
-              exactSupplementLatex: normalizedRadicalSupplementLatex,
+              exactSupplementLatex: simplifySupplementLatex.length > 0 ? simplifySupplementLatex : undefined,
             };
           }
 
           return {
             exactLatex: numeric.exactLatex,
-            exactSupplementLatex: normalizedRadicalSupplementLatex,
+            exactSupplementLatex: simplifySupplementLatex.length > 0 ? simplifySupplementLatex : undefined,
             approxText: numeric.approxText,
-            normalizedMathJson: radical.normalizedNode,
+            normalizedMathJson: simplifyNormalizedExpr.json,
             warnings,
             resultOrigin: 'numeric-fallback',
           };
@@ -594,31 +607,31 @@ function executePreparedExpressionAction(
           return {
             warnings,
             error: numeric.error,
-            exactSupplementLatex: normalizedRadicalSupplementLatex,
+            exactSupplementLatex: simplifySupplementLatex.length > 0 ? simplifySupplementLatex : undefined,
           };
         }
       }
-      const guardError = getResultGuardError(approx?.latex, radicalExpr?.latex);
+      const guardError = getResultGuardError(approx?.latex, simplifyNormalizedExpr?.latex);
       if (guardError) {
         return {
           warnings,
           error: guardError,
-          exactSupplementLatex: normalizedRadicalSupplementLatex,
+          exactSupplementLatex: simplifySupplementLatex.length > 0 ? simplifySupplementLatex : undefined,
         };
       }
 
       return {
-        exactLatex: radical.normalizedLatex,
-        exactSupplementLatex: normalizedRadicalSupplementLatex,
+        exactLatex: absoluteValue?.normalizedLatex ?? radical?.normalizedLatex,
+        exactSupplementLatex: simplifySupplementLatex.length > 0 ? simplifySupplementLatex : undefined,
         approxText: latexToApproxText(approx?.latex),
-        normalizedMathJson: radical.normalizedNode,
+        normalizedMathJson: simplifyNormalizedExpr.json,
         warnings,
         resultOrigin: 'symbolic-engine',
       };
     }
 
     if (action === 'simplify') {
-      const powerLog = normalizeExactPowerLogNode(radicalExpr.json, 'simplify');
+      const powerLog = normalizeExactPowerLogNode(simplifyNormalizedExpr.json, 'simplify');
       if (powerLog?.handled) {
         if (
           canUseExpressionNumericFallback(
@@ -662,7 +675,7 @@ function executePreparedExpressionAction(
         return {
           exactLatex: powerLog.normalizedLatex,
           exactSupplementLatex: normalizedSupplementLatex(
-              radicalSupplementLatex,
+              simplifySupplementLatex,
               powerLog.exactSupplementLatex,
             ),
           approxText: latexToApproxText(approx?.latex),

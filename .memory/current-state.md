@@ -39,6 +39,20 @@
 - Extracted `src/app/*`, `src/styles/app/*`, and decomposition facades under solver/guide/types are in-tree and passing regression.
 
 ## Most Recent Completed Milestone
+- Completed `ABS1` as the shared absolute-value core and bounded abs-solving milestone:
+  - added `src/lib/abs-core.ts` and `src/types/calculator/abs-types.ts` as the shared bounded abs substrate for direct-family recognition, canonical normalization, branch generation, branch/domain constraint extraction, and abs-aware numeric follow-up metadata
+  - rewired `src/lib/equation/guarded/algebra-stage.ts` so direct abs equalities and transform-produced abs follow-ons such as `\sqrt{(u)^2}` now reuse the same bounded branch logic for `|u|=c`, `|u|=v`, and `|u|=|v|`
+  - rewired `src/lib/equation/numeric-interval-solve.ts` so recognized abs families now produce stronger branch-aware guidance when exact bounded closure is unavailable or the chosen interval misses admissible branches
+  - rewired `src/lib/math-engine.ts` so `Calculate > Simplify` reuses the same shared abs core for bounded exact abs normalization without widening `Factor` or adding a new abs transform surface
+  - added focused coverage in `src/lib/abs-core.test.ts`, `src/lib/equation/shared-solve.test.ts`, `src/lib/equation/numeric-interval-solve.test.ts`, `src/lib/math-engine.test.ts`, `src/lib/modes/equation.test.ts`, and `src/types/calculator/runtime-contracts.test.ts`
+  - primary_agent: `codex`
+  - primary_agent_model: `gpt-5.4`
+- Regression checks:
+  - `npm run test:memory-protocol`
+  - `npm run test:unit`
+  - `npm run lint`
+- Verification note:
+  - `npm run test:gate` reached the existing Playwright `COMP5` smoke flake on the side-surface overlay backdrop click in `e2e/qa1-smoke.spec.ts`; the immediate targeted rerun passed, so the recorded blocker is an existing browser-interaction flake rather than an `ABS1` regression
 - Completed `POLY-RAD6` as the bounded mixed polynomial-radical factorization milestone:
   - added `src/lib/symbolic-engine/mixed-factor.ts` as the shared one-pass mixed-carrier recognizer/factorizer for expressions that normalize to a bounded polynomial in one supported carrier `u`, including square-root carriers and same-base rational-power sibling families with one shared denominator
   - rewired `src/lib/symbolic-engine/factoring.ts` and `src/lib/math-engine.ts` so `Calculate > Factor` now routes supported mixed radical/rational-power families through the shared carrier recognizer instead of stopping after radical-domain normalization
@@ -461,6 +475,8 @@
 
 ## Pending Verification
 - Optional desktop smoke pass on the current shell wiring for visual parity confidence beyond automated coverage.
+- ABS1 manual checklist artifact:
+  - `.memory/research/TRACK-ABS1-MANUAL-VERIFICATION-CHECKLIST.md`
 - Keep the Track E manual checklist in parallel:
   - `.memory/research/TRACK-E-MANUAL-VERIFICATION-CHECKLIST.md`
 - Track C checklist artifacts:
@@ -485,21 +501,33 @@
   - `.memory/research/TRACK-PRL4-MANUAL-VERIFICATION-CHECKLIST.md`
 
 ## Next Recommended Task
-- The `PRL1`-`PRL4` stack, `COMP1`-`COMP10`, `POLY1`-`POLY2`, `RAD1`-`RAD2`, and `POLY-RAD1`-`POLY-RAD5` are now shipped.
+- The `PRL1`-`PRL4` stack, `COMP1`-`COMP10`, `POLY1`-`POLY2`, `RAD1`-`RAD2`, `POLY-RAD1`-`POLY-RAD6`, and `ABS1` are now shipped.
 - `ARCH1` through `ARCH5` plus the agent-governance protocol pass are now in place:
   - Equation and Calculate have shared hosts, envelopes, stop policies, and default execution budgets
   - durable memory ownership and handoff rules are now enforced in-repo
   - further architecture work is no longer the blocker for the algebra lane
 - Next preferred decision:
-  1. choose whether the next algebra milestone should be `POLY-RAD6` or a neighboring bounded factor/transform expansion
+  1. choose whether the next algebra milestone should be `ABS2` or a neighboring bounded factor/transform follow-up
   2. keep architecture paused unless a concrete runtime bottleneck appears
-  3. treat any next Poly-Rad step as a bounded extension of the shared transform core, not a new feature-local solver
+  3. treat the abs lane as a bounded shared-core branch family, not as a general-purpose piecewise engine
 - Reason:
-  - `POLY-RAD5` strengthened transform breadth and Equation reuse without widening into combinatorial algebra work
-  - the repo now has a strong shared substrate for conjugate/rationalization, supplements, validation, and bounded sink prediction
-  - the next move can now focus on algebra value rather than more infrastructure cleanup
+  - `ABS1` created a real shared abs core across direct symbolic solving, transform-produced abs follow-ons, calculate-side simplify normalization, and numeric interval guidance
+  - the repo now has a stronger shared substrate for branch generation, grouped trust supplements, and bounded abs-family messaging without reopening architecture
+  - the next move can now choose between more bounded abs breadth and a neighboring algebra-value pass instead of rebuilding fundamentals
 
 ## Recent Verified Context
+- `ABS1` is now verified:
+  - `src/lib/abs-core.ts` centralizes bounded absolute-value family recognition for `|u|=c`, `|u|=v`, and `|u|=|v|`, along with direct abs simplification helpers and branch-aware numeric guidance
+  - `src/lib/equation/guarded/algebra-stage.ts` now reuses that shared core for both direct abs equations and transform-produced abs follow-ons instead of keeping radical-to-abs logic as a narrow special case
+  - `src/lib/math-engine.ts` now reuses the same core in `Calculate > Simplify` only, preserving the current square-root-to-abs wins and adding bounded direct abs normalization without widening `Factor`
+  - `src/lib/equation/numeric-interval-solve.ts` now emits more specific branch-aware interval guidance for recognized abs families that sit outside the exact bounded set or whose intervals miss admissible branches
+  - verified with:
+    - `npm run test:memory-protocol`
+    - `npm run test:unit`
+    - `npm run lint`
+    - `npx playwright test e2e/qa1-smoke.spec.ts --project=chromium --grep "COMP5 smoke keeps deep nested periodic carriers on structured multi-parameter guidance"`
+  - verification note:
+    - `npm run test:gate` reached the existing Playwright `COMP5` overlay-backdrop timeout before the later lint/Rust steps; the targeted rerun passed immediately, so the recorded issue remains an existing flaky browser interaction rather than an `ABS1` regression
 - `AppMain` no longer leaves the display header on `Loading...` while the shell is already usable:
   - `src/AppMain.tsx` now treats `bootApp()` as the readiness boundary and lets history/category loading continue in the background
   - `src/AppMain.status.ui.test.tsx` verifies that slow background loaders no longer block the visible `Ready` state

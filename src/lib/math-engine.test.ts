@@ -258,6 +258,17 @@ describe('runExpressionAction', () => {
     expect(result.exactLatex?.replaceAll(' ', '')).toContain('2xy')
   })
 
+  it('simplifies direct bounded abs identities without widening Factor', () => {
+    const result = runExpressionAction(
+      { ...request, document: { latex: '\\left|x\\right|^2' } },
+      'simplify',
+    )
+
+    expect(result.error).toBeUndefined()
+    expect(result.resultOrigin).toBe('symbolic-engine')
+    expect(result.exactLatex).toBe('x^2')
+  })
+
   it('respects degree mode for direct numeric trig in Calculate', () => {
     const result = runExpressionAction(
       { ...request, mode: 'calculate', angleUnit: 'deg', document: { latex: '\\sin\\left(90\\right)' } },

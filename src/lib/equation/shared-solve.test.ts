@@ -397,6 +397,56 @@ describe('runSharedEquationSolve', () => {
     expect(result.exactSupplementLatex).toEqual(['\\text{Conditions: } x+3\\ge0']);
   });
 
+  it('solves direct bounded |u|=c families through the shared abs core', () => {
+    const result = runSharedEquationSolve({
+      ...request,
+      originalLatex: '\\left|2x-3\\right|=5',
+      resolvedLatex: '\\left|2x-3\\right|=5',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.exactLatex).toContain('x\\in');
+    expect(result.exactLatex).toContain('-1');
+    expect(result.exactLatex).toContain('4');
+    expect(result.solveBadges).toContain('Candidate Checked');
+  });
+
+  it('solves direct bounded |u|=v families with preserved nonnegativity conditions', () => {
+    const result = runSharedEquationSolve({
+      ...request,
+      originalLatex: '\\left|x+1\\right|=x+3',
+      resolvedLatex: '\\left|x+1\\right|=x+3',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.exactLatex).toBe('x=-2');
+    expect(result.exactSupplementLatex).toEqual(['\\text{Conditions: } x+3\\ge0']);
+    expect(result.solveBadges).toContain('Candidate Checked');
+  });
+
+  it('solves direct bounded |u|=|v| families through exact branch reduction', () => {
+    const result = runSharedEquationSolve({
+      ...request,
+      originalLatex: '\\left|2x-1\\right|=\\left|x+4\\right|',
+      resolvedLatex: '\\left|2x-1\\right|=\\left|x+4\\right|',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.exactLatex).toContain('x\\in');
+    expect(result.exactLatex).toContain('-1');
+    expect(result.exactLatex).toContain('5');
+    expect(result.solveBadges).toContain('Candidate Checked');
+  });
+
   it('solves bounded radical equations that polynomialize into algebraic biquadratic follow-ons', () => {
     const result = runSharedEquationSolve({
       ...request,

@@ -122,4 +122,50 @@ describe('runNumericIntervalSolve', () => {
     expect(result.error).toContain('ln(x+1) stays about in');
     expect(result.error).toContain('50 grad + 200 grad * k');
   });
+
+  it('adds abs-branch guidance for recognized direct absolute-value families', () => {
+    const result = runNumericIntervalSolve('\\left|x+1\\right|=e^x', {
+      start: '5',
+      end: '6',
+      subdivisions: 256,
+    });
+
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') {
+      throw new Error('Expected numeric solve error');
+    }
+    expect(result.error).toContain('absolute-value family splits into');
+    expect(result.error).toContain('x+1=\\exponentialE^{x}');
+  });
+
+  it('flags intervals whose recognized abs magnitude stays negative', () => {
+    const result = runNumericIntervalSolve('\\left|x+1\\right|=-x-10', {
+      start: '0',
+      end: '1',
+      subdivisions: 128,
+    });
+
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') {
+      throw new Error('Expected numeric solve error');
+    }
+    expect(result.error).toContain('requires');
+    expect(result.error).toContain('\\ge0');
+    expect(result.error).toContain('stays negative across the chosen interval');
+  });
+
+  it('flags intervals for single-branch abs families', () => {
+    const result = runNumericIntervalSolve('\\left|x+1\\right|=0', {
+      start: '1',
+      end: '2',
+      subdivisions: 128,
+    });
+
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') {
+      throw new Error('Expected numeric solve error');
+    }
+    expect(result.error).toContain('single branch');
+    expect(result.error).toContain('x+1=0');
+  });
 });

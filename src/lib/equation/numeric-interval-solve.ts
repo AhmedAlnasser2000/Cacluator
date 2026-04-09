@@ -1,5 +1,6 @@
 import { ComputeEngine } from '@cortex-js/compute-engine';
 import type { AngleUnit, NumericSolveInterval, SolveDomainConstraint } from '../../types/calculator';
+import { buildAbsoluteValueNumericGuidance } from '../abs-core';
 import { dedupeNumericRoots, validateCandidateRoots } from './candidate-validation';
 import { readNumericNode, evaluateLatexAt, equationToZeroFormLatex } from './domain-guards';
 import { convertAngle } from '../trigonometry/angles';
@@ -668,10 +669,19 @@ export function runNumericIntervalSolve(
     const trigGuidance = noSeededCandidates
       ? buildTrigNoRootGuidance(equationLatex, parsed.start, parsed.end, parsed.subdivisions, angleUnit)
       : null;
+    const absGuidance = noSeededCandidates
+      ? buildAbsoluteValueNumericGuidance(
+        equationLatex,
+        parsed.start,
+        parsed.end,
+        parsed.subdivisions,
+        angleUnit,
+      )
+      : null;
     return {
       kind: 'error',
       error: noSeededCandidates
-        ? `No bracketed or near-zero real roots were found on the chosen interval. ${guidance}${trigGuidance ? ` ${trigGuidance}` : ''}`
+        ? `No bracketed or near-zero real roots were found on the chosen interval. ${guidance}${trigGuidance ? ` ${trigGuidance}` : ''}${absGuidance ? ` ${absGuidance}` : ''}`
         : `Candidate roots were found but rejected after substitution back into the original equation. ${guidance}`,
       rejectedCandidateCount: validated.rejected.length,
       summaryText: summary,
