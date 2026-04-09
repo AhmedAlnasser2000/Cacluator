@@ -616,6 +616,29 @@ describe('runExpressionAction', () => {
     expect(symbolicBinomial.exactSupplementLatex).toEqual(['\\text{Exclusions: } x+\\sqrt{2}\\ne0'])
   })
 
+  it('widens simplify rationalization to affine-scaled and selected three-term square-root denominators', () => {
+    const affineScaled = runExpressionAction(
+      { ...request, document: { latex: '\\frac{1}{2+\\sqrt{x}}' } },
+      'simplify',
+    )
+    const threeTerm = runExpressionAction(
+      { ...request, document: { latex: '\\frac{1}{1+\\sqrt{2}+\\sqrt{3}}' } },
+      'simplify',
+    )
+
+    expect(affineScaled.error).toBeUndefined()
+    expect(affineScaled.resultOrigin).toBe('symbolic-engine')
+    expect(affineScaled.exactLatex).toBe('\\frac{2-\\sqrt{x}}{4-x}')
+    expect(affineScaled.exactSupplementLatex).toEqual([
+      '\\text{Exclusions: } \\sqrt{x}+2\\ne0',
+      '\\text{Conditions: } x\\ge0',
+    ])
+
+    expect(threeTerm.error).toBeUndefined()
+    expect(threeTerm.resultOrigin).toBe('symbolic-engine')
+    expect(threeTerm.exactLatex).toBe('\\frac{1}{8}(4-2\\sqrt{6}+2\\sqrt{2})')
+  })
+
   it('preserves radical cleanup in factor mode without rationalizing denominators', () => {
     const result = runExpressionAction(
       { ...request, document: { latex: '\\sqrt{x^2}' } },

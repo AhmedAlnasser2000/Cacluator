@@ -83,6 +83,15 @@ describe('normalizeExactRadicalLatex', () => {
     expect(result?.exactSupplementLatex?.[0]).toContain('\\sqrt{x+1}+1\\ne0');
   });
 
+  it('widens bounded two-term square-root rationalization to affine-scaled denominators', () => {
+    const result = normalizeExactRadicalLatex('\\frac{1}{2+\\sqrt{x}}', 'simplify');
+
+    expect(result).not.toBeNull();
+    expect(stripFences(result?.normalizedLatex)).toBe('\\frac{2-\\sqrt{x}}{4-x}');
+    expect(result?.exactSupplementLatex?.[0]).toContain('x\\ge0');
+    expect(result?.exactSupplementLatex?.[0]).toContain('\\sqrt{x}+2\\ne0');
+  });
+
   it('rationalizes bounded two-radical denominators in simplify mode', () => {
     const sum = normalizeExactRadicalLatex('\\frac{1}{\\sqrt{x+1}+\\sqrt{x}}', 'simplify');
     const difference = normalizeExactRadicalLatex('\\frac{1}{\\sqrt{x+1}-\\sqrt{x}}', 'simplify');
@@ -103,6 +112,14 @@ describe('normalizeExactRadicalLatex', () => {
     expect(difference?.exactSupplementLatex?.[0]).toContain('\\sqrt{x}');
     expect(difference?.exactSupplementLatex?.[0]).toContain('\\sqrt{x+1}');
     expect(difference?.exactSupplementLatex?.[0]).toContain('\\ne0');
+  });
+
+  it('rationalizes selected bounded three-term square-root denominators with one residual cleanup', () => {
+    const result = normalizeExactRadicalLatex('\\frac{1}{1+\\sqrt{2}+\\sqrt{3}}', 'simplify');
+
+    expect(result).not.toBeNull();
+    expect(stripFences(result?.normalizedLatex)).toBe('\\frac{1}{8}(4-2\\sqrt{6}+2\\sqrt{2})');
+    expect(result?.exactSupplementLatex).toEqual([]);
   });
 
   it('rejects broader multivariable radicals in this bounded milestone', () => {

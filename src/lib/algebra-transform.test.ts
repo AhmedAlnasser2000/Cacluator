@@ -103,6 +103,26 @@ describe('algebra-transform', () => {
     expect(result?.transformBadges).toEqual(['Conjugate']);
   });
 
+  it('widens explicit radical transforms to affine-scaled and selected three-term denominator families', () => {
+    const affineActions = getEligibleExpressionTransforms('\\frac{1}{2+\\sqrt{x}}');
+    const affineResult = applyExpressionTransform('\\frac{1}{2+\\sqrt{x}}', 'conjugate');
+    const threeTermActions = getEligibleExpressionTransforms('\\frac{1}{1+\\sqrt{2}+\\sqrt{3}}');
+    const threeTermResult = applyExpressionTransform('\\frac{1}{1+\\sqrt{2}+\\sqrt{3}}', 'rationalize');
+
+    expect(affineActions).toContain('rationalize');
+    expect(affineActions).toContain('conjugate');
+    expect(affineResult?.exactLatex).toBe('\\frac{2-\\sqrt{x}}{4-x}');
+    expect(affineResult?.exactSupplementLatex).toEqual([
+      '\\text{Exclusions: } \\sqrt{x}+2\\ne0',
+      '\\text{Conditions: } x\\ge0',
+    ]);
+
+    expect(threeTermActions).toContain('rationalize');
+    expect(threeTermActions).toContain('conjugate');
+    expect(threeTermResult?.exactLatex).toBe('\\frac{1}{8}(4-2\\sqrt{6}+2\\sqrt{2})');
+    expect(threeTermResult?.transformBadges).toEqual(['Rationalize']);
+  });
+
   it('cancels factors inside equation sides without auto-solving', () => {
     const result = applyEquationTransform('\\frac{x^2-1}{x-1}=0', 'cancelFactors');
 

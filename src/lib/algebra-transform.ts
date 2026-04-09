@@ -206,7 +206,9 @@ function rationalizeExpression(node: unknown): AlgebraTransformResult | null {
 
   return {
     exactLatex: radical.normalizedLatex,
-    exactSupplementLatex: radical.exactSupplementLatex,
+    exactSupplementLatex: mergeExactSupplementLatex(
+      { latex: radical.exactSupplementLatex, source: 'legacy' },
+    ),
     transformBadges: ['Rationalize'],
     transformSummaryText: 'Rationalized the supported radical denominator exactly',
   };
@@ -220,7 +222,9 @@ function conjugateExpression(node: unknown): AlgebraTransformResult | null {
 
   return {
     exactLatex: conjugate.normalizedLatex,
-    exactSupplementLatex: conjugate.exactSupplementLatex,
+    exactSupplementLatex: mergeExactSupplementLatex(
+      { latex: conjugate.exactSupplementLatex, source: 'legacy' },
+    ),
     transformBadges: ['Conjugate'],
     transformSummaryText: 'Applied a conjugate to remove a square-root denominator',
   };
@@ -329,7 +333,9 @@ function rationalizeEquationSide(node: unknown) {
 
   return {
     latex: radical.normalizedLatex,
-    supplement: radical.exactSupplementLatex,
+    supplement: mergeExactSupplementLatex(
+      { latex: radical.exactSupplementLatex, source: 'legacy' },
+    ),
   };
 }
 
@@ -341,7 +347,9 @@ function conjugateEquationSide(node: unknown) {
 
   return {
     latex: conjugate.normalizedLatex,
-    supplement: conjugate.exactSupplementLatex,
+    supplement: mergeExactSupplementLatex(
+      { latex: conjugate.exactSupplementLatex, source: 'legacy' },
+    ),
   };
 }
 

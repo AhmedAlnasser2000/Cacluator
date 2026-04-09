@@ -39,6 +39,21 @@
 - Extracted `src/app/*`, `src/styles/app/*`, and decomposition facades under solver/guide/types are in-tree and passing regression.
 
 ## Most Recent Completed Milestone
+- Completed `POLY-RAD5` as the staged bounded conjugate and rationalization expansion milestone:
+  - widened the shared square-root conjugate/rationalization core in `src/lib/radical-core.ts` and `src/lib/symbolic-engine/radical.ts` so the same bounded profile now supports stronger two-term denominator families across `Calculate > Simplify`, explicit `Rationalize` / `Conjugate`, and bounded Equation pre-solve
+  - rewired `src/lib/equation/guarded/algebra-stage.ts` to reuse that shared profile for Equation-side bounded conjugate transforms and for selected three-term reciprocal families that deterministically reduce into already-shipped bounded sinks instead of opening a second rationalization engine
+  - kept visible trust behavior on the `POLY-RAD4` path by normalizing transform supplements through `src/lib/algebra-transform.ts` and preserving original-equation validation plus grouped `Exclusions:` / `Conditions:` output
+  - added focused coverage in `src/lib/algebra-transform.test.ts`, `src/lib/symbolic-engine/radical.test.ts`, `src/lib/math-engine.test.ts`, `src/lib/modes/calculate.test.ts`, `src/lib/equation/shared-solve.test.ts`, `src/lib/modes/equation.test.ts`, and `src/AppMain.ui.test.tsx`
+  - primary_agent: `codex`
+  - primary_agent_model: `gpt-5.4`
+- Regression checks:
+  - `npm run test:unit`
+  - `npm run test:ui`
+  - `npx playwright test e2e/qa1-smoke.spec.ts --project=chromium --grep "COMP9 smoke renders mixed-carrier sawtooth closure for power-form carriers"`
+  - `npm run lint`
+  - `cargo check --manifest-path src-tauri/Cargo.toml`
+- Verification note:
+  - `npm run test:gate` reached unit, UI, build, and nearly all E2E coverage but hit one unrelated long-run Playwright flake on the existing `COMP9` smoke (`settings-toggle` click timeout); the failing smoke passed on immediate rerun and the remaining lint/Rust checks passed.
 - Completed the agent-governance and memory-attribution protocol pass:
   - updated `AGENTS.md`, `docs/workflow/commit-first-gates.md`, `.memory/PROTOCOL.md`, and compatibility stubs so Calcwiz now has one authoritative cross-agent rule stack plus a documented read order and handoff contract
   - added `tools/validate-memory-protocol.mjs` and `npm run test:memory-protocol`, and wired the validator into `npm run test:gate`
@@ -459,26 +474,26 @@
   - `.memory/research/TRACK-PRL4-MANUAL-VERIFICATION-CHECKLIST.md`
 
 ## Next Recommended Task
-- The `PRL1`-`PRL4` stack, `COMP1`-`COMP10`, `POLY1`-`POLY2`, and `RAD1`-`RAD2` radical lane are now shipped.
-- `ARCH1` through `ARCH4` are now shipped and regression-verified:
-  - ownership boundaries and runtime seams are clearer
-  - Equation and Calculate now have real static internal hosts, shared outcome envelopes, and minimal shared runtime stop policies
-  - the next architecture step should be chosen deliberately instead of extending the host/policy layer ad hoc
-- Strongest current architecture recommendation before more composition breadth:
-  1. the polynomial/radical foundation lane now extends through `POLY-RAD1`
-  2. the architecture discussion captured from the external kernel pack and repo-grounded review now extends through `ARCH4 — Shared Runtime Policies and Structured Stop Reasons`, so the next choice is between a deeper runtime-policy milestone and returning to algebra/composition from a cleaner base
-  3. next preferred decision:
-     - choose deliberately between:
-       - `ARCH5` or later runtime-policy / job / profile evolution
-       - a dedicated bounded abs milestone
-       - broader composition
-       - a deeper bounded algebraic-follow-on expansion
+- The `PRL1`-`PRL4` stack, `COMP1`-`COMP10`, `POLY1`-`POLY2`, `RAD1`-`RAD2`, and `POLY-RAD1`-`POLY-RAD5` are now shipped.
+- `ARCH1` through `ARCH5` plus the agent-governance protocol pass are now in place:
+  - Equation and Calculate have shared hosts, envelopes, stop policies, and default execution budgets
+  - durable memory ownership and handoff rules are now enforced in-repo
+  - further architecture work is no longer the blocker for the algebra lane
+- Next preferred decision:
+  1. choose whether the next algebra milestone should be `POLY-RAD6` or a neighboring bounded factor/transform expansion
+  2. keep architecture paused unless a concrete runtime bottleneck appears
+  3. treat any next Poly-Rad step as a bounded extension of the shared transform core, not a new feature-local solver
 - Reason:
-  - `POLY1`/`POLY2`, `RAD1`/`RAD2`, and `POLY-RAD1` now provide shared polynomial/radical substrates plus the bounded bridge between them, while `ARCH1`-`ARCH4` now provide cleaner runtime seams, static host ownership, shared envelopes, and minimal shared stop-policy metadata for Equation and Calculate
-  - continuing directly into `COMP11` without deciding the next substrate boundary would risk reintroducing feature-local algebra or runtime logic instead of building on the new shared cores and hosts
-  - a full plugin/microkernel platform is still premature, but the next move can now deliberately choose between more algebra value and a deeper internal runtime platform step
+  - `POLY-RAD5` strengthened transform breadth and Equation reuse without widening into combinatorial algebra work
+  - the repo now has a strong shared substrate for conjugate/rationalization, supplements, validation, and bounded sink prediction
+  - the next move can now focus on algebra value rather than more infrastructure cleanup
 
 ## Recent Verified Context
+- `POLY-RAD5` is now verified:
+  - Stage A widened the shared square-root transform profile to stronger two-term families across `Calculate > Simplify`, explicit `Rationalize` / `Conjugate`, and bounded Equation pre-solve
+  - Stage B added selected three-term reciprocal families only when one canonical first multiply reduces to the existing bounded two-term surface and then into an already-shipped sink
+  - explicit transform supplements now normalize through the shared `POLY-RAD4` supplement renderer, so widened conjugate/rationalize output keeps grouped `Exclusions:` / `Conditions:` instead of drifting back to legacy mixed lines
+  - verification was strong but not single-command clean: `npm run test:gate` hit one unrelated long-run Playwright flake on the existing `COMP9` smoke, the targeted rerun passed immediately, and the remaining lint/Rust checks passed
 - Rust numeric ODE evaluation no longer depends on `meval` / `nom v1`:
   - the Tauri backend now parses and compiles ODE RHS expressions with `mathexpr`
   - supported numeric IVP expressions still cover the current frontend-emitted surface (`sin`, `cos`, `tan`, `exp`, `pow`, `ln`/`log`, `sqrt`, `abs`) with `x` and `y` variables

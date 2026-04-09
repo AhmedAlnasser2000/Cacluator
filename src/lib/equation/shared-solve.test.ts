@@ -726,4 +726,71 @@ describe('runSharedEquationSolve', () => {
     expect(supplements).toContain('x\\ge0');
     expect(supplements).toContain('\\sqrt{x}+1\\ne0');
   });
+
+  it('solves widened affine-scaled conjugate families when the transformed equation lands in an existing bounded sink', () => {
+    const result = runSharedEquationSolve({
+      ...request,
+      originalLatex: '\\frac{1}{2+\\sqrt{x}}=\\frac{1}{3}',
+      resolvedLatex: '\\frac{1}{2+\\sqrt{x}}=\\frac{1}{3}',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.exactLatex).toBe('x=1');
+    expect(result.solveBadges).toContain('Conjugate Transform');
+    expect(result.solveBadges).toContain('LCD Clear');
+    const supplements = result.exactSupplementLatex?.join(' ') ?? '';
+    expect(supplements).toContain('x\\ge0');
+    expect(supplements).toContain('\\sqrt{x}+2\\ne0');
+  });
+
+  it('keeps widened two-radical conjugate families honest when they exceed the bounded follow-on budget', () => {
+    const result = runSharedEquationSolve({
+      ...request,
+      originalLatex: '\\frac{1}{\\sqrt{x+1}+\\sqrt{x-1}}=1',
+      resolvedLatex: '\\frac{1}{\\sqrt{x+1}+\\sqrt{x-1}}=1',
+    });
+
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') {
+      throw new Error('Expected an error outcome');
+    }
+    expect(result.error).toContain('more than two bounded radical transform steps');
+    expect(result.solveBadges).toContain('Conjugate Transform');
+  });
+
+  it('solves selected three-term reciprocal families by clearing into an existing bounded denominator equation', () => {
+    const result = runSharedEquationSolve({
+      ...request,
+      originalLatex: '\\frac{1}{1+\\sqrt{x}+\\sqrt{x+1}}=\\frac{1}{2}',
+      resolvedLatex: '\\frac{1}{1+\\sqrt{x}+\\sqrt{x+1}}=\\frac{1}{2}',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.exactLatex).toBe('x=0');
+    expect(result.solveBadges).toContain('LCD Clear');
+    const supplements = result.exactSupplementLatex?.join(' ') ?? '';
+    expect(supplements).toContain('\\sqrt{x}+\\sqrt{x+1}+1\\ne0');
+    expect(supplements).toContain('x\\ge0');
+  });
+
+  it('keeps selected three-term reciprocal families on bounded guidance when the resulting denominator equation still overreaches', () => {
+    const result = runSharedEquationSolve({
+      ...request,
+      originalLatex: '\\frac{1}{1+\\sqrt{x}+\\sqrt{x+1}}=\\frac{1}{2+\\sqrt{2}}',
+      resolvedLatex: '\\frac{1}{1+\\sqrt{x}+\\sqrt{x+1}}=\\frac{1}{2+\\sqrt{2}}',
+    });
+
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') {
+      throw new Error('Expected an error outcome');
+    }
+    expect(result.error).toContain('outside the current exact bounded solve set');
+    expect(result.solveBadges).toContain('LCD Clear');
+  });
 });

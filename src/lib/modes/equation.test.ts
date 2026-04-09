@@ -732,4 +732,47 @@ describe('runEquationMode', () => {
     expect(result.exactLatex).toBe('x=1');
     expect(result.solveBadges).toContain('Conjugate Transform');
   });
+
+  it('solves widened affine-scaled conjugate families through the shared symbolic backend', () => {
+    const result = runEquationMode({
+      ...makeRequest(),
+      equationScreen: 'symbolic',
+      equationLatex: '\\frac{1}{2+\\sqrt{x}}=\\frac{1}{3}',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.exactLatex).toBe('x=1');
+    expect(result.solveBadges).toContain('Conjugate Transform');
+    expect(result.solveBadges).toContain('LCD Clear');
+  });
+
+  it('solves selected three-term reciprocal families only when the bounded sink closes cleanly', () => {
+    const success = runEquationMode({
+      ...makeRequest(),
+      equationScreen: 'symbolic',
+      equationLatex: '\\frac{1}{1+\\sqrt{x}+\\sqrt{x+1}}=\\frac{1}{2}',
+    });
+    const honestStop = runEquationMode({
+      ...makeRequest(),
+      equationScreen: 'symbolic',
+      equationLatex: '\\frac{1}{1+\\sqrt{x}+\\sqrt{x+1}}=\\frac{1}{2+\\sqrt{2}}',
+    });
+
+    expect(success.kind).toBe('success');
+    if (success.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(success.exactLatex).toBe('x=0');
+    expect(success.solveBadges).toContain('LCD Clear');
+
+    expect(honestStop.kind).toBe('error');
+    if (honestStop.kind !== 'error') {
+      throw new Error('Expected an error outcome');
+    }
+    expect(honestStop.error).toContain('bounded solve set');
+    expect(honestStop.solveBadges).toContain('LCD Clear');
+  });
 });

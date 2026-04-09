@@ -582,6 +582,46 @@ describe('AppMain UI automation flows', () => {
     expect(screen.getByTestId('algebra-transform-changeBase')).toBeInTheDocument();
   });
 
+  it('shows widened bounded conjugate transforms in Calculate', async () => {
+    const { user } = await renderAppMain();
+
+    setMathFieldLatex('main-editor', '\\frac{1}{2+\\sqrt{x}}');
+    await user.click(screen.getByTestId('soft-action-algebra'));
+    await waitFor(() => expect(screen.getByTestId('algebra-transform-tray')).toBeInTheDocument());
+    await user.click(screen.getByTestId('algebra-transform-conjugate'));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expect(
+      screen
+        .getByTestId('display-outcome-exact')
+        .querySelector('[data-raw-latex]')?.getAttribute('data-raw-latex'),
+    ).toBe('\\frac{2-\\sqrt{x}}{4-x}');
+    const affineSupplements = Array.from(
+      document.querySelectorAll('[data-testid^="display-outcome-supplement-"] [data-raw-latex]'),
+    )
+      .map((node) => node.getAttribute('data-raw-latex') ?? '')
+      .join(' ');
+    expect(affineSupplements).toContain('\\sqrt{x}+2\\ne0');
+    expect(affineSupplements).toContain('x\\ge0');
+  });
+
+  it('shows selected three-term rationalize transforms in Calculate', async () => {
+    const { user } = await renderAppMain();
+
+    setMathFieldLatex('main-editor', '\\frac{1}{1+\\sqrt{2}+\\sqrt{3}}');
+    await user.click(screen.getByTestId('soft-action-algebra'));
+    await waitFor(() => expect(screen.getByTestId('algebra-transform-tray')).toBeInTheDocument());
+    await user.click(screen.getByTestId('algebra-transform-rationalize'));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expect(
+      screen
+        .getByTestId('display-outcome-exact')
+        .querySelector('[data-raw-latex]')?.getAttribute('data-raw-latex'),
+    ).toBe('\\frac{1}{8}(4-2\\sqrt{6}+2\\sqrt{2})');
+    expect(screen.getByTestId('algebra-transform-rationalize')).toBeInTheDocument();
+  });
+
   it('renders transform summary math separately from plain text', async () => {
     const { user } = await renderAppMain();
 
@@ -1226,6 +1266,18 @@ describe('AppMain UI automation flows', () => {
     expect(supplements).toContain('\\sqrt{x}+1\\ne0');
     expect(screen.getByText('Conjugate Transform')).toBeInTheDocument();
   });
+
+  it('renders POLY-RAD5 selected three-term reciprocal solves only when the bounded sink closes cleanly', async () => {
+    const { user } = await renderAppMain();
+
+    await openEquationSymbolic(user);
+    setMathFieldLatex('main-editor', '\\frac{1}{1+\\sqrt{x}+\\sqrt{x+1}}=\\frac{1}{2}');
+    await user.click(screen.getByTestId('soft-action-solve'));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expectMathStaticLatex(screen.getByTestId('display-outcome-exact'), 'x=0');
+    expect(screen.getByText('LCD Clear')).toBeInTheDocument();
+  }, 15000);
 
   it('renders RAD2 sequential radical solves with exact follow-on provenance', async () => {
     const { user } = await renderAppMain();

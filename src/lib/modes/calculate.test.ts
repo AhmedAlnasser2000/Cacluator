@@ -110,4 +110,35 @@ describe('runCalculateMode', () => {
     expect(changedBase.exactLatex).toBe('\\frac{\\ln\\left(x\\right)}{\\ln\\left(4\\right)}')
     expect(changedBase.transformBadges).toEqual(['Change Base'])
   })
+
+  it('runs widened bounded conjugate and rationalize transforms explicitly in Calculate', () => {
+    const affineConjugate = runCalculateAlgebraTransform({
+      action: 'conjugate',
+      latex: '\\frac{1}{2+\\sqrt{x}}',
+      angleUnit: 'deg',
+    })
+    const threeTermRationalize = runCalculateAlgebraTransform({
+      action: 'rationalize',
+      latex: '\\frac{1}{1+\\sqrt{2}+\\sqrt{3}}',
+      angleUnit: 'deg',
+    })
+
+    expect(affineConjugate.kind).toBe('success')
+    if (affineConjugate.kind !== 'success') {
+      throw new Error('Expected a success outcome')
+    }
+    expect(affineConjugate.exactLatex).toBe('\\frac{2-\\sqrt{x}}{4-x}')
+    expect(affineConjugate.transformBadges).toEqual(['Conjugate'])
+    expect(affineConjugate.exactSupplementLatex).toEqual([
+      '\\text{Exclusions: } \\sqrt{x}+2\\ne0',
+      '\\text{Conditions: } x\\ge0',
+    ])
+
+    expect(threeTermRationalize.kind).toBe('success')
+    if (threeTermRationalize.kind !== 'success') {
+      throw new Error('Expected a success outcome')
+    }
+    expect(threeTermRationalize.exactLatex).toBe('\\frac{1}{8}(4-2\\sqrt{6}+2\\sqrt{2})')
+    expect(threeTermRationalize.transformBadges).toEqual(['Rationalize'])
+  })
 })

@@ -13,6 +13,7 @@ import { parseExactPolynomial } from '../../polynomial-core';
 import { recognizeBoundedPolynomialEquationAst } from '../../polynomial-factor-solve';
 import { normalizeAst } from '../../symbolic-engine/normalize';
 import { boxLatex, isNodeArray, termKey } from '../../symbolic-engine/patterns';
+import { buildRationalizedSquareRootQuotient } from '../../symbolic-engine/radical';
 import { normalizeExactRationalNode } from '../../symbolic-engine/rational';
 import { mergeExactSupplementLatex } from '../../exact-supplements';
 import { evaluateRealNumericExpression } from '../../real-numeric-eval';
@@ -1405,35 +1406,116 @@ function matchRepeatedClearingTransform(request: GuardedSolveRequest): AlgebraTr
   return null;
 }
 
-function tryRationalizeSquareRootBinomialSide(node: unknown, variable: string): AlgebraTransform | null {
+function tryRationalizeSquareRootDenominatorSide(node: unknown, variable: string): AlgebraTransform | null {
   const normalized = normalizeAst(node);
-  if (!isNodeArray(normalized) || normalized[0] !== 'Divide' || normalized.length !== 3) {
+  const quotient =
+    isNodeArray(normalized) && normalized[0] === 'Divide' && normalized.length === 3
+      ? { numerator: normalized[1], denominator: normalized[2] }
+      : isNodeArray(normalized)
+        && normalized[0] === 'Power'
+        && normalized.length === 3
+        && normalized[2] === -1
+          ? { numerator: 1 as unknown, denominator: normalized[1] }
+          : null;
+  if (!quotient) {
     return null;
   }
 
-  const profile = buildSquareRootConjugateProfile(normalized[2], variable);
-  if (!profile || profile.radicalCount !== 1) {
+  const rationalized = buildRationalizedSquareRootQuotient(
+    quotient.numerator,
+    quotient.denominator,
+    variable,
+  );
+  if (!rationalized) {
     return null;
   }
-
-  const rationalizedNode = normalizeAst(['Divide',
-    buildProductNode(normalized[1], profile.conjugateNode),
-    profile.denominatorProductNode,
-  ]);
 
   const constraints: SolveDomainConstraint[] = [{
     kind: 'nonzero',
-    expressionLatex: boxLatex(profile.denominatorNode),
+    expressionLatex: boxLatex(quotient.denominator),
   }];
 
   return {
-    equationLatex: boxLatex(rationalizedNode),
-    domainConstraints: mergeConstraints(constraints, profile.conditionConstraints),
+    equationLatex: boxLatex(rationalized.node),
+    domainConstraints: mergeConstraints(constraints, rationalized.conditionConstraints),
     solveBadges: ['Conjugate Transform'],
-    solveSummaryText: 'Applied a conjugate to remove a square-root denominator',
+    solveSummaryText: rationalized.usedResidualCleanup
+      ? 'Applied bounded conjugates to remove the supported square-root denominator'
+      : 'Applied a conjugate to remove a square-root denominator',
     unresolvedError: 'This recognized radical conjugate family is outside the current exact bounded solve set. Use Numeric Solve with an interval in Equation mode.',
     radicalStepCost: 1,
   };
+}
+
+function extractReciprocalTargetNode(node: unknown): unknown | null {
+  const normalized = normalizeAst(node);
+  if (isNodeArray(normalized) && normalized[0] === 'Divide' && normalized.length === 3 && normalized[1] === 1) {
+    return normalized[2];
+  }
+
+  if (isNodeArray(normalized) && normalized[0] === 'Power' && normalized.length === 3 && normalized[2] === -1) {
+    return normalized[1];
+  }
+
+  const scalar = readExactScalar(normalized);
+  if (!scalar || scalar.numerator === 0) {
+    return null;
+  }
+
+  return buildScalarNode({
+    numerator: scalar.denominator,
+    denominator: scalar.numerator,
+  });
+}
+
+function matchThreeTermReciprocalEqualityTransform(request: GuardedSolveRequest): AlgebraTransform | null {
+  const parsed = ce.parse(request.resolvedLatex).json;
+  if (!isNodeArray(parsed) || parsed[0] !== 'Equal' || parsed.length !== 3) {
+    return null;
+  }
+
+  const leftNode = normalizeAst(parsed[1]);
+  const rightNode = normalizeAst(parsed[2]);
+  const variable = getSolveVariable(leftNode, rightNode);
+  const attempts: Array<{ reciprocalSide: unknown; otherSide: unknown }> = [
+    { reciprocalSide: leftNode, otherSide: rightNode },
+    { reciprocalSide: rightNode, otherSide: leftNode },
+  ];
+
+  for (const attempt of attempts) {
+    const reciprocalDenominator = extractReciprocalTargetNode(attempt.reciprocalSide);
+    if (!reciprocalDenominator) {
+      continue;
+    }
+
+    const profile = buildSquareRootConjugateProfile(reciprocalDenominator, variable);
+    if (!profile || profile.familyId !== 'three-term-scalar-double-radical') {
+      continue;
+    }
+
+    const reciprocalTarget = extractReciprocalTargetNode(attempt.otherSide);
+    if (!reciprocalTarget || !isSupportedRightSideExpression(reciprocalTarget, variable)) {
+      continue;
+    }
+
+    const equationLatex = `${boxLatex(reciprocalDenominator)}=${boxLatex(reciprocalTarget)}`;
+    if (equationStateKey(equationLatex) === equationStateKey(request.resolvedLatex)) {
+      continue;
+    }
+
+    return {
+      equationLatex,
+      domainConstraints: mergeConstraints([{
+        kind: 'nonzero',
+        expressionLatex: boxLatex(reciprocalDenominator),
+      }], profile.conditionConstraints),
+      solveBadges: ['LCD Clear'],
+      solveSummaryText: 'Cleared a bounded reciprocal equality into a supported denominator equation',
+      unresolvedError: 'This recognized radical conjugate family is outside the current exact bounded solve set. Use Numeric Solve with an interval in Equation mode.',
+    };
+  }
+
+  return null;
 }
 
 function isSupportedClearableDenominator(node: unknown, variable: string) {
@@ -1484,6 +1566,49 @@ function tryCrossMultiplySingleFractionEquation(equationLatex: string, variable:
   }
 
   return null;
+}
+
+function equationContainsDivision(node: unknown): boolean {
+  if (!isNodeArray(node) || node.length === 0) {
+    return false;
+  }
+
+  if (node[0] === 'Divide') {
+    return true;
+  }
+
+  return node.slice(1).some((child) => equationContainsDivision(child));
+}
+
+function canUseBoundedConjugateEquation(
+  equationLatex: string,
+  request: GuardedSolveRequest,
+  variable: string,
+  currentTargetCount: number,
+) {
+  const transformedParsed = ce.parse(equationLatex).json;
+  if (!isNodeArray(transformedParsed) || transformedParsed[0] !== 'Equal' || transformedParsed.length !== 3) {
+    return false;
+  }
+
+  if (isRecognizedPolynomialSink(transformedParsed, request.polynomialCarrierHints)) {
+    return true;
+  }
+
+  const nextLeftNode = normalizeAst(transformedParsed[1]);
+  const nextRightNode = normalizeAst(transformedParsed[2]);
+  const nextTargetCount = countEquationRadicalTargets(nextLeftNode, nextRightNode, variable);
+
+  if (
+    !equationContainsDivision(nextLeftNode)
+    && !equationContainsDivision(nextRightNode)
+    && nextTargetCount > 0
+    && nextTargetCount <= currentTargetCount
+  ) {
+    return true;
+  }
+
+  return nextTargetCount > 0 && nextTargetCount < currentTargetCount;
 }
 
 function matchBoundedAbsoluteValueTransform(request: GuardedSolveRequest): AlgebraTransform | null {
@@ -1539,8 +1664,14 @@ function matchConjugateTransform(request: GuardedSolveRequest): AlgebraTransform
   const leftNode = normalizeAst(parsed[1]);
   const rightNode = normalizeAst(parsed[2]);
   const variable = getSolveVariable(leftNode, rightNode);
+  const currentTargetCount = countEquationRadicalTargets(leftNode, rightNode, variable);
 
-  const leftTransform = tryRationalizeSquareRootBinomialSide(leftNode, variable);
+  const reciprocalEqualityTransform = matchThreeTermReciprocalEqualityTransform(request);
+  if (reciprocalEqualityTransform) {
+    return reciprocalEqualityTransform;
+  }
+
+  const leftTransform = tryRationalizeSquareRootDenominatorSide(leftNode, variable);
   if (leftTransform) {
     const equationLatex = `${leftTransform.equationLatex}=${boxLatex(rightNode)}`;
     const cleared = tryCrossMultiplySingleFractionEquation(equationLatex, variable);
@@ -1551,7 +1682,10 @@ function matchConjugateTransform(request: GuardedSolveRequest): AlgebraTransform
         radicalStepCost: leftTransform.radicalStepCost,
       };
     }
-    if (equationStateKey(equationLatex) !== equationStateKey(request.resolvedLatex)) {
+    if (
+      equationStateKey(equationLatex) !== equationStateKey(request.resolvedLatex)
+      && canUseBoundedConjugateEquation(equationLatex, request, variable, currentTargetCount)
+    ) {
       return {
         ...leftTransform,
         equationLatex,
@@ -1559,7 +1693,7 @@ function matchConjugateTransform(request: GuardedSolveRequest): AlgebraTransform
     }
   }
 
-  const rightTransform = tryRationalizeSquareRootBinomialSide(rightNode, variable);
+  const rightTransform = tryRationalizeSquareRootDenominatorSide(rightNode, variable);
   if (rightTransform) {
     const equationLatex = `${boxLatex(leftNode)}=${rightTransform.equationLatex}`;
     const cleared = tryCrossMultiplySingleFractionEquation(equationLatex, variable);
@@ -1570,7 +1704,10 @@ function matchConjugateTransform(request: GuardedSolveRequest): AlgebraTransform
         radicalStepCost: rightTransform.radicalStepCost,
       };
     }
-    if (equationStateKey(equationLatex) !== equationStateKey(request.resolvedLatex)) {
+    if (
+      equationStateKey(equationLatex) !== equationStateKey(request.resolvedLatex)
+      && canUseBoundedConjugateEquation(equationLatex, request, variable, currentTargetCount)
+    ) {
       return {
         ...rightTransform,
         equationLatex,

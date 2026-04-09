@@ -11,6 +11,7 @@ import {
   parseInteger,
   parseMonomial,
   recognizePerfectSquareRadicand,
+  type SquareRootConjugateFamilyId,
   type Monomial,
 } from '../radical-core';
 import {
@@ -48,6 +49,23 @@ export type RadicalConjugateTransformResult = {
   normalizedLatex: string;
   conditionConstraints: SolveDomainConstraint[];
   exactSupplementLatex: string[];
+};
+
+export type SquareRootRationalizationResult = {
+  changed: boolean;
+  normalizedNode: unknown;
+  normalizedLatex: string;
+  conditionConstraints: SolveDomainConstraint[];
+  exactSupplementLatex: string[];
+  familyId: SquareRootConjugateFamilyId;
+  usedResidualCleanup: boolean;
+};
+
+export type SquareRootRationalizedQuotient = {
+  node: unknown;
+  conditionConstraints: SolveDomainConstraint[];
+  familyId: SquareRootConjugateFamilyId;
+  usedResidualCleanup: boolean;
 };
 
 function gcd(left: number, right: number): number {
@@ -804,7 +822,45 @@ function tryRationalizeMonomialDenominator(
   };
 }
 
-function tryRationalizeSquareRootBinomial(
+export function buildRationalizedSquareRootQuotient(
+  numerator: unknown,
+  denominator: unknown,
+  variable: string | undefined,
+) : SquareRootRationalizedQuotient | null {
+  const profile = buildSquareRootConjugateProfile(denominator, variable);
+  if (!profile) {
+    return null;
+  }
+
+  let numeratorProduct = buildProductNode([numerator, profile.conjugateNode]);
+  let denominatorNode = profile.denominatorProductNode;
+  let conditionConstraints = profile.conditionConstraints;
+  let usedResidualCleanup = false;
+
+  if (profile.residualCleanupEligible) {
+    const residualProfile = buildSquareRootConjugateProfile(denominatorNode, variable, false);
+    if (!residualProfile) {
+      return null;
+    }
+
+    numeratorProduct = buildProductNode([numeratorProduct, residualProfile.conjugateNode]);
+    denominatorNode = residualProfile.denominatorProductNode;
+    conditionConstraints = mergeConstraints(
+      conditionConstraints,
+      residualProfile.conditionConstraints,
+    );
+    usedResidualCleanup = true;
+  }
+
+  return {
+    node: normalizeDivisionSign(composeQuotient(numeratorProduct, denominatorNode)),
+    conditionConstraints,
+    familyId: profile.familyId,
+    usedResidualCleanup,
+  };
+}
+
+function tryRationalizeSquareRootDenominator(
   numerator: unknown,
   denominator: unknown,
   mode: RadicalNormalizationMode,
@@ -814,17 +870,17 @@ function tryRationalizeSquareRootBinomial(
     return null;
   }
 
-  const profile = buildSquareRootConjugateProfile(denominator, variable);
-  if (!profile) {
+  const rationalized = buildRationalizedSquareRootQuotient(numerator, denominator, variable);
+  if (!rationalized) {
     return null;
   }
 
-  const numeratorProduct = buildProductNode([numerator, profile.conjugateNode]);
-
   return {
-    node: normalizeDivisionSign(composeQuotient(numeratorProduct, profile.denominatorProductNode)),
+    node: rationalized.node,
     rationalized: true,
-    conditionConstraints: profile.conditionConstraints,
+    conditionConstraints: rationalized.conditionConstraints,
+    familyId: rationalized.familyId,
+    usedResidualCleanup: rationalized.usedResidualCleanup,
   };
 }
 
@@ -1057,7 +1113,7 @@ function normalizeNode(
       };
     }
 
-    const binomialRationalized = tryRationalizeSquareRootBinomial(
+    const binomialRationalized = tryRationalizeSquareRootDenominator(
       numeratorResult.node,
       denominatorResult.node,
       mode,
