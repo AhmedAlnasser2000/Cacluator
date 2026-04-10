@@ -19,6 +19,7 @@
 - Post initial launcher/category and top-panel Guide consolidation.
 - Post workflow and memory infrastructure overhaul to Memory V2.
 - Track `R` decomposition sweep is closed and regression-verified.
+- Post first shared algebra-core extraction for transform handling.
 
 ## Stable Architecture Snapshot
 - Desktop-first calculator with Tauri shell and React/TypeScript frontend.
@@ -26,7 +27,10 @@
 - Architecture direction remains kernel-first, but not microkernel-heavy:
   - keep `src/lib/kernel/*` as the single runtime kernel for host ownership, capabilities, budgets, stop policy, and envelope/advisory handling
   - prefer reusable math/algebra cores for bounded family logic such as `polynomial-core`, `radical-core`, and `abs-core`
-  - if piecewise/case handling and transform handling grow further, the next clean extraction shape is shared algebra cores such as `branch-core` / `case-core` and `transform-core`, not multiple per-engine microkernels
+  - `src/lib/algebra/transform-core.ts` is now the shared deterministic transform core behind the public `src/lib/algebra-transform.ts` facade
+  - if piecewise/case handling grows further, the next clean extraction shape is a shared algebra core such as `branch-core`, not multiple per-engine microkernels
+  - `transform-core` owns deterministic transform eligibility, exact transform application, preserved-constraint inputs, normalized output comparison, and sink-prediction hints
+  - `branch-core` should own bounded branch generation, branch constraints, and branch metadata for abs/principal-range/periodic-style families; it should not grow into a full inequality or general piecewise engine
   - an additional thin algebra registry may become worthwhile later if orchestration gets too branchy, but only after real shared-family pressure appears
 - Mode separation is intentional:
   - `Calculate` for general scalar/expression evaluation
@@ -44,6 +48,18 @@
 - Extracted `src/app/*`, `src/styles/app/*`, and decomposition facades under solver/guide/types are in-tree and passing regression.
 
 ## Most Recent Completed Milestone
+- Completed `ARCH6A` as the transform-core extraction without behavior change milestone:
+  - added `src/lib/algebra/transform-core.ts` as the shared internal deterministic transform substrate for action descriptors, source-eligibility checks, exact transform application, preserved supplement inputs, normalized output comparison, and equation-vs-expression transform routing
+  - turned `src/lib/algebra-transform.ts` into a thin public compatibility facade so existing mode, UI, and runtime consumers still import the same public transform entrypoints and types while the core logic now lives behind the new internal boundary
+  - centralized duplicated transform mechanics such as expression/equation parsing, materially-changed checks, per-side equation application, and transform action ordering without widening the visible transform set or changing badge/summary behavior
+  - added focused parity coverage in `src/lib/algebra/transform-core.test.ts` and preserved existing transform/mode/UI regression coverage through the unchanged facade
+  - primary_agent: `codex`
+  - primary_agent_model: `gpt-5.4`
+- Regression checks:
+  - `npm run test:unit -- src/lib/algebra/transform-core.test.ts src/lib/algebra-transform.test.ts src/lib/modes/calculate.test.ts src/lib/modes/equation.test.ts`
+  - `npm run test:ui -- src/AppMain.ui.test.tsx`
+  - `npm run lint -- src/lib/algebra/transform-core.ts src/lib/algebra/transform-core.test.ts src/lib/algebra-transform.ts src/lib/algebra-transform.test.ts src/lib/modes/calculate.ts src/lib/modes/equation.ts src/AppMain.tsx src/app/logic/runtimeControllers.ts`
+  - `npm run test:gate`
 - Completed `ABS2` as the broader bounded absolute-value families and branch-aware numeric-guidance milestone:
   - extended `src/lib/abs-core.ts` and `src/types/calculator/abs-types.ts` so the shared abs substrate now recognizes affine-wrapped direct families such as `a|u|+b=c`, `a|u|+b=v`, `a|u|+b=|v|`, plus deterministic equivalent readbacks like `|u|/a=v`
   - rewired `src/lib/equation/guarded/algebra-stage.ts` so direct input and transform-produced perfect-square follow-ons now reuse the same broader wrapped-abs normalization path instead of stopping at the old direct-top-level abs surface
@@ -521,21 +537,31 @@
 
 ## Next Recommended Task
 - The `PRL1`-`PRL4` stack, `COMP1`-`COMP10`, `POLY1`-`POLY2`, `RAD1`-`RAD2`, `POLY-RAD1`-`POLY-RAD6`, and `ABS1`-`ABS2` are now shipped.
-- `ARCH1` through `ARCH5` plus the agent-governance protocol pass are now in place:
+- `ARCH1` through `ARCH6A` plus the agent-governance protocol pass are now in place:
   - Equation and Calculate have shared hosts, envelopes, stop policies, and default execution budgets
   - durable memory ownership and handoff rules are now enforced in-repo
+  - transform handling now has a shared internal core behind the stable public facade
   - further architecture work is no longer the blocker for the algebra lane
 - Next preferred decision:
-  1. choose whether the next algebra milestone should stay in the abs lane as `ABS3` or return to the composition lane
-  2. keep the abs lane branch-model-stable instead of widening into nested abs, inequalities, or general piecewise search
-  3. keep architecture paused unless a concrete reuse bottleneck appears in case handling or transform routing
-  4. if architecture work does resume, prefer shared algebra-core extraction (`branch-core` / `case-core`, then `transform-core`) over adding multiple microkernels
+  1. choose whether to keep architecture paused now that `transform-core` is extracted, or take a second algebra-core pass for `branch-core`
+  2. if product work resumes first, choose whether the next algebra milestone should stay in the abs lane as `ABS3` or return to the composition lane
+  3. keep the abs lane branch-model-stable instead of widening into nested abs, inequalities, or general piecewise search
+  4. if architecture work does resume, keep it shared-core-first rather than adding multiple microkernels
 - Reason:
-  - `ABS2` broadened the same shared abs substrate to affine-wrapped direct families and stronger branch-aware numeric guidance without adding search depth or reopening architecture
-  - the repo now has a cleaner base for either one more bounded abs-breadth pass or a deliberate return to the composition lane
-  - the architecture discussion is now more specific too: the repo should continue with one runtime kernel plus reusable algebra cores, not drift into per-engine microkernels unless there is a later real plugin/runtime need
+  - `ARCH6A` removed duplicated transform routing mechanics without changing product behavior, so the next architecture question is no longer whether `transform-core` should exist but whether a second extraction is actually worth taking now
+  - `ABS2` already broadened the abs lane cleanly, so the repo now has a stable base for either one more bounded abs-breadth pass or a deliberate return to the composition lane
+  - the architecture direction is now more concrete too: one runtime kernel plus reusable algebra cores, not per-engine microkernels unless a later real plugin/runtime need appears
 
 ## Recent Verified Context
+- `ARCH6A` is now verified:
+  - `src/lib/algebra/transform-core.ts` now owns deterministic transform descriptors, labels, eligibility checks, exact application, preserved supplement inputs, and normalized comparison for both expression-side and equation-structural transforms
+  - `src/lib/algebra-transform.ts` is now a thin stable facade that preserves the existing public transform APIs and consumer import paths
+  - focused parity coverage in `src/lib/algebra/transform-core.test.ts` confirms stable action ordering, labels, and representative transform outputs while the existing transform/mode/UI suite continues to verify no behavior change at the public surface
+  - verified with:
+    - `npm run test:unit -- src/lib/algebra/transform-core.test.ts src/lib/algebra-transform.test.ts src/lib/modes/calculate.test.ts src/lib/modes/equation.test.ts`
+    - `npm run test:ui -- src/AppMain.ui.test.tsx`
+    - `npm run lint -- src/lib/algebra/transform-core.ts src/lib/algebra/transform-core.test.ts src/lib/algebra-transform.ts src/lib/algebra-transform.test.ts src/lib/modes/calculate.ts src/lib/modes/equation.ts src/AppMain.tsx src/app/logic/runtimeControllers.ts`
+    - `npm run test:gate`
 - `ABS2` is now verified:
   - `src/lib/abs-core.ts` now recognizes affine-wrapped direct abs families and preserves exact outer scalar coefficients/offsets so the shared abs core can normalize `a|u|+b=c`, `a|u|+b=v`, and `a|u|+b=|v|` without opening a broader case engine
   - `src/lib/equation/guarded/algebra-stage.ts` now reuses that broader normalization for both direct user input and transform-produced wrapped perfect-square follow-ons, including cases that previously stopped before the shared abs bridge could close

@@ -35,6 +35,7 @@
   - the agent/model that recorded the memory
   - the agent/model that verified the gate
 - Commit metadata belongs in session `commit-log.md` and other commit-recording artifacts only when a commit actually exists.
+- When a commit is being made, update session commit metadata in that same checkpoint whenever possible; avoid a second metadata-only commit unless recovery is unavoidable.
 - `CLAUDE.md` and `GEMINI.md` are compatibility stubs only; `AGENTS.md` remains authoritative.
 
 ## Temporary Task Tracking

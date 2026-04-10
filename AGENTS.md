@@ -40,6 +40,7 @@
 - Default workflow is commit-first, not worktree-first.
 - Commit after each meaningful verified gate instead of after every tiny edit.
 - Keep explicit user approval before `git commit` and `git push`.
+- When a task is being committed, update session commit metadata as part of that same checkpoint whenever possible; do not create a second metadata-only commit just to record the hash unless recovery is unavoidable.
 - Use `.task_tmp/<task-id>/` for multi-step or UI-heavy tasks that need gate notes, verification logs, or recovery artifacts.
 - Label gates as `ui` or `backend` and record verification evidence before considering them complete.
 - Worktrees or extra branches are exceptions for parallel isolation, risky rewrites, or recovery scenarios; they are not the default model for this repo.

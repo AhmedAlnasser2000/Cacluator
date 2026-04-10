@@ -58,6 +58,7 @@
 - `.memory/sessions/<task-id>/commit-log.md`
   - include an `## Attribution` block at the top
   - require `committed_by_agent` and `committed_by_agent_model` only when a commit is actually recorded
+  - when a commit is planned, update commit metadata in the same checkpoint whenever possible instead of making a follow-up metadata-only commit
 - `.memory/approvals.md`
   - is reserved for governance-level approvals, workflow-policy approvals, and major roadmap-sequencing approvals
   - do not use it for every routine feature task
@@ -99,6 +100,7 @@
 - `.memory/sessions/<task-id>/` should be updated at meaningful task or gate completion points.
 - Every meaningful task or verified gate must carry attribution metadata in the updated durable-memory artifacts.
 - Every cross-agent handoff must be recorded in the active session dossier before the next agent continues the task.
+- When a task is committed, prefer recording `commit_hash` and commit-log details as part of that same commit flow; do not split those updates into a second commit unless a recovery situation forces it.
 - Checkpoints under `docs/checkpoints/` should be updated only for major milestones, architecture shifts, or workflow overhauls.
 - Before starting a new roadmap track, add a user-facing manual verification checklist for the just-finished track.
   - Store it under `.memory/research/` or the active session folder.
