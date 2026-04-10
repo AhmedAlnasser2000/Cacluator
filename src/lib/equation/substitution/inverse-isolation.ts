@@ -1,6 +1,7 @@
 import {
   exponentialDomainError,
 } from '../domain-guards';
+import { createBranchSet } from '../../algebra/branch-core';
 import type {
   InverseCarrier,
   SubstitutionSolveResult,
@@ -207,19 +208,24 @@ function matchInverseIsolation(equationAst: unknown): SubstitutionSolveResult {
   if (next.error) {
     return { kind: 'blocked', error: next.error };
   }
+  const branchSet = createBranchSet({
+    equations: [next.nextEquationLatex],
+    constraints: linearCarrier.carrier.kind === 'ln' || linearCarrier.carrier.kind === 'log'
+      ? [{ kind: 'positive', expressionLatex: linearCarrier.carrier.innerLatex }]
+      : undefined,
+    provenance: 'substitution-inverse-isolation',
+  });
 
   return {
     kind: 'branches',
-    equations: [next.nextEquationLatex],
+    equations: branchSet.equations,
     solveBadges: ['Inverse Isolation', 'Candidate Checked'],
     solveSummaryText: `Inverted ${toInlineSummaryMath(linearCarrier.carrier.carrierLatex)} into ${toInlineSummaryMath(next.nextEquationLatex)}`,
-    domainConstraints: linearCarrier.carrier.kind === 'ln' || linearCarrier.carrier.kind === 'log'
-      ? [{ kind: 'positive', expressionLatex: linearCarrier.carrier.innerLatex }]
-      : undefined,
+    domainConstraints: branchSet.constraints,
     diagnostics: {
       family: 'inverse-isolation',
       carrierKind: linearCarrier.carrier.kind,
-      branchCount: 1,
+      branchCount: branchSet.equations.length,
       filteredBranchCount: 0,
     },
   };

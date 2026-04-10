@@ -3,6 +3,7 @@ import type {
   LogCallMatch,
   SubstitutionSolveResult,
 } from './types';
+import { createBranchSet } from '../../algebra/branch-core';
 import {
   EPSILON,
   boxLatex,
@@ -413,18 +414,23 @@ function trySameBaseAggregateSolve(
 
   if (singleTarget.kind === 'single' && sameLogBase(aggregate.left, singleTarget.call)) {
     const nextEquationLatex = `${aggregate.argumentLatex}=${singleTarget.call.innerLatex}`;
+    const branchSet = createBranchSet({
+      equations: [nextEquationLatex],
+      constraints: mergeDomainConstraints([aggregate.left, aggregate.right, singleTarget.call]),
+      provenance: 'substitution-log-combine',
+    });
     return {
       kind: 'branches',
-      equations: [nextEquationLatex],
+      equations: branchSet.equations,
       solveBadges: usesExplicitBase
         ? ['Symbolic Substitution', solveBadge, 'Same-Base Equality', 'Log Base Normalize', 'Candidate Checked']
         : ['Symbolic Substitution', solveBadge, 'Same-Base Equality', 'Candidate Checked'],
       solveSummaryText: `Combined ${toInlineSummaryMath(aggregate.carrierLatex)} into ${toInlineSummaryMath(nextEquationLatex)}`,
-      domainConstraints: mergeDomainConstraints([aggregate.left, aggregate.right, singleTarget.call]),
+      domainConstraints: branchSet.constraints,
       diagnostics: {
         family: aggregate.relation === 'product' ? 'log-same-base' : 'log-quotient',
         carrierKind: aggregate.left.kind,
-        branchCount: 1,
+        branchCount: branchSet.equations.length,
         filteredBranchCount: 0,
       },
     };
@@ -433,18 +439,23 @@ function trySameBaseAggregateSolve(
   if (numericTarget !== undefined) {
     const targetLatex = sameBaseTargetLatex(aggregate.left, formatBranchValue(numericTarget));
     const nextEquationLatex = `${aggregate.argumentLatex}=${targetLatex}`;
+    const branchSet = createBranchSet({
+      equations: [nextEquationLatex],
+      constraints: mergeDomainConstraints([aggregate.left, aggregate.right]),
+      provenance: 'substitution-log-combine',
+    });
     return {
       kind: 'branches',
-      equations: [nextEquationLatex],
+      equations: branchSet.equations,
       solveBadges: usesExplicitBase
         ? ['Symbolic Substitution', solveBadge, 'Log Base Normalize', 'Candidate Checked']
         : ['Symbolic Substitution', solveBadge, 'Candidate Checked'],
       solveSummaryText: `Combined ${toInlineSummaryMath(aggregate.carrierLatex)} into ${toInlineSummaryMath(nextEquationLatex)}`,
-      domainConstraints: mergeDomainConstraints([aggregate.left, aggregate.right]),
+      domainConstraints: branchSet.constraints,
       diagnostics: {
         family: aggregate.relation === 'product' ? 'log-same-base' : 'log-quotient',
         carrierKind: aggregate.left.kind,
-        branchCount: 1,
+        branchCount: branchSet.equations.length,
         filteredBranchCount: 0,
       },
     };
@@ -502,16 +513,21 @@ function tryMixedBaseExactSolve(equationAst: unknown): SubstitutionSolveResult {
           ? naturalLatex
           : `${formatBranchValue(logTerm.coefficient)}\\left(${naturalLatex}\\right)`;
       }).join('+')}=${formatBranchValue(constant)}`;
+      const branchSet = createBranchSet({
+        equations: [normalizedEquationLatex],
+        constraints: mergeDomainConstraints(terms.map((term) => term.call)),
+        provenance: 'substitution-log-combine',
+      });
       return {
         kind: 'branches',
-        equations: [normalizedEquationLatex],
+        equations: branchSet.equations,
         solveBadges: ['Symbolic Substitution', 'Log Base Normalize', 'Candidate Checked'],
         solveSummaryText: `Normalized mixed-base logs via change-of-base: ${toInlineSummaryMath(normalizedEquationLatex)}`,
-        domainConstraints: mergeDomainConstraints(terms.map((term) => term.call)),
+        domainConstraints: branchSet.constraints,
         diagnostics: {
           family: 'log-mixed-base',
           carrierKind: 'log',
-          branchCount: 1,
+          branchCount: branchSet.equations.length,
           filteredBranchCount: 0,
         },
       };
@@ -526,17 +542,22 @@ function tryMixedBaseExactSolve(equationAst: unknown): SubstitutionSolveResult {
   const isolatedValue = constant / rationalToNumber(totalCoefficient);
   const isolatedValueLatex = formatBranchValue(isolatedValue);
   const nextEquationLatex = singleLogEquationLatex(anchor, isolatedValueLatex);
+  const branchSet = createBranchSet({
+    equations: [nextEquationLatex],
+    constraints: mergeDomainConstraints(terms.map((term) => term.call)),
+    provenance: 'substitution-log-combine',
+  });
 
   return {
     kind: 'branches',
-    equations: [nextEquationLatex],
+    equations: branchSet.equations,
     solveBadges: ['Symbolic Substitution', 'Log Base Normalize', 'Candidate Checked'],
     solveSummaryText: `Normalized mixed-base logs into ${toInlineSummaryMath(nextEquationLatex)}`,
-    domainConstraints: mergeDomainConstraints(terms.map((term) => term.call)),
+    domainConstraints: branchSet.constraints,
     diagnostics: {
       family: 'log-mixed-base-rational',
       carrierKind: 'log',
-      branchCount: 1,
+      branchCount: branchSet.equations.length,
       filteredBranchCount: 0,
     },
   };
@@ -557,16 +578,21 @@ function tryRecognizedMixedBaseGuidance(
   }
 
   const normalizedEquationLatex = `${logCallToNaturalTermLatex(aggregate.left)}${aggregate.relation === 'product' ? '+' : '-'}${logCallToNaturalTermLatex(aggregate.right)}=${formatBranchValue(numericTarget)}`;
+  const branchSet = createBranchSet({
+    equations: [normalizedEquationLatex],
+    constraints: mergeDomainConstraints([aggregate.left, aggregate.right]),
+    provenance: 'substitution-log-combine',
+  });
   return {
     kind: 'branches',
-    equations: [normalizedEquationLatex],
+    equations: branchSet.equations,
     solveBadges: ['Symbolic Substitution', 'Log Base Normalize', 'Candidate Checked'],
     solveSummaryText: `Normalized mixed-base logs via change-of-base: ${toInlineSummaryMath(normalizedEquationLatex)}`,
-    domainConstraints: mergeDomainConstraints([aggregate.left, aggregate.right]),
+    domainConstraints: branchSet.constraints,
     diagnostics: {
       family: 'log-mixed-base',
       carrierKind: 'log',
-      branchCount: 1,
+      branchCount: branchSet.equations.length,
       filteredBranchCount: 0,
     },
   };

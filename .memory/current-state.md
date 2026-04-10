@@ -19,7 +19,7 @@
 - Post initial launcher/category and top-panel Guide consolidation.
 - Post workflow and memory infrastructure overhaul to Memory V2.
 - Track `R` decomposition sweep is closed and regression-verified.
-- Post first shared algebra-core extraction for transform handling.
+- Post second shared algebra-core extraction for transform and branch handling.
 
 ## Stable Architecture Snapshot
 - Desktop-first calculator with Tauri shell and React/TypeScript frontend.
@@ -28,9 +28,9 @@
   - keep `src/lib/kernel/*` as the single runtime kernel for host ownership, capabilities, budgets, stop policy, and envelope/advisory handling
   - prefer reusable math/algebra cores for bounded family logic such as `polynomial-core`, `radical-core`, and `abs-core`
   - `src/lib/algebra/transform-core.ts` is now the shared deterministic transform core behind the public `src/lib/algebra-transform.ts` facade
-  - if piecewise/case handling grows further, the next clean extraction shape is a shared algebra core such as `branch-core`, not multiple per-engine microkernels
+  - `src/lib/algebra/branch-core.ts` is now the shared bounded branch/case bookkeeping core behind abs, periodic/principal-range, trig rewrite, and substitution adapters
   - `transform-core` owns deterministic transform eligibility, exact transform application, preserved-constraint inputs, normalized output comparison, and sink-prediction hints
-  - `branch-core` should own bounded branch generation, branch constraints, and branch metadata for abs/principal-range/periodic-style families; it should not grow into a full inequality or general piecewise engine
+  - `branch-core` owns bounded branch-set normalization, branch constraints, and branch metadata for abs/principal-range/periodic-style families; it should not grow into a full inequality or general piecewise engine
   - an additional thin algebra registry may become worthwhile later if orchestration gets too branchy, but only after real shared-family pressure appears
 - Mode separation is intentional:
   - `Calculate` for general scalar/expression evaluation
@@ -48,6 +48,17 @@
 - Extracted `src/app/*`, `src/styles/app/*`, and decomposition facades under solver/guide/types are in-tree and passing regression.
 
 ## Most Recent Completed Milestone
+- Completed `ARCH6B` as the branch-core extraction without behavior change milestone:
+  - added `src/lib/algebra/branch-core.ts` as the shared internal bounded branch/case bookkeeping substrate for normalized branch sets, branch-local constraints, branch-pair adapters, and periodic/principal-range metadata merge behavior
+  - rewired `src/lib/abs-core.ts`, `src/lib/equation/composition-stage.ts`, and `src/lib/equation/guarded/merge.ts` so abs-family branch arrays and periodic-family metadata now reuse one internal source of truth instead of stage-local dedupe and merge helpers
+  - rewired the lighter branch-array lanes in trig rewrite and substitution (`src/lib/trigonometry/rewrite/*`, `src/lib/equation/substitution/*`, and guarded consumers) so simple split families now normalize through the same internal branch-set helpers while keeping their public result unions and UI behavior unchanged
+  - added focused parity coverage in `src/lib/algebra/branch-core.test.ts` and preserved existing abs, periodic, trig rewrite, substitution, Equation, and UI behavior through unchanged public types and facades
+  - primary_agent: `codex`
+  - primary_agent_model: `gpt-5.4`
+- Regression checks:
+  - `npm run test:unit -- src/lib/algebra/branch-core.test.ts src/lib/abs-core.test.ts src/lib/trigonometry/rewrite-solve.test.ts src/lib/equation/shared-solve.test.ts src/lib/equation/guarded-solve.test.ts src/lib/modes/equation.test.ts`
+  - `npm run lint -- src/lib/algebra/branch-core.ts src/lib/algebra/branch-core.test.ts src/lib/abs-core.ts src/lib/equation/guarded/merge.ts src/lib/equation/composition-stage.ts src/lib/equation/guarded/rewrite-trig-stage.ts src/lib/equation/guarded/substitution-stage.ts src/lib/equation/guarded/algebra-stage.ts src/lib/trigonometry/rewrite/square-split.ts src/lib/trigonometry/rewrite/sum-product.ts src/lib/equation/substitution/trig-polynomial.ts src/lib/equation/substitution/inverse-isolation.ts src/lib/equation/substitution/log-combine.ts src/lib/equation/substitution/exp-polynomial.ts src/lib/equation/substitution/same-base-equality.ts`
+  - `npm run test:gate`
 - Completed `ARCH6A` as the transform-core extraction without behavior change milestone:
   - added `src/lib/algebra/transform-core.ts` as the shared internal deterministic transform substrate for action descriptors, source-eligibility checks, exact transform application, preserved supplement inputs, normalized output comparison, and equation-vs-expression transform routing
   - turned `src/lib/algebra-transform.ts` into a thin public compatibility facade so existing mode, UI, and runtime consumers still import the same public transform entrypoints and types while the core logic now lives behind the new internal boundary
@@ -537,22 +548,31 @@
 
 ## Next Recommended Task
 - The `PRL1`-`PRL4` stack, `COMP1`-`COMP10`, `POLY1`-`POLY2`, `RAD1`-`RAD2`, `POLY-RAD1`-`POLY-RAD6`, and `ABS1`-`ABS2` are now shipped.
-- `ARCH1` through `ARCH6A` plus the agent-governance protocol pass are now in place:
+- `ARCH1` through `ARCH6B` plus the agent-governance protocol pass are now in place:
   - Equation and Calculate have shared hosts, envelopes, stop policies, and default execution budgets
   - durable memory ownership and handoff rules are now enforced in-repo
-  - transform handling now has a shared internal core behind the stable public facade
+  - transform handling and bounded branch handling now have shared internal cores behind stable public surfaces
   - further architecture work is no longer the blocker for the algebra lane
 - Next preferred decision:
-  1. choose whether to keep architecture paused now that `transform-core` is extracted, or take a second algebra-core pass for `branch-core`
+  1. choose whether to pause architecture again now that both `transform-core` and `branch-core` are extracted
   2. if product work resumes first, choose whether the next algebra milestone should stay in the abs lane as `ABS3` or return to the composition lane
   3. keep the abs lane branch-model-stable instead of widening into nested abs, inequalities, or general piecewise search
-  4. if architecture work does resume, keep it shared-core-first rather than adding multiple microkernels
+  4. if architecture work resumes later, prefer a thin algebra registry only if shared-core orchestration pressure becomes real
 - Reason:
-  - `ARCH6A` removed duplicated transform routing mechanics without changing product behavior, so the next architecture question is no longer whether `transform-core` should exist but whether a second extraction is actually worth taking now
+  - `ARCH6B` removed duplicated branch-array and periodic/principal-range merge plumbing without changing product behavior, so the next architecture question is whether shared-core extraction should pause until another concrete reuse bottleneck appears
   - `ABS2` already broadened the abs lane cleanly, so the repo now has a stable base for either one more bounded abs-breadth pass or a deliberate return to the composition lane
   - the architecture direction is now more concrete too: one runtime kernel plus reusable algebra cores, not per-engine microkernels unless a later real plugin/runtime need appears
 
 ## Recent Verified Context
+- `ARCH6B` is now verified:
+  - `src/lib/algebra/branch-core.ts` now owns normalized branch-set descriptors, branch-constraint merging, branch-pair adapters, and periodic/principal-range metadata merge helpers for the Equation/abs/rewrite/substitution lane
+  - `src/lib/abs-core.ts`, `src/lib/equation/composition-stage.ts`, and `src/lib/equation/guarded/merge.ts` now reuse that core for branch arrays and periodic-family metadata instead of carrying local dedupe/merge logic
+  - lighter branch-array producers and consumers in trig rewrite, substitution, and guarded recursion now normalize through the same core while keeping public unions, badges, supplements, and UI behavior unchanged
+  - focused parity coverage in `src/lib/algebra/branch-core.test.ts` confirms stable branch-equation dedupe/order, branch-constraint merge behavior, and periodic metadata adapter parity
+  - verified with:
+    - `npm run test:unit -- src/lib/algebra/branch-core.test.ts src/lib/abs-core.test.ts src/lib/trigonometry/rewrite-solve.test.ts src/lib/equation/shared-solve.test.ts src/lib/equation/guarded-solve.test.ts src/lib/modes/equation.test.ts`
+    - `npm run lint -- src/lib/algebra/branch-core.ts src/lib/algebra/branch-core.test.ts src/lib/abs-core.ts src/lib/equation/guarded/merge.ts src/lib/equation/composition-stage.ts src/lib/equation/guarded/rewrite-trig-stage.ts src/lib/equation/guarded/substitution-stage.ts src/lib/equation/guarded/algebra-stage.ts src/lib/trigonometry/rewrite/square-split.ts src/lib/trigonometry/rewrite/sum-product.ts src/lib/equation/substitution/trig-polynomial.ts src/lib/equation/substitution/inverse-isolation.ts src/lib/equation/substitution/log-combine.ts src/lib/equation/substitution/exp-polynomial.ts src/lib/equation/substitution/same-base-equality.ts`
+    - `npm run test:gate`
 - `ARCH6A` is now verified:
   - `src/lib/algebra/transform-core.ts` now owns deterministic transform descriptors, labels, eligibility checks, exact application, preserved supplement inputs, and normalized comparison for both expression-side and equation-structural transforms
   - `src/lib/algebra-transform.ts` is now a thin stable facade that preserves the existing public transform APIs and consumer import paths

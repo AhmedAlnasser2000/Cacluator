@@ -7,6 +7,7 @@ import {
   buildEquationCandidateRejectionMessage,
   classifyCandidateRejections,
 } from '../candidate-rejection';
+import { createBranchSet } from '../../algebra/branch-core';
 import type {
   DisplayOutcome,
   EquationExecutionBudget,
@@ -118,7 +119,11 @@ function substitutionSolve(
   }
 
   const parentKey = equationStateKey(request.resolvedLatex);
-  const branchEquations = dedupe(substitution.equations).filter(
+  const branchEquations = createBranchSet({
+    equations: substitution.equations,
+    constraints: substitution.domainConstraints,
+    provenance: 'guarded-substitution-stage',
+  }).equations.filter(
     (equationLatex) => equationStateKey(equationLatex) !== parentKey,
   );
 

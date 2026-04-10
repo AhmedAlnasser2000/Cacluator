@@ -10,6 +10,7 @@ import {
   UNSUPPORTED_FAMILY_ERROR,
   errorOutcome,
 } from './outcome';
+import { mergeBranchFamilies } from '../../algebra/branch-core';
 
 function extractExactSolutions(exactLatex?: string) {
   if (!exactLatex) {
@@ -56,60 +57,6 @@ function mergeDetailSections(outcomes: DisplayOutcome[]) {
       .map((section) => JSON.stringify(section)),
   );
   return encoded.map((entry) => JSON.parse(entry));
-}
-
-function mergePeriodicFamilies(families: PeriodicFamilyInfo[]) {
-  if (families.length === 0) {
-    return undefined;
-  }
-
-  const discoveredFamilies = dedupe(
-    families.flatMap((family) => family.discoveredFamilies ?? []),
-  );
-  const carrierLatex = families[0].carrierLatex;
-  const parameterLatex = families[0].parameterLatex;
-  if (families.some((family) => family.carrierLatex !== carrierLatex || family.parameterLatex !== parameterLatex)) {
-    return {
-      ...families[0],
-      discoveredFamilies: discoveredFamilies.length > 0 ? discoveredFamilies : families[0].discoveredFamilies,
-    };
-  }
-
-  const representatives = dedupe(
-    families.flatMap((family) => family.representatives ?? []).map((entry) => JSON.stringify(entry)),
-  ).map((entry) => JSON.parse(entry));
-  const parameterConstraintLatex = dedupe(
-    families.flatMap((family) => family.parameterConstraintLatex ?? []),
-  );
-  const suggestedIntervals = dedupe(
-    families.flatMap((family) => family.suggestedIntervals ?? []).map((entry) => JSON.stringify(entry)),
-  ).map((entry) => JSON.parse(entry));
-  const piecewiseBranches = dedupe(
-    families.flatMap((family) => family.piecewiseBranches ?? []).map((entry) => JSON.stringify(entry)),
-  ).map((entry) => JSON.parse(entry));
-  const principalRangeLatex = dedupe(
-    families.map((family) => family.principalRangeLatex).filter((entry): entry is string => Boolean(entry)),
-  );
-  const reducedCarrierLatex = dedupe(
-    families.map((family) => family.reducedCarrierLatex).filter((entry): entry is string => Boolean(entry)),
-  );
-  const structuredStopReason = dedupe(
-    families.map((family) => family.structuredStopReason).filter((entry): entry is NonNullable<PeriodicFamilyInfo['structuredStopReason']> => Boolean(entry)),
-  );
-
-  return {
-    carrierLatex,
-    parameterLatex,
-    parameterConstraintLatex: parameterConstraintLatex.length > 0 ? parameterConstraintLatex : undefined,
-    branchesLatex: dedupe(families.flatMap((family) => family.branchesLatex)),
-    discoveredFamilies: discoveredFamilies.length > 0 ? discoveredFamilies : undefined,
-    representatives: representatives.length > 0 ? representatives : undefined,
-    suggestedIntervals: suggestedIntervals.length > 0 ? suggestedIntervals : undefined,
-    piecewiseBranches: piecewiseBranches.length > 0 ? piecewiseBranches : undefined,
-    principalRangeLatex: principalRangeLatex.length > 0 ? principalRangeLatex[0] : undefined,
-    reducedCarrierLatex: reducedCarrierLatex.length > 0 ? reducedCarrierLatex[0] : undefined,
-    structuredStopReason: structuredStopReason.length > 0 ? structuredStopReason[0] : undefined,
-  } satisfies PeriodicFamilyInfo;
 }
 
 function mergeDisplayOutcomes(
@@ -159,7 +106,7 @@ function mergeDisplayOutcomes(
   const candidateValues = dedupe(successes.flatMap((outcome) => outcome.candidateValues ?? []));
   const rejectedCandidateCount = successes.reduce((total, outcome) => total + (outcome.rejectedCandidateCount ?? 0), 0);
   const numericMethod = dedupe(successes.map((outcome) => outcome.numericMethod).filter((method): method is string => Boolean(method))).join('; ');
-  const periodicFamily = mergePeriodicFamilies(
+  const periodicFamily = mergeBranchFamilies(
     successes
       .map((outcome) => outcome.periodicFamily)
       .filter((family): family is PeriodicFamilyInfo => Boolean(family)),

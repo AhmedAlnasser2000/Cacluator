@@ -4,6 +4,7 @@ import {
 import {
   exponentialDomainError,
 } from '../domain-guards';
+import { createBranchSet } from '../../algebra/branch-core';
 import type {
   ExpCarrier,
   SubstitutionSolveResult,
@@ -235,18 +236,22 @@ function matchExponentialPolynomialSubstitution(nonZeroSide: unknown): Substitut
   const summaryPolynomial = degree === 2
     ? `${formatBranchValue(coefficients.get(2) ?? 0)}t^2${coefficients.get(1) ? `${(coefficients.get(1) ?? 0) >= 0 ? '+' : ''}${formatBranchValue(coefficients.get(1) ?? 0)}t` : ''}${coefficients.get(0) ? `${(coefficients.get(0) ?? 0) >= 0 ? '+' : ''}${formatBranchValue(coefficients.get(0) ?? 0)}` : ''}=0`
     : `${formatBranchValue(coefficients.get(1) ?? 0)}t${coefficients.get(0) ? `${(coefficients.get(0) ?? 0) >= 0 ? '+' : ''}${formatBranchValue(coefficients.get(0) ?? 0)}` : ''}=0`;
+  const branchSet = createBranchSet({
+    equations,
+    provenance: 'substitution-exp-polynomial',
+  });
 
   return {
     kind: 'branches',
-    equations,
+    equations: branchSet.equations,
     solveBadges: ['Symbolic Substitution', 'Candidate Checked'],
     solveSummaryText: `Substituted t = ${carrierLabel}, solved ${summaryPolynomial}`,
     diagnostics: {
       family: 'exp-polynomial',
       carrierKind: carrier.kind,
       polynomialDegree: degree as 1 | 2,
-      branchCount: equations.length,
-      filteredBranchCount: Math.max(0, uniqueRoots.length - equations.length),
+      branchCount: branchSet.equations.length,
+      filteredBranchCount: Math.max(0, uniqueRoots.length - branchSet.equations.length),
     },
   };
 }

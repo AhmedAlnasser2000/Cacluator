@@ -17,6 +17,7 @@ import {
   type SupportedRadical,
   type SupportedRationalPower,
 } from '../../radical-core';
+import { createBranchSet } from '../../algebra/branch-core';
 import { parseExactPolynomial } from '../../polynomial-core';
 import { recognizeBoundedPolynomialEquationAst } from '../../polynomial-factor-solve';
 import { normalizeAst } from '../../symbolic-engine/normalize';
@@ -958,14 +959,16 @@ function buildLiftedPowerTransform(
     branchNodes.push(buildNegatedNode(solvedMagnitude));
   }
 
-  const branchEquations = dedupe(
-    branchNodes.map((branchNode) => `${boxLatex(power.base)}=${boxLatex(branchNode)}`),
-  );
+  const branchEquations = createBranchSet({
+    equations: branchNodes.map((branchNode) => `${boxLatex(power.base)}=${boxLatex(branchNode)}`),
+    constraints: domainConstraints,
+    provenance: 'guarded-algebra-stage',
+  });
 
   return {
-    equationLatex: branchEquations[0],
-    branchEquations,
-    domainConstraints,
+    equationLatex: branchEquations.equations[0],
+    branchEquations: branchEquations.equations,
+    domainConstraints: branchEquations.constraints ?? domainConstraints,
     solveBadges: ['Power Lift'],
     solveSummaryText: 'Isolated a rational power and applied an exact lift',
     unresolvedError: 'This recognized rational-power family is outside the current exact bounded solve set. Use Numeric Solve with an interval in Equation mode.',
@@ -1685,7 +1688,11 @@ function recurseTransform(
   }
 
   const parentKey = equationStateKey(request.resolvedLatex);
-  const branchEquations = dedupe(transform.branchEquations ?? [transform.equationLatex]).filter(
+  const branchEquations = createBranchSet({
+    equations: transform.branchEquations ?? [transform.equationLatex],
+    constraints: transform.domainConstraints,
+    provenance: 'guarded-algebra-stage',
+  }).equations.filter(
     (equationLatex) => equationStateKey(equationLatex) !== parentKey,
   );
   if (branchEquations.length === 0) {

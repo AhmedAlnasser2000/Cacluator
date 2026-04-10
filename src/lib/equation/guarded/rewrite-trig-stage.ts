@@ -4,6 +4,7 @@ import type {
 } from '../../../types/calculator';
 import { solveTrigEquation } from '../../trigonometry/equations';
 import { matchTrigEquationRewriteForSolve } from '../../trigonometry/rewrite-solve';
+import { branchPairToSet } from '../../algebra/branch-core';
 import {
   errorOutcome,
   successOutcome,
@@ -62,7 +63,12 @@ function rewriteTrigSolve(request: GuardedSolveRequest): DisplayOutcome | null {
   }
 
   if (rewriteMatch.candidate.kind === 'split-sum-product') {
-    const outcomes = rewriteMatch.candidate.branchLatex.map((equationLatex) => {
+    const branchSet = branchPairToSet(
+      rewriteMatch.candidate.branchLatex,
+      undefined,
+      { provenance: 'rewrite-trig-stage' },
+    );
+    const outcomes = branchSet.equations.map((equationLatex) => {
       const trig = solveTrigEquation({
         equationLatex,
         variable: 'x',
@@ -94,7 +100,12 @@ function rewriteTrigSolve(request: GuardedSolveRequest): DisplayOutcome | null {
     );
   }
 
-  const outcomes = rewriteMatch.candidate.branchLatex.map((equationLatex) => {
+  const branchSet = branchPairToSet(
+    rewriteMatch.candidate.branchLatex,
+    undefined,
+    { provenance: 'rewrite-trig-stage' },
+  );
+  const outcomes = branchSet.equations.map((equationLatex) => {
     const trig = solveTrigEquation({
       equationLatex,
       variable: 'x',

@@ -2,6 +2,7 @@ import type {
   InverseCarrier,
   SubstitutionSolveResult,
 } from './types';
+import { createBranchSet } from '../../algebra/branch-core';
 import {
   EPSILON,
   boxLatex,
@@ -149,24 +150,29 @@ function matchSameBaseEquality(equationAst: unknown): SubstitutionSolveResult {
   const usesExplicitLogBase = left.family === 'log'
     && Math.abs(left.baseNumeric - Math.E) >= EPSILON
     && Math.abs(left.baseNumeric - 10) >= EPSILON;
-
-  return {
-    kind: 'branches',
+  const branchSet = createBranchSet({
     equations: [nextEquationLatex],
-    solveBadges: usesExplicitLogBase
-      ? ['Symbolic Substitution', 'Same-Base Equality', 'Log Base Normalize', 'Candidate Checked']
-      : ['Symbolic Substitution', 'Same-Base Equality', 'Candidate Checked'],
-    solveSummaryText: `Reduced same-base equality ${toInlineSummaryMath(left.carrierLatex)}=${toInlineSummaryMath(right.carrierLatex)} into ${toInlineSummaryMath(nextEquationLatex)}`,
-    domainConstraints: left.family === 'log'
+    constraints: left.family === 'log'
       ? [
           { kind: 'positive', expressionLatex: left.innerLatex },
           { kind: 'positive', expressionLatex: right.innerLatex },
         ]
       : undefined,
+    provenance: 'substitution-same-base-equality',
+  });
+
+  return {
+    kind: 'branches',
+    equations: branchSet.equations,
+    solveBadges: usesExplicitLogBase
+      ? ['Symbolic Substitution', 'Same-Base Equality', 'Log Base Normalize', 'Candidate Checked']
+      : ['Symbolic Substitution', 'Same-Base Equality', 'Candidate Checked'],
+    solveSummaryText: `Reduced same-base equality ${toInlineSummaryMath(left.carrierLatex)}=${toInlineSummaryMath(right.carrierLatex)} into ${toInlineSummaryMath(nextEquationLatex)}`,
+    domainConstraints: branchSet.constraints,
     diagnostics: {
       family: 'same-base-equality',
       carrierKind: left.kind,
-      branchCount: 1,
+      branchCount: branchSet.equations.length,
       filteredBranchCount: 0,
     },
   };

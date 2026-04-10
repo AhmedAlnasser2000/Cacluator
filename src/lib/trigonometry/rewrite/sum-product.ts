@@ -3,6 +3,7 @@ import {
   termKey,
 } from '../../symbolic-engine/patterns';
 import { normalizeAst } from '../../symbolic-engine/normalize';
+import { branchSetToPair, createTwoBranchSet } from '../../algebra/branch-core';
 import {
   matchAffineVariableArgument,
   matchTrigCall,
@@ -142,12 +143,22 @@ function matchTrigSumProductRewrite(expressionNode: unknown, rhsNode: unknown): 
             `\\sin\\left(${difference.argumentLatex}\\right)=0`,
           ];
 
+    const branchLatex = branchSetToPair(createTwoBranchSet(
+      firstBranch,
+      secondBranch,
+      undefined,
+      { provenance: 'trig-sum-product' },
+    ));
+    if (!branchLatex) {
+      return { kind: 'none' };
+    }
+
     return {
       kind: 'candidate',
       candidate: {
         kind: 'split-sum-product',
         rewriteKind: 'sum-product-split',
-        branchLatex: [firstBranch, secondBranch],
+        branchLatex,
         normalizedLatex,
         summaryText: 'Normalized a bounded two-term trig sum/difference to product form and split the zero-product branches before solving.',
       },

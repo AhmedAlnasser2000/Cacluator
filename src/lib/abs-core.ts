@@ -16,6 +16,7 @@ import {
   matchSupportedRationalPower,
   recognizePerfectSquareRadicand,
 } from './radical-core';
+import { createTwoBranchSet } from './algebra/branch-core';
 import { parseExactPolynomial } from './polynomial-core';
 import { evaluateLatexAt } from './equation/domain-guards';
 import { normalizeAst } from './symbolic-engine/normalize';
@@ -697,10 +698,14 @@ export function buildAbsoluteValueEquationFamily(
   const effectiveComparison = pureComparisonAbs
     ? buildScaledNode(pureComparisonAbs.base, pureComparisonAbs.coefficient)
     : normalizedComparison;
-  const branchEquations = [...new Set([
+  const branchSet = createTwoBranchSet(
     `${boxLatex(normalizedBase)}=${boxLatex(effectiveComparison)}`,
     `${boxLatex(normalizedBase)}=${boxLatex(negateNode(effectiveComparison))}`,
-  ])];
+    pureComparisonAbs
+      ? []
+      : [buildAbsoluteValueNonnegativeConstraint(normalizedComparison)],
+    { provenance: 'abs-core' },
+  );
 
   return {
     kind,
@@ -712,10 +717,8 @@ export function buildAbsoluteValueEquationFamily(
     },
     comparisonNode: normalizedComparison,
     comparisonTarget: pureComparisonAbs,
-    branchEquations,
-    branchConstraints: pureComparisonAbs
-      ? []
-      : [buildAbsoluteValueNonnegativeConstraint(normalizedComparison)],
+    branchEquations: branchSet.equations,
+    branchConstraints: branchSet.constraints ?? [],
   };
 }
 
