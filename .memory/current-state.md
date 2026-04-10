@@ -20,7 +20,7 @@
 - Post workflow and memory infrastructure overhaul to Memory V2.
 - Track `R` decomposition sweep is closed and regression-verified.
 - Post second shared algebra-core extraction for transform and branch handling.
-- Post `ABS3` broader bounded absolute-value carrier-closure pass.
+- Post `ABS4` outer-polynomial absolute-value closure with trig and composition reuse.
 
 ## Stable Architecture Snapshot
 - Desktop-first calculator with Tauri shell and React/TypeScript frontend.
@@ -49,6 +49,18 @@
 - Extracted `src/app/*`, `src/styles/app/*`, and decomposition facades under solver/guide/types are in-tree and passing regression.
 
 ## Most Recent Completed Milestone
+- Completed `ABS4` as the outer-polynomial absolute-value closure with trig and composition reuse milestone:
+  - kept the shared abs branch model fixed at `u = \pm v` while broadening exact closure to bounded one-placeholder outer-polynomial families `P(|u|)=0` on the existing exact polynomial surface
+  - extended `src/lib/abs-core.ts` so recognized abs equations can now classify direct versus outer-polynomial normalization, solve bounded placeholder roots `t = |u|`, filter them to real nonnegative values, and route accepted roots back through the existing shared abs family path
+  - widened `src/lib/equation/guarded/algebra-stage.ts` so trig and composition-backed abs carriers can reuse already-shipped periodic/composition sinks after the same `u = \pm v` split, while guided periodic/composition branches now keep the overall abs result in an honest unresolved state instead of leaking partial exact closure
+  - strengthened symbolic and numeric guidance so recognized outer-polynomial abs families distinguish polynomial failure, empty admissible branch sets, and branch-sink failures while preserving generated branch equations and periodic/principal-range metadata
+  - kept `Calculate > Simplify` narrow and reused the same shared abs/branch infrastructure without adding new factor behavior, nested abs solving, inequalities, or a new branch lane
+  - primary_agent: `codex`
+  - primary_agent_model: `gpt-5.4`
+- Regression checks:
+  - `npm run test:unit -- src/lib/equation/numeric-interval-solve.test.ts src/lib/equation/shared-solve.test.ts src/lib/modes/equation.test.ts src/lib/abs-core.test.ts`
+  - `npm run lint -- src/lib/abs-core.ts src/lib/abs-core.test.ts src/lib/equation/guarded/algebra-stage.ts src/lib/equation/shared-solve.test.ts src/lib/equation/numeric-interval-solve.test.ts src/lib/modes/equation.test.ts`
+  - `npm run test:gate`
 - Completed `ABS3` as the broader bounded absolute-value carrier-closure milestone:
   - kept the shared abs branch model fixed at `u = \pm v` while broadening exact closure to stronger polynomial, radical, rational-power, and stronger `|u|=|v|` carrier families whenever every generated branch still lands in already-shipped bounded sinks
   - extended `src/lib/abs-core.ts` so stronger unresolved families now identify themselves as stronger absolute-value carrier families in symbolic/numeric guidance instead of reusing the older generic abs-family stop text
@@ -532,6 +544,8 @@
 ## Pending Verification
 - ABS3 manual checklist artifact:
   - `.memory/research/TRACK-ABS3-MANUAL-VERIFICATION-CHECKLIST.md`
+- ABS4 manual checklist artifact:
+  - `.memory/research/TRACK-ABS4-MANUAL-VERIFICATION-CHECKLIST.md`
 - ABS2 manual checklist artifact:
   - `.memory/research/TRACK-ABS2-MANUAL-VERIFICATION-CHECKLIST.md`
 - Optional desktop smoke pass on the current shell wiring for visual parity confidence beyond automated coverage.
@@ -561,7 +575,7 @@
   - `.memory/research/TRACK-PRL4-MANUAL-VERIFICATION-CHECKLIST.md`
 
 ## Next Recommended Task
-- The `PRL1`-`PRL4` stack, `COMP1`-`COMP10`, `POLY1`-`POLY2`, `RAD1`-`RAD2`, `POLY-RAD1`-`POLY-RAD6`, and `ABS1`-`ABS3` are now shipped.
+- The `PRL1`-`PRL4` stack, `COMP1`-`COMP10`, `POLY1`-`POLY2`, `RAD1`-`RAD2`, `POLY-RAD1`-`POLY-RAD6`, and `ABS1`-`ABS4` are now shipped.
 - `ARCH1` through `ARCH6B` plus the agent-governance protocol pass are now in place:
   - Equation and Calculate have shared hosts, envelopes, stop policies, and default execution budgets
   - durable memory ownership and handoff rules are now enforced in-repo
@@ -569,15 +583,27 @@
   - further architecture work is no longer the blocker for the algebra lane
 - Next preferred decision:
   1. choose whether to pause architecture again now that both `transform-core` and `branch-core` are extracted
-  2. if product work resumes first, choose whether the next algebra milestone should stay in the abs lane as `ABS4` or return to the composition lane
+  2. if product work resumes first, choose whether the next algebra milestone should stay in the abs lane as `ABS5` or return to the composition lane
   3. keep the abs lane branch-model-stable instead of widening into nested abs, inequalities, or general piecewise search
   4. if architecture work resumes later, prefer a thin algebra registry only if shared-core orchestration pressure becomes real
 - Reason:
   - `ARCH6B` removed duplicated branch-array and periodic/principal-range merge plumbing without changing product behavior, so the next architecture question is whether shared-core extraction should pause until another concrete reuse bottleneck appears
-  - `ABS3` now gives the abs lane stronger carrier closure on the same bounded branch model, so the next product question is whether one more bounded abs pass is worthwhile or whether the repo should deliberately return to composition
+  - `ABS4` now adds outer-polynomial abs closure plus bounded trig/composition reuse on the same shared branch model, so the next product question is whether one more bounded abs pass is worthwhile or whether the repo should deliberately return to composition
   - the architecture direction is now more concrete too: one runtime kernel plus reusable algebra cores, not per-engine microkernels unless a later real plugin/runtime need appears
 
 ## Recent Verified Context
+- `ABS4` is now verified:
+  - `src/lib/abs-core.ts` now recognizes one-placeholder outer-polynomial abs families `P(|u|)=0`, solves accepted placeholder roots `t = |u|` on the existing bounded exact polynomial surface, and carries richer unresolved metadata for empty-branch, polynomial-failure, and branch-sink stops
+  - `src/lib/equation/guarded/algebra-stage.ts` now keeps composition/trig-backed abs families honest by blocking partial exact merge when any generated abs branch only lands in guided periodic/composition output instead of an already-shipped exact sink
+  - focused ABS4 regression coverage now lives in:
+    - `src/lib/abs-core.test.ts`
+    - `src/lib/equation/numeric-interval-solve.test.ts`
+    - `src/lib/equation/shared-solve.test.ts`
+    - `src/lib/modes/equation.test.ts`
+  - verified with:
+    - `npm run test:unit -- src/lib/equation/numeric-interval-solve.test.ts src/lib/equation/shared-solve.test.ts src/lib/modes/equation.test.ts src/lib/abs-core.test.ts`
+    - `npm run lint -- src/lib/abs-core.ts src/lib/abs-core.test.ts src/lib/equation/guarded/algebra-stage.ts src/lib/equation/shared-solve.test.ts src/lib/equation/numeric-interval-solve.test.ts src/lib/modes/equation.test.ts`
+    - `npm run test:gate`
 - `ABS3` is now verified:
   - `src/lib/abs-core.ts` now distinguishes ordinary affine abs families from stronger polynomial/radical/rational-power carrier families for unresolved guidance while keeping the same shared `u=\pm v` branch model and family matcher
   - `src/lib/equation/guarded/algebra-stage.ts` now reuses family-specific stronger-carrier unresolved messaging for both direct and transform-produced abs families

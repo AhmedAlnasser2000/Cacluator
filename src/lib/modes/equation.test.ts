@@ -236,6 +236,49 @@ describe('runEquationMode', () => {
     expect(rationalPower.exactLatex).toContain('-1');
   });
 
+  it('solves outer-polynomial abs families through the shared symbolic backend', () => {
+    const polynomial = runEquationMode({
+      ...makeRequest(),
+      equationScreen: 'symbolic',
+      equationLatex: '\\left|x-1\\right|^2-5\\left|x-1\\right|+6=0',
+    });
+    const composition = runEquationMode({
+      ...makeRequest(),
+      equationScreen: 'symbolic',
+      equationLatex: '\\left|\\sin\\left(x^2+x\\right)\\right|^2=\\frac{1}{4}',
+    });
+
+    expect(polynomial.kind).toBe('success');
+    if (polynomial.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(polynomial.exactLatex).toContain('-2');
+    expect(polynomial.exactLatex).toContain('4');
+
+    expect(composition.kind).toBe('success');
+    if (composition.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(composition.periodicFamily?.branchesLatex.length ?? 0).toBeGreaterThan(0);
+  });
+
+  it('keeps unresolved outer-polynomial composition-backed abs families numeric-follow-up eligible', () => {
+    const result = runEquationMode({
+      ...makeRequest(),
+      equationScreen: 'symbolic',
+      equationLatex: '6\\left|\\sin\\left(x^3+x\\right)\\right|^2-5\\left|\\sin\\left(x^3+x\\right)\\right|+1=0',
+    });
+
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') {
+      throw new Error('Expected an error outcome');
+    }
+    expect(result.error).toContain('bounded polynomial in \\left|u\\right|');
+    expect(result.runtimeAdvisories?.equationNumericSolve).toEqual({
+      kind: 'suggest-on-error',
+    });
+  });
+
   it('solves linear 2x2 systems', () => {
     const result = runEquationMode({
       ...makeRequest(),

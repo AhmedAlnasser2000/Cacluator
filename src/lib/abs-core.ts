@@ -16,8 +16,16 @@ import {
   matchSupportedRationalPower,
   recognizePerfectSquareRadicand,
 } from './radical-core';
-import { createTwoBranchSet } from './algebra/branch-core';
-import { exactPolynomialDegree, parseExactPolynomial } from './polynomial-core';
+import { createBranchSet, createTwoBranchSet } from './algebra/branch-core';
+import {
+  exactPolynomialDegree,
+  exactPolynomialToNode,
+  getExactPolynomialCoefficient,
+  parseExactPolynomial,
+  quadraticDiscriminant,
+  type ExactPolynomial,
+} from './polynomial-core';
+import { solveBoundedPolynomialEquationAst } from './polynomial-factor-solve';
 import { evaluateLatexAt } from './equation/domain-guards';
 import { normalizeAst } from './symbolic-engine/normalize';
 import { boxLatex, isNodeArray, termKey } from './symbolic-engine/patterns';
@@ -25,6 +33,13 @@ import { boxLatex, isNodeArray, termKey } from './symbolic-engine/patterns';
 const ce = new ComputeEngine();
 const ABS_NUMERIC_EPSILON = 1e-8;
 const ABS_PLACEHOLDER_SYMBOL = '__calcwiz_abs_u';
+const ABS_POLYNOMIAL_PLACEHOLDER_SYMBOL = '__calcwiz_abs_t';
+
+export type RecognizedAbsoluteValueEquationFamily = AbsoluteValueEquationFamily & {
+  normalizationKind: 'direct' | 'outer-polynomial';
+  blockOnGuidedBranchError?: boolean;
+  emptyBranchError?: string;
+};
 
 type AbsoluteValueExpressionSupportKind =
   | 'constant'
@@ -473,6 +488,174 @@ function replaceFirstMatch(node: unknown, targetKey: string, replacement: unknow
   };
 }
 
+function replaceAllMatches(
+  node: unknown,
+  targetKey: string,
+  replacement: unknown,
+): { node: unknown; replacementCount: number } {
+  if (termKey(node) === targetKey) {
+    return {
+      node: replacement,
+      replacementCount: 1,
+    };
+  }
+
+  if (!isNodeArray(node) || node.length === 0) {
+    return {
+      node,
+      replacementCount: 0,
+    };
+  }
+
+  let replacementCount = 0;
+  const rebuilt = [
+    node[0],
+    ...node.slice(1).map((child) => {
+      const next = replaceAllMatches(child, targetKey, replacement);
+      replacementCount += next.replacementCount;
+      return next.node;
+    }),
+  ];
+
+  return {
+    node: normalizeAst(rebuilt),
+    replacementCount,
+  };
+}
+
+type AbsoluteValuePolynomialRoot = {
+  node: unknown;
+  latex: string;
+  numeric: number;
+};
+
+function buildAbsoluteValuePolynomialRoot(node: unknown): AbsoluteValuePolynomialRoot | null {
+  const normalized = simplifyNode(node);
+  const numeric = evaluateLatexAt(boxLatex(normalized), 0, 'rad').value;
+  if (numeric === null || !Number.isFinite(numeric)) {
+    const evaluated = ce.box(normalized as Parameters<typeof ce.box>[0]).N?.()
+      ?? ce.box(normalized as Parameters<typeof ce.box>[0]).evaluate();
+    const fallback = typeof evaluated.json === 'number' ? evaluated.json : null;
+    if (fallback === null || !Number.isFinite(fallback)) {
+      return null;
+    }
+    return {
+      node: normalized,
+      latex: boxLatex(normalized),
+      numeric: fallback,
+    };
+  }
+
+  return {
+    node: normalized,
+    latex: boxLatex(normalized),
+    numeric,
+  };
+}
+
+function sortAndDedupeAbsoluteValuePolynomialRoots(roots: AbsoluteValuePolynomialRoot[]) {
+  return roots
+    .slice()
+    .sort((left, right) => left.numeric - right.numeric)
+    .filter((root, index, list) =>
+      index === 0 || Math.abs(root.numeric - list[index - 1].numeric) > ABS_NUMERIC_EPSILON);
+}
+
+function solveLinearOrQuadraticAbsoluteValuePolynomial(
+  polynomial: ExactPolynomial,
+): AbsoluteValuePolynomialRoot[] | null {
+  const degree = exactPolynomialDegree(polynomial);
+  if (degree === 1) {
+    const root = divideScalar(
+      negateScalar(getExactPolynomialCoefficient(polynomial, 0)),
+      getExactPolynomialCoefficient(polynomial, 1),
+    );
+    if (!root) {
+      return null;
+    }
+
+    const solvedRoot = buildAbsoluteValuePolynomialRoot(buildScalarNode(root));
+    return solvedRoot ? [solvedRoot] : null;
+  }
+
+  if (degree !== 2) {
+    return null;
+  }
+
+  const discriminant = quadraticDiscriminant(polynomial);
+  if (!discriminant) {
+    return null;
+  }
+
+  const discriminantNode = buildScalarNode(discriminant);
+  const discriminantRoot = buildAbsoluteValuePolynomialRoot(discriminantNode);
+  const discriminantNumeric = discriminantRoot?.numeric ?? null;
+  if (discriminantNumeric === null) {
+    return null;
+  }
+
+  if (discriminantNumeric < -ABS_NUMERIC_EPSILON) {
+    return [];
+  }
+
+  const a = getExactPolynomialCoefficient(polynomial, 2);
+  const b = getExactPolynomialCoefficient(polynomial, 1);
+  const minusBNode = buildScalarNode(negateScalar(b));
+  const twoANode = buildScalarNode(
+    multiplyScalar(a, { numerator: 2, denominator: 1 }) ?? { numerator: 0, denominator: 1 },
+  );
+
+  if (Math.abs(discriminantNumeric) <= ABS_NUMERIC_EPSILON) {
+    const root = buildAbsoluteValuePolynomialRoot(['Divide', minusBNode, twoANode]);
+    return root ? [root] : null;
+  }
+
+  const sqrtNode = ['Sqrt', discriminantNode];
+  const positive = buildAbsoluteValuePolynomialRoot(['Divide', ['Add', minusBNode, sqrtNode], twoANode]);
+  const negative = buildAbsoluteValuePolynomialRoot(['Divide', ['Add', minusBNode, ['Negate', sqrtNode]], twoANode]);
+  if (!positive || !negative) {
+    return null;
+  }
+
+  return sortAndDedupeAbsoluteValuePolynomialRoots([positive, negative]);
+}
+
+function solveOuterAbsoluteValuePlaceholderRoots(
+  polynomial: ExactPolynomial,
+  placeholder: string,
+): AbsoluteValuePolynomialRoot[] | null {
+  const degree = exactPolynomialDegree(polynomial);
+  if (degree < 1 || degree > 4) {
+    return null;
+  }
+
+  if (degree <= 2) {
+    return solveLinearOrQuadraticAbsoluteValuePolynomial(polynomial);
+  }
+
+  const solved = solveBoundedPolynomialEquationAst(
+    ['Equal', exactPolynomialToNode(polynomial), 0],
+    placeholder,
+  );
+  if (!solved) {
+    return null;
+  }
+
+  const roots = solved.exactSolutions
+    .map((latex) => {
+      try {
+        return buildAbsoluteValuePolynomialRoot(ce.parse(latex).json);
+      } catch {
+        return null;
+      }
+    })
+    .filter((root): root is AbsoluteValuePolynomialRoot => root !== null);
+
+  return roots.length === solved.exactSolutions.length
+    ? sortAndDedupeAbsoluteValuePolynomialRoots(roots)
+    : null;
+}
+
 export function buildAbsoluteValueNode(node: unknown) {
   return simplifyNode(['Abs', node]);
 }
@@ -534,6 +717,9 @@ function buildAbsoluteValueFamilyLabel(family: AbsoluteValueEquationFamily) {
 }
 
 export function buildAbsoluteValueUnresolvedError(family: AbsoluteValueEquationFamily) {
+  if ('normalizationKind' in family && family.normalizationKind === 'outer-polynomial') {
+    return buildOuterPolynomialUnresolvedError(buildAbsoluteValueFamilyLabel(family));
+  }
   return `This recognized ${buildAbsoluteValueFamilyLabel(family)} is outside the current exact bounded solve set. Use Numeric Solve with an interval in Equation mode.`;
 }
 
@@ -638,6 +824,41 @@ export function collectAbsoluteValueTargets(
   return targets;
 }
 
+function collectRawAbsoluteValueTargets(
+  node: unknown,
+  variable: string,
+  targets: AbsoluteValueTargetDescriptor[] = [],
+) {
+  const normalized = normalizeAst(node);
+  if (isNodeArray(normalized) && normalized[0] === 'Abs' && normalized.length === 2) {
+    if (isSupportedAbsoluteValueExpression(normalized[1], variable)) {
+      targets.push({
+        targetNode: normalized,
+        base: normalized[1],
+        coefficient: { numerator: 1, denominator: 1 },
+      });
+    }
+  }
+
+  if (!isNodeArray(normalized) || normalized.length === 0) {
+    return targets;
+  }
+
+  for (const child of normalized.slice(1)) {
+    collectRawAbsoluteValueTargets(child, variable, targets);
+  }
+
+  return targets;
+}
+
+function buildOuterPolynomialNoRootError(familyLabel: string) {
+  return `This recognized ${familyLabel} reduces to a bounded polynomial in \\left|u\\right| with no nonnegative real roots, so it has no real solutions.`;
+}
+
+function buildOuterPolynomialUnresolvedError(familyLabel: string) {
+  return `This recognized ${familyLabel} reduces to a bounded polynomial in \\left|u\\right|, but at least one resulting branch leaves the current exact bounded sink set. Use Numeric Solve with an interval in Equation mode.`;
+}
+
 type AffineAbsoluteValueSide = {
   target: AbsoluteValueTargetDescriptor;
   offset: AbsoluteValueExactScalar;
@@ -724,7 +945,7 @@ export function buildAbsoluteValueEquationFamily(
   target: AbsoluteValueTargetDescriptor,
   comparisonNode: unknown,
   variable: string,
-): AbsoluteValueEquationFamily {
+): RecognizedAbsoluteValueEquationFamily {
   const normalizedBase = normalizeAst(target.base);
   const normalizedComparison = isUnitScalar(target.coefficient)
     ? normalizeAst(comparisonNode)
@@ -765,10 +986,114 @@ export function buildAbsoluteValueEquationFamily(
     comparisonTarget: pureComparisonAbs,
     branchEquations: branchSet.equations,
     branchConstraints: branchSet.constraints ?? [],
+    normalizationKind: 'direct',
   };
 }
 
-export function matchDirectAbsoluteValueEquationNode(node: unknown): AbsoluteValueEquationFamily | null {
+function matchOuterPolynomialAbsoluteValueEquationNode(node: unknown): RecognizedAbsoluteValueEquationFamily | null {
+  const normalized = normalizeAst(node);
+  if (!isNodeArray(normalized) || normalized[0] !== 'Equal' || normalized.length !== 3) {
+    return null;
+  }
+
+  const leftNode = normalizeAst(normalized[1]);
+  const rightNode = normalizeAst(normalized[2]);
+  // Preserve raw |u| structure here: simplification can incorrectly rewrite
+  // outer abs powers like |sin(x)|^2 into sin(|x|)^2 before placeholder reduction.
+  const zeroForm = normalizeAst(['Add', leftNode, ['Negate', rightNode]]);
+  const variable = detectSingleVariable(zeroForm);
+  if (variable === null && expressionHasVariable(zeroForm)) {
+    return null;
+  }
+
+  const effectiveVariable = variable ?? detectEquationVariable(leftNode, rightNode);
+  const rawTargets = collectRawAbsoluteValueTargets(zeroForm, effectiveVariable).filter(
+    (target, index, pool) => pool.findIndex((entry) => termKey(entry.targetNode) === termKey(target.targetNode)) === index,
+  );
+  if (rawTargets.length !== 1) {
+    return null;
+  }
+
+  const target = rawTargets[0];
+  const replaced = replaceAllMatches(
+    zeroForm,
+    termKey(target.targetNode),
+    ABS_POLYNOMIAL_PLACEHOLDER_SYMBOL,
+  );
+  if (replaced.replacementCount === 0) {
+    return null;
+  }
+
+  const polynomial = parseExactPolynomial(
+    normalizeAst(replaced.node),
+    ABS_POLYNOMIAL_PLACEHOLDER_SYMBOL,
+    4,
+  );
+  if (!polynomial || exactPolynomialDegree(polynomial) < 1) {
+    return null;
+  }
+
+  const roots = solveOuterAbsoluteValuePlaceholderRoots(polynomial, ABS_POLYNOMIAL_PLACEHOLDER_SYMBOL);
+  const familyLabel = isStrongerAbsoluteValueCarrierKind(
+    classifyAbsoluteValueExpressionSupport(target.base, effectiveVariable),
+  )
+    ? 'stronger absolute-value carrier family'
+    : 'absolute-value family';
+
+  if (!roots) {
+    return {
+      kind: 'abs-equals-constant',
+      variable: effectiveVariable,
+      target,
+      comparisonNode: 0,
+      branchEquations: [],
+      branchConstraints: [],
+      normalizationKind: 'outer-polynomial',
+      blockOnGuidedBranchError: true,
+      emptyBranchError: buildOuterPolynomialUnresolvedError(familyLabel),
+    };
+  }
+
+  const acceptedRoots = roots.filter((root) => root.numeric >= -ABS_NUMERIC_EPSILON);
+  if (acceptedRoots.length === 0) {
+    return {
+      kind: 'abs-equals-constant',
+      variable: effectiveVariable,
+      target,
+      comparisonNode: 0,
+      branchEquations: [],
+      branchConstraints: [],
+      normalizationKind: 'outer-polynomial',
+      blockOnGuidedBranchError: true,
+      emptyBranchError: buildOuterPolynomialNoRootError(familyLabel),
+    };
+  }
+
+  const reducedFamilies = acceptedRoots.map((root) =>
+    buildAbsoluteValueEquationFamily(target, root.node, effectiveVariable));
+  const branchSet = createBranchSet({
+    equations: reducedFamilies.flatMap((family) => family.branchEquations),
+    constraints: reducedFamilies.flatMap((family) => family.branchConstraints),
+    provenance: 'abs-core',
+  });
+
+  return {
+    kind: 'abs-equals-constant',
+    variable: effectiveVariable,
+    target: {
+      targetNode: buildAbsoluteValueNode(normalizeAst(target.base)),
+      base: normalizeAst(target.base),
+      coefficient: { numerator: 1, denominator: 1 },
+    },
+    comparisonNode: acceptedRoots[0].node,
+    branchEquations: branchSet.equations,
+    branchConstraints: branchSet.constraints ?? [],
+    normalizationKind: 'outer-polynomial',
+    blockOnGuidedBranchError: true,
+  };
+}
+
+export function matchDirectAbsoluteValueEquationNode(node: unknown): RecognizedAbsoluteValueEquationFamily | null {
   const normalized = normalizeAst(node);
   if (!isNodeArray(normalized) || normalized[0] !== 'Equal' || normalized.length !== 3) {
     return null;
@@ -800,7 +1125,7 @@ export function matchDirectAbsoluteValueEquationNode(node: unknown): AbsoluteVal
     return buildAbsoluteValueEquationFamily(target.target, isolatedComparison, variable);
   }
 
-  return null;
+  return matchOuterPolynomialAbsoluteValueEquationNode(normalized);
 }
 
 export function matchDirectAbsoluteValueEquationLatex(latex: string) {
@@ -978,6 +1303,11 @@ export function buildAbsoluteValueNumericGuidance(
   }
 
   const familyLabel = buildAbsoluteValueFamilyLabel(family);
+
+  if (family.branchEquations.length === 0) {
+    return family.emptyBranchError
+      ?? `This recognized ${familyLabel} does not produce any admissible real absolute-value branches on the current bounded exact surface.`;
+  }
 
   if (family.kind !== 'abs-equals-abs') {
     const comparisonValues = sampleFiniteValues(

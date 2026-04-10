@@ -168,6 +168,37 @@ describe('runNumericIntervalSolve', () => {
     expect(result.error).toContain('x^2+1=\\exponentialE^{x}-1');
   });
 
+  it('adds outer-polynomial abs guidance when the interval misses every generated branch', () => {
+    const result = runNumericIntervalSolve('\\left|x-1\\right|^2-5\\left|x-1\\right|+6=0', {
+      start: '-10',
+      end: '-5',
+      subdivisions: 128,
+    });
+
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') {
+      throw new Error('Expected numeric solve error');
+    }
+    expect(result.error).toContain('absolute-value family splits into');
+    expect(result.error).toContain('x-1=2');
+    expect(result.error).toContain('x-1=-3');
+  });
+
+  it('keeps outer-polynomial composition-backed abs guidance branch-aware on unresolved intervals', () => {
+    const result = runNumericIntervalSolve('6\\left|\\sin\\left(x^3+x\\right)\\right|^2-5\\left|\\sin\\left(x^3+x\\right)\\right|+1=0', {
+      start: '0',
+      end: '1',
+      subdivisions: 256,
+    }, [], 'deg');
+
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') {
+      throw new Error('Expected numeric solve error');
+    }
+    expect(result.error).toContain('\\sin(x^3+x)=\\frac{1}{2}');
+    expect(result.error).toContain('\\sin(x^3+x)=\\frac{-1}{3}');
+  });
+
   it('flags intervals whose recognized abs magnitude stays negative', () => {
     const result = runNumericIntervalSolve('\\left|x+1\\right|=-x-10', {
       start: '0',

@@ -598,6 +598,99 @@ describe('runSharedEquationSolve', () => {
     expect(result.error).toContain('stronger absolute-value carrier family is outside the current exact bounded solve set');
   });
 
+  it('solves bounded outer-polynomial abs families through one normalized |u| placeholder', () => {
+    const result = runSharedEquationSolve({
+      ...request,
+      originalLatex: '\\left|x-1\\right|^2-5\\left|x-1\\right|+6=0',
+      resolvedLatex: '\\left|x-1\\right|^2-5\\left|x-1\\right|+6=0',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.exactLatex).toContain('-2');
+    expect(result.exactLatex).toContain('-1');
+    expect(result.exactLatex).toContain('3');
+    expect(result.exactLatex).toContain('4');
+    expect(result.candidateValues).toHaveLength(4);
+  });
+
+  it('keeps outer-polynomial stronger polynomial abs families real-only after branch validation', () => {
+    const result = runSharedEquationSolve({
+      ...request,
+      originalLatex: '2\\left|x^2-1\\right|^2-8\\left|x^2-1\\right|=0',
+      resolvedLatex: '2\\left|x^2-1\\right|^2-8\\left|x^2-1\\right|=0',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.exactLatex).toContain('-1');
+    expect(result.exactLatex).toContain('1');
+    expect(result.exactLatex).toContain('\\sqrt{5}');
+    expect(result.exactLatex).not.toContain('\\imaginaryI');
+  });
+
+  it('solves outer-polynomial radical and rational-power abs carriers through the shared branch model', () => {
+    const radical = runSharedEquationSolve({
+      ...request,
+      originalLatex: '\\left|\\sqrt{x+1}-2\\right|^2=1',
+      resolvedLatex: '\\left|\\sqrt{x+1}-2\\right|^2=1',
+    });
+    const rationalPower = runSharedEquationSolve({
+      ...request,
+      originalLatex: '\\left|x^{\\frac{1}{3}}-1\\right|^2-\\left|x^{\\frac{1}{3}}-1\\right|-2=0',
+      resolvedLatex: '\\left|x^{\\frac{1}{3}}-1\\right|^2-\\left|x^{\\frac{1}{3}}-1\\right|-2=0',
+    });
+
+    expect(radical.kind).toBe('success');
+    if (radical.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(radical.exactLatex).toContain('0');
+    expect(radical.exactLatex).toContain('8');
+
+    expect(rationalPower.kind).toBe('success');
+    if (rationalPower.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(rationalPower.exactLatex).toContain('27');
+    expect(rationalPower.exactLatex).toContain('-1');
+  });
+
+  it('solves composition-backed abs outer polynomials when every generated branch stays exact', () => {
+    const result = runSharedEquationSolve({
+      ...request,
+      originalLatex: '\\left|\\sin\\left(x^2+x\\right)\\right|^2=\\frac{1}{4}',
+      resolvedLatex: '\\left|\\sin\\left(x^2+x\\right)\\right|^2=\\frac{1}{4}',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.solveBadges).toContain('Periodic Family');
+    expect(result.periodicFamily?.branchesLatex.length ?? 0).toBeGreaterThan(0);
+  });
+
+  it('keeps outer-polynomial composition-backed abs families honest when generated branches only reach guided composition outputs', () => {
+    const result = runSharedEquationSolve({
+      ...request,
+      originalLatex: '6\\left|\\sin\\left(x^3+x\\right)\\right|^2-5\\left|\\sin\\left(x^3+x\\right)\\right|+1=0',
+      resolvedLatex: '6\\left|\\sin\\left(x^3+x\\right)\\right|^2-5\\left|\\sin\\left(x^3+x\\right)\\right|+1=0',
+    });
+
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') {
+      throw new Error('Expected an error outcome');
+    }
+    expect(result.error).toContain('bounded polynomial in \\left|u\\right|');
+    expect(result.solveBadges).toContain('Periodic Family');
+    expect(result.solveBadges).toContain('Composition Branch');
+  });
+
   it('solves bounded radical equations that polynomialize into algebraic biquadratic follow-ons', () => {
     const result = runSharedEquationSolve({
       ...request,

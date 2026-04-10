@@ -35,6 +35,17 @@ describe('abs-core', () => {
     expect(family).toBeNull();
   });
 
+  it('recognizes bounded outer-polynomial abs families through one normalized |u| placeholder', () => {
+    const family = matchDirectAbsoluteValueEquationLatex('\\left|x-1\\right|^2-5\\left|x-1\\right|+6=0');
+
+    expect(family).not.toBeNull();
+    expect(family?.normalizationKind).toBe('outer-polynomial');
+    expect(family?.branchEquations).toContain('x-1=2');
+    expect(family?.branchEquations).toContain('x-1=-2');
+    expect(family?.branchEquations).toContain('x-1=3');
+    expect(family?.branchEquations).toContain('x-1=-3');
+  });
+
   it('normalizes direct bounded abs identities for simplify-only reuse', () => {
     const normalized = normalizeExactAbsoluteValueNode(['Power', ['Abs', 'x'], 2]);
 
@@ -80,5 +91,19 @@ describe('abs-core', () => {
 
     expect(guidance).toContain('stronger absolute-value carrier family');
     expect(guidance).toContain('x^2+1=\\exponentialE^{x}-1');
+  });
+
+  it('builds outer-polynomial numeric guidance from the same normalized abs descriptor', () => {
+    const guidance = buildAbsoluteValueNumericGuidance(
+      '\\left|x-1\\right|^2-5\\left|x-1\\right|+6=0',
+      -10,
+      -5,
+      64,
+      'rad',
+    );
+
+    expect(guidance).toContain('absolute-value family splits into');
+    expect(guidance).toContain('x-1=2');
+    expect(guidance).toContain('x-1=-3');
   });
 });

@@ -6,6 +6,7 @@ import {
   collectAbsoluteValueTargets as collectSharedAbsoluteValueTargets,
   isSupportedAbsoluteValueExpression as isSharedAbsoluteValueExpression,
   matchDirectAbsoluteValueEquationNode,
+  type RecognizedAbsoluteValueEquationFamily,
   matchAbsoluteValueTarget as matchSharedAbsoluteValueTarget,
   matchPerfectSquareAbsoluteValueCarrier as matchSharedPerfectSquareAbsoluteValueCarrier,
 } from '../../abs-core';
@@ -18,7 +19,7 @@ import {
   type SupportedRadical,
   type SupportedRationalPower,
 } from '../../radical-core';
-import { createBranchSet } from '../../algebra/branch-core';
+import { createBranchSet, mergeBranchFamilies } from '../../algebra/branch-core';
 import { parseExactPolynomial } from '../../polynomial-core';
 import { recognizeBoundedPolynomialEquationAst } from '../../polynomial-factor-solve';
 import { normalizeAst } from '../../symbolic-engine/normalize';
@@ -135,6 +136,8 @@ type AlgebraTransform = {
   solveBadges: SolveBadge[];
   solveSummaryText: string;
   unresolvedError: string;
+  emptyBranchError?: string;
+  blockOnGuidedBranchError?: boolean;
   radicalStepCost?: number;
   repeatedClearingStepCost?: number;
   polynomialCarrierHints?: unknown[];
@@ -1045,14 +1048,16 @@ function buildAbsoluteValueRadicalTransform(
   };
 }
 
-function buildAbsoluteValueBranchTransform(family: ReturnType<typeof buildAbsoluteValueEquationFamily>): AlgebraTransform {
+function buildAbsoluteValueBranchTransform(family: RecognizedAbsoluteValueEquationFamily): AlgebraTransform {
   return {
-    equationLatex: family.branchEquations[0],
+    equationLatex: family.branchEquations[0] ?? '',
     branchEquations: family.branchEquations,
     domainConstraints: family.branchConstraints,
     solveBadges: [],
     solveSummaryText: 'Branched a bounded absolute-value family into exact cases',
     unresolvedError: buildAbsoluteValueUnresolvedError(family),
+    emptyBranchError: family.emptyBranchError,
+    blockOnGuidedBranchError: family.blockOnGuidedBranchError,
   };
 }
 
@@ -1539,8 +1544,11 @@ function matchBoundedAbsoluteValueTransform(request: GuardedSolveRequest): Algeb
   }
 
   const directFamily = matchDirectAbsoluteValueEquationNode(parsed);
-  if (directFamily && directFamily.branchEquations.length > 0) {
+  if (directFamily) {
     const transform = buildAbsoluteValueBranchTransform(directFamily);
+    if (transform.emptyBranchError) {
+      return transform;
+    }
     if (equationStateKey(transform.equationLatex) !== equationStateKey(request.resolvedLatex)) {
       return transform;
     }
@@ -1645,6 +1653,70 @@ function matchConjugateTransform(request: GuardedSolveRequest): AlgebraTransform
   return null;
 }
 
+function isGuidedUnsupportedAbsBranchOutcome(outcome: DisplayOutcome) {
+  if (outcome.kind !== 'error') {
+    return false;
+  }
+
+  if (outcome.error === UNSUPPORTED_FAMILY_ERROR) {
+    return true;
+  }
+
+  const solveBadges = outcome.solveBadges ?? [];
+  return solveBadges.includes('Periodic Family')
+    || solveBadges.includes('Composition Branch');
+}
+
+function buildBlockedAbsBranchOutcome(
+  request: GuardedSolveRequest,
+  transform: AlgebraTransform,
+  recursiveOutcomes: DisplayOutcome[],
+): DisplayOutcome {
+  const warnings = dedupe(recursiveOutcomes.flatMap((outcome) => outcome.warnings));
+  const plannerBadges = dedupe(
+    recursiveOutcomes.flatMap((outcome) => outcome.kind === 'prompt' ? [] : outcome.plannerBadges ?? []),
+  );
+  const solveBadges = dedupe(
+    recursiveOutcomes.flatMap((outcome) => outcome.kind === 'prompt' ? [] : outcome.solveBadges ?? []).concat(transform.solveBadges),
+  );
+  const periodicFamily = mergeBranchFamilies(
+    recursiveOutcomes
+      .flatMap((outcome) => outcome.kind === 'prompt' ? [] : outcome.periodicFamily ? [outcome.periodicFamily] : []),
+  );
+  const newTransformConstraints = subtractConstraints(
+    transform.domainConstraints,
+    request.domainConstraints,
+  );
+  const exactSupplementLatex = mergeExactSupplementLatex(
+    ...recursiveOutcomes
+      .flatMap((outcome) =>
+        outcome.kind === 'prompt'
+          ? []
+          : [{ latex: outcome.exactSupplementLatex, source: 'legacy' as const }]),
+    { constraints: newTransformConstraints, source: 'transform' },
+  );
+
+  return {
+    kind: 'error',
+    title: 'Solve',
+    error: transform.unresolvedError,
+    warnings,
+    plannerBadges,
+    solveBadges,
+    solveSummaryText: dedupe([
+      transform.solveSummaryText,
+      ...recursiveOutcomes
+        .flatMap((outcome) => (outcome.kind !== 'prompt' && outcome.solveSummaryText ? [outcome.solveSummaryText] : [])),
+    ]).join('; '),
+    periodicFamily,
+    exactSupplementLatex: exactSupplementLatex.length > 0 ? exactSupplementLatex : undefined,
+    rejectedCandidateCount: recursiveOutcomes.reduce(
+      (total, outcome) => total + (outcome.kind === 'prompt' ? 0 : outcome.rejectedCandidateCount ?? 0),
+      0,
+    ) || undefined,
+  };
+}
+
 function recurseTransform(
   request: GuardedSolveRequest,
   transform: AlgebraTransform,
@@ -1697,6 +1769,16 @@ function recurseTransform(
     (equationLatex) => equationStateKey(equationLatex) !== parentKey,
   );
   if (branchEquations.length === 0) {
+    if (transform.emptyBranchError) {
+      return errorOutcome(
+        'Solve',
+        transform.emptyBranchError,
+        [],
+        [],
+        transform.solveBadges,
+        transform.solveSummaryText,
+      );
+    }
     return null;
   }
 
@@ -1728,9 +1810,20 @@ function recurseTransform(
         dedupe([
           transform.solveSummaryText,
           ...recursiveOutcomes
-            .flatMap((outcome) => (outcome.kind !== 'prompt' && outcome.solveSummaryText ? [outcome.solveSummaryText] : [])),
+          .flatMap((outcome) => (outcome.kind !== 'prompt' && outcome.solveSummaryText ? [outcome.solveSummaryText] : [])),
         ]).join('; '),
       );
+
+  if (
+    transform.blockOnGuidedBranchError
+    && recursiveOutcomes.some((outcome) => isGuidedUnsupportedAbsBranchOutcome(outcome))
+  ) {
+    if (request.numericInterval) {
+      return null;
+    }
+
+    return buildBlockedAbsBranchOutcome(request, transform, recursiveOutcomes);
+  }
 
   if (recursiveOutcome.kind === 'error' && recursiveOutcome.error === UNSUPPORTED_FAMILY_ERROR) {
     if (request.numericInterval) {
