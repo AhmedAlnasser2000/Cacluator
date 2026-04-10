@@ -277,6 +277,74 @@ describe('runEquationMode', () => {
     expect(result.periodicFamily?.branchesLatex.length ?? 0).toBeGreaterThan(1);
   });
 
+  it('solves deeper outer non-periodic abs families through the shared symbolic backend', () => {
+    const logarithmic = runEquationMode({
+      ...makeRequest(),
+      equationScreen: 'symbolic',
+      equationLatex: '\\ln\\left(\\left|x\\right|+1\\right)=2',
+    });
+    const stacked = runEquationMode({
+      ...makeRequest(),
+      equationScreen: 'symbolic',
+      equationLatex: '\\ln\\left(\\sqrt{\\left|x-1\\right|+1}\\right)=2',
+    });
+    const composition = runEquationMode({
+      ...makeRequest(),
+      equationScreen: 'symbolic',
+      equationLatex: '2^{\\left|\\sin\\left(x^3+x\\right)\\right|}=2^{\\frac{1}{2}}',
+    });
+
+    expect(logarithmic.kind).toBe('success');
+    if (logarithmic.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(logarithmic.exactLatex ?? '').toContain('\\exponentialE^{2}-1');
+
+    expect(stacked.kind).toBe('success');
+    if (stacked.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(stacked.exactLatex ?? '').toContain('\\exponentialE^{4}');
+
+    expect(composition.kind).toBe('success');
+    if (composition.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(composition.exactLatex ?? '').toContain('x^3+x');
+    expect(composition.periodicFamily?.branchesLatex.length ?? 0).toBeGreaterThan(1);
+  });
+
+  it('keeps deeper outer non-periodic abs families numeric-follow-up eligible when they exceed the bounded placeholder depth or downstream exact sink set', () => {
+    const depthLimited = runEquationMode({
+      ...makeRequest(),
+      equationScreen: 'symbolic',
+      equationLatex: '\\ln\\left(\\sqrt{\\log_{2}\\left(\\left|x\\right|+2\\right)}\\right)=0',
+    });
+    const unresolvedComposition = runEquationMode({
+      ...makeRequest(),
+      equationScreen: 'symbolic',
+      equationLatex: '2^{\\left|\\sin\\left(x^5+x\\right)\\right|}=2^{\\frac{1}{2}}',
+    });
+
+    expect(depthLimited.kind).toBe('error');
+    if (depthLimited.kind !== 'error') {
+      throw new Error('Expected a bounded-depth error outcome');
+    }
+    expect(depthLimited.error).toContain('more than one extra bounded non-periodic outer layer');
+    expect(depthLimited.runtimeAdvisories?.equationNumericSolve).toEqual({
+      kind: 'suggest-on-error',
+    });
+
+    expect(unresolvedComposition.kind).toBe('error');
+    if (unresolvedComposition.kind !== 'error') {
+      throw new Error('Expected an unresolved composition-backed error outcome');
+    }
+    expect(unresolvedComposition.error).toContain('bounded non-periodic outer layer');
+    expect(unresolvedComposition.runtimeAdvisories?.equationNumericSolve).toEqual({
+      kind: 'suggest-on-error',
+    });
+  });
+
   it('returns exact reduced-carrier composition families for shifted radical carriers after COMP12A', () => {
     const result = runEquationMode({
       ...makeRequest(),

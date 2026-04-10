@@ -20,6 +20,7 @@
 - Post workflow and memory infrastructure overhaul to Memory V2.
 - Track `R` decomposition sweep is closed and regression-verified.
 - Post second shared algebra-core extraction for transform and branch handling.
+- Post `ABS5A` deep single-placeholder absolute-value closure through non-periodic outer sinks.
 - Post `COMP12B` reduced-carrier composition readback/guidance polish.
 - Post `COMP12A` cross-lane reduced-carrier composition closure.
 - Post `COMP11` deep periodic and sawtooth closure over reduced polynomial carriers.
@@ -51,6 +52,18 @@
 - Extracted `src/app/*`, `src/styles/app/*`, and decomposition facades under solver/guide/types are in-tree and passing regression.
 
 ## Most Recent Completed Milestone
+- Completed `ABS5A` as the deep single-placeholder absolute-value closure through non-periodic outer sinks milestone:
+  - widened `src/lib/abs-core.ts` so the abs lane now treats `t = |u|` as a reusable bounded placeholder across shipped non-periodic outer sinks including logarithmic, exponential/same-base, radical/root, and rational-power follow-ons, while keeping the existing `u = \pm c` branch model unchanged
+  - added a bounded outer-placeholder solver for one exact abs target that can isolate admissible real nonnegative `t` values, route accepted values back through the existing abs-family branch path, and stop honestly when a recognized outer family would require more than one extra non-periodic outer layer
+  - preserved the existing exact sink discipline after `t` is solved: explicit `x` closure remains preferred, already-shipped reduced-carrier inner reuse is allowed only when it is already exact, and any branch that reaches only guided periodic/composition output keeps the whole abs family unresolved
+  - strengthened branch-aware guidance for recognized outer non-periodic abs families so depth-cap, empty-admissible-`t`, outer-sink-boundary, and downstream guided-composition cases now stop with more specific guidance instead of generic abs-family errors
+  - added focused regression coverage in `src/lib/abs-core.test.ts`, `src/lib/equation/shared-solve.test.ts`, `src/lib/equation/numeric-interval-solve.test.ts`, and `src/lib/modes/equation.test.ts`, and verified cleanly with focused ABS5A checks plus a full `npm run test:gate`
+  - primary_agent: `codex`
+  - primary_agent_model: `gpt-5.4`
+- Regression checks:
+  - `npm run test:unit -- src/lib/abs-core.test.ts src/lib/equation/shared-solve.test.ts src/lib/modes/equation.test.ts src/lib/equation/numeric-interval-solve.test.ts`
+  - `npm run lint -- src/lib/abs-core.ts src/lib/abs-core.test.ts src/lib/equation/shared-solve.test.ts src/lib/modes/equation.test.ts src/lib/equation/numeric-interval-solve.test.ts`
+  - `npm run test:gate`
 - Completed `COMP12B` as the reduced-carrier composition readback, guidance, and result-surface polish milestone:
   - polished `src/lib/equation/composition-stage.ts` so admitted reduced-carrier periodic and sawtooth exact wins now emit one canonical exact summary style instead of reading like fallback or layered stop messaging
   - kept explicit `x` closure preferred, kept the `COMP12A` exact/guided boundary unchanged, and refined guided composition explanations so mixed reduced carriers, continuation-boundary stops, higher-degree reduced-polynomial stops, multi-parameter boundaries, and depth-cap stops read as distinct blockers

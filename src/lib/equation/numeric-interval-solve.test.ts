@@ -199,6 +199,21 @@ describe('runNumericIntervalSolve', () => {
     expect(result.error).toContain('\\sin(x^3+x)=\\frac{-1}{3}');
   });
 
+  it('keeps outer non-periodic composition-backed abs guidance branch-aware on unresolved intervals', () => {
+    const result = runNumericIntervalSolve('2^{\\left|\\sin\\left(x^5+x\\right)\\right|}=2^{\\frac{1}{2}}', {
+      start: '0',
+      end: '0.2',
+      subdivisions: 128,
+    }, [], 'rad');
+
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') {
+      throw new Error('Expected numeric solve error');
+    }
+    expect(result.error).toContain('\\sin(x^5+x)=0.500');
+    expect(result.error).toContain('\\sin(x^5+x)=-0.500');
+  });
+
   it('flags intervals whose recognized abs magnitude stays negative', () => {
     const result = runNumericIntervalSolve('\\left|x+1\\right|=-x-10', {
       start: '0',

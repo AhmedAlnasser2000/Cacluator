@@ -32,11 +32,12 @@ import { boxLatex, isNodeArray, termKey } from './symbolic-engine/patterns';
 
 const ce = new ComputeEngine();
 const ABS_NUMERIC_EPSILON = 1e-8;
-const ABS_PLACEHOLDER_SYMBOL = '__calcwiz_abs_u';
-const ABS_POLYNOMIAL_PLACEHOLDER_SYMBOL = '__calcwiz_abs_t';
+const ABS_PLACEHOLDER_SYMBOL = 'calcwizabsu';
+const ABS_POLYNOMIAL_PLACEHOLDER_SYMBOL = 'calcwizabst';
+const ABS_OUTER_NON_PERIODIC_MAX_TRANSFORMS = 2;
 
 export type RecognizedAbsoluteValueEquationFamily = AbsoluteValueEquationFamily & {
-  normalizationKind: 'direct' | 'outer-polynomial';
+  normalizationKind: 'direct' | 'outer-polynomial' | 'outer-nonperiodic';
   blockOnGuidedBranchError?: boolean;
   emptyBranchError?: string;
 };
@@ -308,6 +309,25 @@ function detectEquationVariable(...nodes: unknown[]) {
   return variables.size === 1 ? [...variables][0] : 'x';
 }
 
+function collectEquationVariables(node: unknown, variables: Set<string> = new Set<string>()) {
+  if (typeof node === 'string') {
+    if (node !== 'Pi' && node !== 'ExponentialE') {
+      variables.add(node);
+    }
+    return variables;
+  }
+
+  if (!isNodeArray(node) || node.length === 0) {
+    return variables;
+  }
+
+  for (const child of node.slice(1)) {
+    collectEquationVariables(child, variables);
+  }
+
+  return variables;
+}
+
 function containsPlaceholder(node: unknown, placeholder: string): boolean {
   if (node === placeholder) {
     return true;
@@ -529,6 +549,17 @@ type AbsoluteValuePolynomialRoot = {
   numeric: number;
 };
 
+type AbsoluteValuePlaceholderSolveOutcome =
+  | { kind: 'unrecognized' }
+  | { kind: 'solved'; roots: AbsoluteValuePolynomialRoot[]; normalizationKind: 'outer-polynomial' | 'outer-nonperiodic' }
+  | { kind: 'no-roots'; normalizationKind: 'outer-polynomial' | 'outer-nonperiodic'; reason: 'no-real-nonnegative-root' }
+  | { kind: 'unresolved'; normalizationKind: 'outer-polynomial' | 'outer-nonperiodic'; reason: 'outer-depth' | 'outer-sink' };
+
+type AbsoluteValuePlaceholderTransformOutcome =
+  | { kind: 'none' }
+  | { kind: 'next'; equationNode: unknown }
+  | { kind: 'no-roots' };
+
 function buildAbsoluteValuePolynomialRoot(node: unknown): AbsoluteValuePolynomialRoot | null {
   const normalized = simplifyNode(node);
   const numeric = evaluateLatexAt(boxLatex(normalized), 0, 'rad').value;
@@ -656,6 +687,464 @@ function solveOuterAbsoluteValuePlaceholderRoots(
     : null;
 }
 
+function solveLinearAbsoluteValuePlaceholderRoots(
+  equationNode: unknown,
+  placeholder: string,
+): AbsoluteValuePlaceholderSolveOutcome {
+  const normalized = normalizeAst(equationNode);
+  if (!isNodeArray(normalized) || normalized[0] !== 'Equal' || normalized.length !== 3) {
+    return { kind: 'unrecognized' };
+  }
+
+  const zeroForm = normalizeAst(['Add', normalized[1], ['Negate', normalized[2]]]);
+  const linear = parseLinearPlaceholder(zeroForm, placeholder);
+  if (!linear || isZeroScalar(linear.a)) {
+    return { kind: 'unrecognized' };
+  }
+
+  const rootNode = buildQuotientNode(negateNode(linear.remainder), buildScalarNode(linear.a));
+  const root = buildAbsoluteValuePolynomialRoot(rootNode);
+  if (!root) {
+    return {
+      kind: 'unresolved',
+      normalizationKind: 'outer-nonperiodic',
+      reason: 'outer-sink',
+    };
+  }
+
+  return {
+    kind: 'solved',
+    normalizationKind: 'outer-nonperiodic',
+    roots: [root],
+  };
+}
+
+function solvePolynomialAbsoluteValuePlaceholderRoots(
+  equationNode: unknown,
+  placeholder: string,
+): AbsoluteValuePlaceholderSolveOutcome {
+  const normalized = normalizeAst(equationNode);
+  if (!isNodeArray(normalized) || normalized[0] !== 'Equal' || normalized.length !== 3) {
+    return { kind: 'unrecognized' };
+  }
+
+  const zeroForm = normalizeAst(['Add', normalized[1], ['Negate', normalized[2]]]);
+  const polynomial = parseExactPolynomial(zeroForm, placeholder, 4);
+  if (!polynomial || exactPolynomialDegree(polynomial) < 1) {
+    return { kind: 'unrecognized' };
+  }
+
+  const roots = solveOuterAbsoluteValuePlaceholderRoots(polynomial, placeholder);
+  if (!roots) {
+    return {
+      kind: 'unresolved',
+      normalizationKind: 'outer-polynomial',
+      reason: 'outer-sink',
+    };
+  }
+
+  return {
+    kind: 'solved',
+    normalizationKind: 'outer-polynomial',
+    roots,
+  };
+}
+
+type AbsoluteValuePlaceholderCarrier =
+  | {
+      family: 'log';
+      kind: 'ln' | 'log';
+      inner: unknown;
+      baseNode: unknown;
+      baseNumeric: number;
+    }
+  | {
+      family: 'power';
+      kind: 'exp' | 'power';
+      inner: unknown;
+      baseNode: unknown;
+      baseNumeric: number;
+    };
+
+function isValidLogLikeBase(baseNumeric: number) {
+  return Number.isFinite(baseNumeric) && baseNumeric > 0 && Math.abs(baseNumeric - 1) > ABS_NUMERIC_EPSILON;
+}
+
+function matchAbsoluteValuePlaceholderCarrier(node: unknown): AbsoluteValuePlaceholderCarrier | null {
+  const normalized = normalizeAst(node);
+  if (!isNodeArray(normalized) || normalized.length === 0) {
+    return null;
+  }
+
+  if (normalized[0] === 'Ln' && normalized.length === 2) {
+    return {
+      family: 'log',
+      kind: 'ln',
+      inner: normalized[1],
+      baseNode: 'ExponentialE',
+      baseNumeric: Math.E,
+    };
+  }
+
+  if (normalized[0] === 'Log' && (normalized.length === 2 || normalized.length === 3)) {
+    const baseNode = normalized.length === 2 ? 10 : normalized[2];
+    const baseNumeric = readFiniteNumericValue(baseNode);
+    if (baseNumeric === null || !isValidLogLikeBase(baseNumeric)) {
+      return null;
+    }
+
+    return {
+      family: 'log',
+      kind: 'log',
+      inner: normalized[1],
+      baseNode,
+      baseNumeric,
+    };
+  }
+
+  if (normalized[0] === 'Exp' && normalized.length === 2) {
+    return {
+      family: 'power',
+      kind: 'exp',
+      inner: normalized[1],
+      baseNode: 'ExponentialE',
+      baseNumeric: Math.E,
+    };
+  }
+
+  if (normalized[0] === 'Power' && normalized.length === 3) {
+    const baseNode = normalized[1];
+    const exponent = normalized[2];
+    if (baseNode === 'ExponentialE') {
+      return {
+        family: 'power',
+        kind: 'exp',
+        inner: exponent,
+        baseNode,
+        baseNumeric: Math.E,
+      };
+    }
+
+    const baseNumeric = readFiniteNumericValue(baseNode);
+    if (baseNumeric === null || !isValidLogLikeBase(baseNumeric)) {
+      return null;
+    }
+
+    return {
+      family: 'power',
+      kind: 'power',
+      inner: exponent,
+      baseNode,
+      baseNumeric,
+    };
+  }
+
+  return null;
+}
+
+function reduceSameBaseAbsoluteValuePlaceholderEquation(
+  equationNode: unknown,
+): AbsoluteValuePlaceholderTransformOutcome {
+  const normalized = normalizeAst(equationNode);
+  if (!isNodeArray(normalized) || normalized[0] !== 'Equal' || normalized.length !== 3) {
+    return { kind: 'none' };
+  }
+
+  const leftCarrier = matchAbsoluteValuePlaceholderCarrier(normalized[1]);
+  const rightCarrier = matchAbsoluteValuePlaceholderCarrier(normalized[2]);
+  if (!leftCarrier || !rightCarrier) {
+    return { kind: 'none' };
+  }
+
+  if (
+    leftCarrier.family !== rightCarrier.family
+    || Math.abs(leftCarrier.baseNumeric - rightCarrier.baseNumeric) > ABS_NUMERIC_EPSILON
+  ) {
+    return { kind: 'none' };
+  }
+
+  return {
+    kind: 'next',
+    equationNode: normalizeAst(['Equal', leftCarrier.inner, rightCarrier.inner]),
+  };
+}
+
+function reduceInverseAbsoluteValuePlaceholderEquation(
+  equationNode: unknown,
+): AbsoluteValuePlaceholderTransformOutcome {
+  const normalized = normalizeAst(equationNode);
+  if (!isNodeArray(normalized) || normalized[0] !== 'Equal' || normalized.length !== 3) {
+    return { kind: 'none' };
+  }
+
+  const attempts: Array<{ carrierSide: unknown; otherSide: unknown }> = [
+    { carrierSide: normalizeAst(normalized[1]), otherSide: normalizeAst(normalized[2]) },
+    { carrierSide: normalizeAst(normalized[2]), otherSide: normalizeAst(normalized[1]) },
+  ];
+
+  for (const attempt of attempts) {
+    const carrier = matchAbsoluteValuePlaceholderCarrier(attempt.carrierSide);
+    if (!carrier) {
+      continue;
+    }
+
+    if (expressionHasVariable(attempt.otherSide)) {
+      continue;
+    }
+
+    if (carrier.family === 'log') {
+      return {
+        kind: 'next',
+        equationNode: normalizeAst([
+          'Equal',
+          carrier.inner,
+          simplifyNode(['Power', carrier.baseNode, attempt.otherSide]),
+        ]),
+      };
+    }
+
+    const otherNumeric = readFiniteNumericValue(attempt.otherSide);
+    if (otherNumeric === null || otherNumeric <= ABS_NUMERIC_EPSILON) {
+      return { kind: 'no-roots' };
+    }
+
+    const inverseNode = carrier.kind === 'exp'
+      ? simplifyNode(['Ln', attempt.otherSide])
+      : simplifyNode(['Divide', ['Ln', attempt.otherSide], ['Ln', carrier.baseNode]]);
+
+    return {
+      kind: 'next',
+      equationNode: normalizeAst(['Equal', carrier.inner, inverseNode]),
+    };
+  }
+
+  return { kind: 'none' };
+}
+
+function readFiniteNumericValue(node: unknown) {
+  return buildAbsoluteValuePolynomialRoot(node)?.numeric ?? null;
+}
+
+function isEvenInteger(value: number) {
+  return Number.isInteger(value) && value % 2 === 0;
+}
+
+function invertRationalExponent(
+  numerator: number,
+  denominator: number,
+): AbsoluteValueExactScalar | null {
+  return normalizeScalar(denominator, numerator);
+}
+
+function matchOuterPlaceholderRadical(
+  node: unknown,
+  placeholder: string,
+): { inner: unknown; index: number } | null {
+  const normalized = normalizeAst(node);
+  if (!isNodeArray(normalized) || normalized.length === 0) {
+    return null;
+  }
+
+  if (normalized[0] === 'Sqrt' && normalized.length === 2) {
+    if (!containsPlaceholder(normalized[1], placeholder) || containsAbsoluteValue(normalized[1])) {
+      return null;
+    }
+
+    return {
+      inner: normalized[1],
+      index: 2,
+    };
+  }
+
+  if (normalized[0] === 'Root' && normalized.length === 3) {
+    const index = readExactScalar(normalized[2]);
+    if (
+      !index
+      || index.denominator !== 1
+      || index.numerator < 2
+      || !containsPlaceholder(normalized[1], placeholder)
+      || containsAbsoluteValue(normalized[1])
+    ) {
+      return null;
+    }
+
+    return {
+      inner: normalized[1],
+      index: index.numerator,
+    };
+  }
+
+  return null;
+}
+
+function matchOuterPlaceholderRationalPower(
+  node: unknown,
+  placeholder: string,
+): { base: unknown; exponent: AbsoluteValueExactScalar } | null {
+  const normalized = normalizeAst(node);
+  if (!isNodeArray(normalized) || normalized[0] !== 'Power' || normalized.length !== 3) {
+    return null;
+  }
+
+  const exponent = readExactScalar(normalized[2]);
+  if (
+    !exponent
+    || exponent.numerator <= 0
+    || exponent.denominator <= 0
+    || !containsPlaceholder(normalized[1], placeholder)
+    || containsAbsoluteValue(normalized[1])
+  ) {
+    return null;
+  }
+
+  return {
+    base: normalized[1],
+    exponent,
+  };
+}
+
+function reduceRadicalAbsoluteValuePlaceholderEquation(
+  equationNode: unknown,
+  placeholder: string,
+): AbsoluteValuePlaceholderTransformOutcome {
+  const normalized = normalizeAst(equationNode);
+  if (!isNodeArray(normalized) || normalized[0] !== 'Equal' || normalized.length !== 3) {
+    return { kind: 'none' };
+  }
+
+  const attempts: Array<{ radicalSide: unknown; otherSide: unknown }> = [
+    { radicalSide: normalizeAst(normalized[1]), otherSide: normalizeAst(normalized[2]) },
+    { radicalSide: normalizeAst(normalized[2]), otherSide: normalizeAst(normalized[1]) },
+  ];
+
+  for (const attempt of attempts) {
+    if (containsPlaceholder(attempt.otherSide, placeholder)) {
+      continue;
+    }
+
+    const radical = matchOuterPlaceholderRadical(attempt.radicalSide, placeholder);
+    if (radical) {
+      const otherNumeric = readFiniteNumericValue(attempt.otherSide);
+      if (otherNumeric === null) {
+        return {
+          kind: 'next',
+          equationNode: normalizeAst([
+            'Equal',
+            radical.inner,
+            simplifyNode(['Power', attempt.otherSide, radical.index]),
+          ]),
+        };
+      }
+
+      if (isEvenInteger(radical.index) && otherNumeric < -ABS_NUMERIC_EPSILON) {
+        return { kind: 'no-roots' };
+      }
+
+      return {
+        kind: 'next',
+        equationNode: normalizeAst([
+          'Equal',
+          radical.inner,
+          simplifyNode(['Power', attempt.otherSide, radical.index]),
+        ]),
+      };
+    }
+
+    const rationalPower = matchOuterPlaceholderRationalPower(attempt.radicalSide, placeholder);
+    if (!rationalPower) {
+      continue;
+    }
+
+    const invertedExponent = invertRationalExponent(
+      rationalPower.exponent.numerator,
+      rationalPower.exponent.denominator,
+    );
+    if (!invertedExponent) {
+      return { kind: 'none' };
+    }
+
+    const otherNumeric = readFiniteNumericValue(attempt.otherSide);
+    if (
+      otherNumeric !== null
+      && isEvenInteger(invertedExponent.denominator)
+      && otherNumeric < -ABS_NUMERIC_EPSILON
+    ) {
+      return { kind: 'no-roots' };
+    }
+
+    return {
+      kind: 'next',
+      equationNode: normalizeAst([
+        'Equal',
+        rationalPower.base,
+        simplifyNode(['Power', attempt.otherSide, buildScalarNode(invertedExponent)]),
+      ]),
+    };
+  }
+
+  return { kind: 'none' };
+}
+
+function solveAbsoluteValuePlaceholderEquation(
+  equationNode: unknown,
+  placeholder: string,
+  remainingTransforms: number,
+): AbsoluteValuePlaceholderSolveOutcome {
+  const linearSink = solveLinearAbsoluteValuePlaceholderRoots(equationNode, placeholder);
+  if (linearSink.kind !== 'unrecognized') {
+    return linearSink;
+  }
+
+  const polynomialSink = solvePolynomialAbsoluteValuePlaceholderRoots(equationNode, placeholder);
+  if (polynomialSink.kind !== 'unrecognized') {
+    return polynomialSink;
+  }
+
+  const transforms = [
+    reduceSameBaseAbsoluteValuePlaceholderEquation(equationNode),
+    reduceInverseAbsoluteValuePlaceholderEquation(equationNode),
+    reduceRadicalAbsoluteValuePlaceholderEquation(equationNode, placeholder),
+  ];
+
+  for (const transform of transforms) {
+    if (transform.kind === 'none') {
+      continue;
+    }
+
+    if (transform.kind === 'no-roots') {
+      return {
+        kind: 'no-roots',
+        normalizationKind: 'outer-nonperiodic',
+        reason: 'no-real-nonnegative-root',
+      };
+    }
+
+    if (remainingTransforms <= 0) {
+      return {
+        kind: 'unresolved',
+        normalizationKind: 'outer-nonperiodic',
+        reason: 'outer-depth',
+      };
+    }
+
+    const recursive = solveAbsoluteValuePlaceholderEquation(
+      transform.equationNode,
+      placeholder,
+      remainingTransforms - 1,
+    );
+
+    return recursive.kind === 'unrecognized'
+      ? {
+          kind: 'unresolved',
+          normalizationKind: 'outer-nonperiodic',
+          reason: 'outer-sink',
+        }
+      : recursive;
+  }
+
+  return { kind: 'unrecognized' };
+}
+
 export function buildAbsoluteValueNode(node: unknown) {
   return simplifyNode(['Abs', node]);
 }
@@ -719,6 +1208,9 @@ function buildAbsoluteValueFamilyLabel(family: AbsoluteValueEquationFamily) {
 export function buildAbsoluteValueUnresolvedError(family: AbsoluteValueEquationFamily) {
   if ('normalizationKind' in family && family.normalizationKind === 'outer-polynomial') {
     return buildOuterPolynomialUnresolvedError(buildAbsoluteValueFamilyLabel(family));
+  }
+  if ('normalizationKind' in family && family.normalizationKind === 'outer-nonperiodic') {
+    return buildOuterNonPeriodicUnresolvedError(buildAbsoluteValueFamilyLabel(family));
   }
   return `This recognized ${buildAbsoluteValueFamilyLabel(family)} is outside the current exact bounded solve set. Use Numeric Solve with an interval in Equation mode.`;
 }
@@ -857,6 +1349,18 @@ function buildOuterPolynomialNoRootError(familyLabel: string) {
 
 function buildOuterPolynomialUnresolvedError(familyLabel: string) {
   return `This recognized ${familyLabel} reduces to a bounded polynomial in \\left|u\\right|, but at least one resulting branch leaves the current exact bounded sink set. Use Numeric Solve with an interval in Equation mode.`;
+}
+
+function buildOuterNonPeriodicNoRootError(familyLabel: string) {
+  return `This recognized ${familyLabel} reduces through a bounded non-periodic outer layer to no nonnegative real \\left|u\\right| values, so it has no real solutions.`;
+}
+
+function buildOuterNonPeriodicUnresolvedError(familyLabel: string) {
+  return `This recognized ${familyLabel} reduces through a bounded non-periodic outer layer, but the resulting \\left|u\\right| equation leaves the current exact bounded sink set. Use Numeric Solve with an interval in Equation mode.`;
+}
+
+function buildOuterNonPeriodicDepthError(familyLabel: string) {
+  return `This recognized ${familyLabel} would require more than one extra bounded non-periodic outer layer over \\left|u\\right|. Use Numeric Solve with an interval in Equation mode.`;
 }
 
 type AffineAbsoluteValueSide = {
@@ -1015,32 +1519,48 @@ function matchOuterPolynomialAbsoluteValueEquationNode(node: unknown): Recognize
   }
 
   const target = rawTargets[0];
-  const replaced = replaceAllMatches(
-    zeroForm,
+  const replacedLeft = replaceAllMatches(
+    leftNode,
     termKey(target.targetNode),
     ABS_POLYNOMIAL_PLACEHOLDER_SYMBOL,
   );
-  if (replaced.replacementCount === 0) {
-    return null;
-  }
-
-  const polynomial = parseExactPolynomial(
-    normalizeAst(replaced.node),
+  const replacedRight = replaceAllMatches(
+    rightNode,
+    termKey(target.targetNode),
     ABS_POLYNOMIAL_PLACEHOLDER_SYMBOL,
-    4,
   );
-  if (!polynomial || exactPolynomialDegree(polynomial) < 1) {
+  if (replacedLeft.replacementCount + replacedRight.replacementCount === 0) {
     return null;
   }
 
-  const roots = solveOuterAbsoluteValuePlaceholderRoots(polynomial, ABS_POLYNOMIAL_PLACEHOLDER_SYMBOL);
+  const remainingVariables = [
+    ...collectEquationVariables(replacedLeft.node),
+    ...collectEquationVariables(replacedRight.node),
+  ];
+  if (remainingVariables.some((entry) => entry !== ABS_POLYNOMIAL_PLACEHOLDER_SYMBOL)) {
+    return null;
+  }
+
+  const placeholderEquation = normalizeAst([
+    'Equal',
+    normalizeAst(replacedLeft.node),
+    normalizeAst(replacedRight.node),
+  ]);
+  const placeholderSolve = solveAbsoluteValuePlaceholderEquation(
+    placeholderEquation,
+    ABS_POLYNOMIAL_PLACEHOLDER_SYMBOL,
+    ABS_OUTER_NON_PERIODIC_MAX_TRANSFORMS,
+  );
+  if (placeholderSolve.kind === 'unrecognized') {
+    return null;
+  }
   const familyLabel = isStrongerAbsoluteValueCarrierKind(
     classifyAbsoluteValueExpressionSupport(target.base, effectiveVariable),
   )
     ? 'stronger absolute-value carrier family'
     : 'absolute-value family';
 
-  if (!roots) {
+  if (placeholderSolve.kind === 'unresolved') {
     return {
       kind: 'abs-equals-constant',
       variable: effectiveVariable,
@@ -1048,13 +1568,19 @@ function matchOuterPolynomialAbsoluteValueEquationNode(node: unknown): Recognize
       comparisonNode: 0,
       branchEquations: [],
       branchConstraints: [],
-      normalizationKind: 'outer-polynomial',
+      normalizationKind: placeholderSolve.normalizationKind,
       blockOnGuidedBranchError: true,
-      emptyBranchError: buildOuterPolynomialUnresolvedError(familyLabel),
+      emptyBranchError: placeholderSolve.reason === 'outer-depth'
+        ? buildOuterNonPeriodicDepthError(familyLabel)
+        : placeholderSolve.normalizationKind === 'outer-polynomial'
+          ? buildOuterPolynomialUnresolvedError(familyLabel)
+          : buildOuterNonPeriodicUnresolvedError(familyLabel),
     };
   }
 
-  const acceptedRoots = roots.filter((root) => root.numeric >= -ABS_NUMERIC_EPSILON);
+  const acceptedRoots = placeholderSolve.kind === 'solved'
+    ? placeholderSolve.roots.filter((root) => root.numeric >= -ABS_NUMERIC_EPSILON)
+    : [];
   if (acceptedRoots.length === 0) {
     return {
       kind: 'abs-equals-constant',
@@ -1063,9 +1589,11 @@ function matchOuterPolynomialAbsoluteValueEquationNode(node: unknown): Recognize
       comparisonNode: 0,
       branchEquations: [],
       branchConstraints: [],
-      normalizationKind: 'outer-polynomial',
+      normalizationKind: placeholderSolve.normalizationKind,
       blockOnGuidedBranchError: true,
-      emptyBranchError: buildOuterPolynomialNoRootError(familyLabel),
+      emptyBranchError: placeholderSolve.normalizationKind === 'outer-polynomial'
+        ? buildOuterPolynomialNoRootError(familyLabel)
+        : buildOuterNonPeriodicNoRootError(familyLabel),
     };
   }
 
@@ -1088,7 +1616,7 @@ function matchOuterPolynomialAbsoluteValueEquationNode(node: unknown): Recognize
     comparisonNode: acceptedRoots[0].node,
     branchEquations: branchSet.equations,
     branchConstraints: branchSet.constraints ?? [],
-    normalizationKind: 'outer-polynomial',
+    normalizationKind: placeholderSolve.normalizationKind,
     blockOnGuidedBranchError: true,
   };
 }

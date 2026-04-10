@@ -46,6 +46,15 @@ describe('abs-core', () => {
     expect(family?.branchEquations).toContain('x-1=-3');
   });
 
+  it('recognizes bounded outer non-periodic abs families through one normalized |u| placeholder', () => {
+    const family = matchDirectAbsoluteValueEquationLatex('\\ln\\left(\\left|x\\right|+1\\right)=2');
+
+    expect(family).not.toBeNull();
+    expect(family?.normalizationKind).toBe('outer-nonperiodic');
+    expect(family?.branchEquations).toContain('x=\\exponentialE^{2}-1');
+    expect(family?.branchEquations).toContain('x=1-\\exponentialE^{2}');
+  });
+
   it('normalizes direct bounded abs identities for simplify-only reuse', () => {
     const normalized = normalizeExactAbsoluteValueNode(['Power', ['Abs', 'x'], 2]);
 
@@ -105,5 +114,30 @@ describe('abs-core', () => {
     expect(guidance).toContain('absolute-value family splits into');
     expect(guidance).toContain('x-1=2');
     expect(guidance).toContain('x-1=-3');
+  });
+
+  it('builds outer non-periodic numeric guidance from the same normalized abs descriptor', () => {
+    const guidance = buildAbsoluteValueNumericGuidance(
+      '\\ln\\left(\\left|x\\right|+1\\right)=2',
+      5,
+      7,
+      64,
+      'rad',
+    );
+
+    expect(guidance).toContain('only samples the x=\\exponentialE^{2}-1 branch');
+  });
+
+  it('keeps composition-backed outer non-periodic abs guidance branch-aware on unresolved intervals', () => {
+    const guidance = buildAbsoluteValueNumericGuidance(
+      '2^{\\left|\\sin\\left(x^5+x\\right)\\right|}=2^{\\frac{1}{2}}',
+      0,
+      0.2,
+      64,
+      'rad',
+    );
+
+    expect(guidance).toContain('\\sin(x^5+x)=0.500');
+    expect(guidance).toContain('\\sin(x^5+x)=-0.500');
   });
 });

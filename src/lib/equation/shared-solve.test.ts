@@ -692,6 +692,100 @@ describe('runSharedEquationSolve', () => {
     expect(result.periodicFamily?.branchesLatex.length ?? 0).toBeGreaterThan(1);
   });
 
+  it('solves bounded outer non-periodic abs families through one normalized |u| placeholder', () => {
+    const logarithmic = runSharedEquationSolve({
+      ...request,
+      originalLatex: '\\ln\\left(\\left|x\\right|+1\\right)=2',
+      resolvedLatex: '\\ln\\left(\\left|x\\right|+1\\right)=2',
+    });
+    const exponential = runSharedEquationSolve({
+      ...request,
+      originalLatex: '2^{\\left|x-3\\right|}=8',
+      resolvedLatex: '2^{\\left|x-3\\right|}=8',
+    });
+    const stacked = runSharedEquationSolve({
+      ...request,
+      originalLatex: '\\ln\\left(\\sqrt{\\left|x-1\\right|+1}\\right)=2',
+      resolvedLatex: '\\ln\\left(\\sqrt{\\left|x-1\\right|+1}\\right)=2',
+    });
+
+    expect(logarithmic.kind).toBe('success');
+    if (logarithmic.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(logarithmic.exactLatex).toContain('\\exponentialE^{2}-1');
+    expect(logarithmic.exactLatex).toContain('1-\\exponentialE^{2}');
+
+    expect(exponential.kind).toBe('success');
+    if (exponential.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(exponential.exactLatex).toContain('0');
+    expect(exponential.exactLatex).toContain('6');
+
+    expect(stacked.kind).toBe('success');
+    if (stacked.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(stacked.exactLatex).toContain('\\exponentialE^{4}');
+    expect(stacked.exactLatex).toContain('2-\\exponentialE^{4}');
+  });
+
+  it('solves deeper polynomial and composition-backed inner carriers after outer non-periodic placeholder reduction', () => {
+    const polynomial = runSharedEquationSolve({
+      ...request,
+      originalLatex: '\\sqrt{\\left|x^2-1\\right|+1}=3',
+      resolvedLatex: '\\sqrt{\\left|x^2-1\\right|+1}=3',
+    });
+    const composition = runSharedEquationSolve({
+      ...request,
+      originalLatex: '2^{\\left|\\sin\\left(x^3+x\\right)\\right|}=2^{\\frac{1}{2}}',
+      resolvedLatex: '2^{\\left|\\sin\\left(x^3+x\\right)\\right|}=2^{\\frac{1}{2}}',
+    });
+
+    expect(polynomial.kind).toBe('success');
+    if (polynomial.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(polynomial.exactLatex).toContain('-3');
+    expect(polynomial.exactLatex).toContain('3');
+
+    expect(composition.kind).toBe('success');
+    if (composition.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(composition.exactLatex ?? '').toContain('x^3+x');
+    expect(composition.solveBadges).toContain('Periodic Family');
+    expect(composition.solveBadges).toContain('Composition Branch');
+  });
+
+  it('keeps deeper outer non-periodic abs families honest when they exceed the bounded placeholder depth or downstream exact sink set', () => {
+    const depthLimited = runSharedEquationSolve({
+      ...request,
+      originalLatex: '\\ln\\left(\\sqrt{\\log_{2}\\left(\\left|x\\right|+2\\right)}\\right)=0',
+      resolvedLatex: '\\ln\\left(\\sqrt{\\log_{2}\\left(\\left|x\\right|+2\\right)}\\right)=0',
+    });
+    const unresolvedComposition = runSharedEquationSolve({
+      ...request,
+      originalLatex: '2^{\\left|\\sin\\left(x^5+x\\right)\\right|}=2^{\\frac{1}{2}}',
+      resolvedLatex: '2^{\\left|\\sin\\left(x^5+x\\right)\\right|}=2^{\\frac{1}{2}}',
+    });
+
+    expect(depthLimited.kind).toBe('error');
+    if (depthLimited.kind !== 'error') {
+      throw new Error('Expected a bounded-depth error outcome');
+    }
+    expect(depthLimited.error).toContain('more than one extra bounded non-periodic outer layer');
+
+    expect(unresolvedComposition.kind).toBe('error');
+    if (unresolvedComposition.kind !== 'error') {
+      throw new Error('Expected an unresolved composition-backed error outcome');
+    }
+    expect(unresolvedComposition.error).toContain('bounded non-periodic outer layer');
+    expect(unresolvedComposition.solveBadges).toContain('Periodic Family');
+    expect(unresolvedComposition.solveSummaryText).toContain('x^5+x exceeds the current bounded reduced-polynomial degree-4 surface');
+  });
+
   it('solves bounded radical equations that polynomialize into algebraic biquadratic follow-ons', () => {
     const result = runSharedEquationSolve({
       ...request,
