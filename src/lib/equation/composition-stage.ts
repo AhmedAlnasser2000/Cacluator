@@ -22,6 +22,7 @@ import {
   equationToZeroFormLatex,
   readNumericNode,
 } from './domain-guards';
+import { matchAbsoluteValueTarget as matchSharedAbsoluteValueTarget } from '../abs-core';
 import { dedupe, extractApproxSolutions, extractExactSolutions, mergeDisplayOutcomes } from './guarded/merge';
 import {
   buildCompositeCandidateRejectionMessage,
@@ -37,6 +38,7 @@ import { buildTrigPeriodicTemplate, type TrigPeriodicBranch } from '../trigonome
 import { dependsOnVariable, isNodeArray } from '../symbolic-engine/patterns';
 import { normalizeAst } from '../symbolic-engine/normalize';
 import { matchAffineVariableArgument } from '../trigonometry/normalize';
+import { matchSupportedRadical, matchSupportedRationalPower } from '../radical-core';
 import {
   buildExactScalarNode,
   exactScalarToNumber,
@@ -79,6 +81,13 @@ type NumericTarget = {
   latex: string;
   value: number;
 };
+
+type ReducedSingleFamilyCarrierKind =
+  | 'absolute-value'
+  | 'radical'
+  | 'rational-power'
+  | 'logarithmic'
+  | 'exponential';
 
 type NonPeriodicTransform = {
   equations: string[];
@@ -1598,6 +1607,149 @@ function matchReducedPolynomialPeriodicCarrier(node: unknown) {
   };
 }
 
+function isVariableFreeCarrierNode(node: unknown) {
+  return !dependsOnVariable(normalizeAst(node), 'x');
+}
+
+function matchDirectLogarithmicReducedCarrier(node: unknown) {
+  const normalized = normalizeAst(node);
+  if (isNodeArray(normalized) && normalized[0] === 'Ln' && normalized.length === 2) {
+    return dependsOnVariable(normalized[1], 'x') && isDirectAffineInner(normalized[1]);
+  }
+
+  if (isNodeArray(normalized) && normalized[0] === 'Log' && normalized.length === 3) {
+    const base = parseNumericTarget(normalized[2]);
+    return Boolean(
+      base
+      && base.value > 0
+      && Math.abs(base.value - 1) > EPSILON
+      && dependsOnVariable(normalized[1], 'x')
+      && isDirectAffineInner(normalized[1]),
+    );
+  }
+
+  return false;
+}
+
+function matchDirectExponentialReducedCarrier(node: unknown) {
+  const normalized = normalizeAst(node);
+  if (isNodeArray(normalized) && normalized[0] === 'Exp' && normalized.length === 2) {
+    return dependsOnVariable(normalized[1], 'x') && isDirectAffineInner(normalized[1]);
+  }
+
+  if (isNodeArray(normalized) && normalized[0] === 'Power' && normalized.length === 3) {
+    const base = parseNumericTarget(normalized[1]);
+    return Boolean(
+      base
+      && base.value > 0
+      && Math.abs(base.value - 1) > EPSILON
+      && dependsOnVariable(normalized[2], 'x')
+      && isDirectAffineInner(normalized[2]),
+    );
+  }
+
+  return false;
+}
+
+function matchDirectReducedSingleFamilyCarrier(node: unknown): ReducedSingleFamilyCarrierKind | null {
+  const normalized = normalizeAst(node);
+  if (matchSharedAbsoluteValueTarget(normalized, 'x')) {
+    return 'absolute-value';
+  }
+
+  if (matchSupportedRadical(normalized, 'x')) {
+    return 'radical';
+  }
+
+  if (matchSupportedRationalPower(normalized, 'x')) {
+    return 'rational-power';
+  }
+
+  if (matchDirectLogarithmicReducedCarrier(normalized)) {
+    return 'logarithmic';
+  }
+
+  if (matchDirectExponentialReducedCarrier(normalized)) {
+    return 'exponential';
+  }
+
+  return null;
+}
+
+function matchReducedSingleFamilyPeriodicCarrier(node: unknown): ReducedSingleFamilyCarrierKind | null {
+  const normalized = normalizeAst(node);
+  if (!dependsOnVariable(normalized, 'x')) {
+    return null;
+  }
+
+  const direct = matchDirectReducedSingleFamilyCarrier(normalized);
+  if (direct) {
+    return direct;
+  }
+
+  if (!isNodeArray(normalized) || normalized.length === 0) {
+    return null;
+  }
+
+  if (normalized[0] === 'Negate' && normalized.length === 2) {
+    return matchReducedSingleFamilyPeriodicCarrier(normalized[1]);
+  }
+
+  if ((normalized[0] === 'Add' || normalized[0] === 'Subtract') && normalized.length === 3) {
+    if (isVariableFreeCarrierNode(normalized[1])) {
+      return matchReducedSingleFamilyPeriodicCarrier(normalized[2]);
+    }
+
+    if (isVariableFreeCarrierNode(normalized[2])) {
+      return matchReducedSingleFamilyPeriodicCarrier(normalized[1]);
+    }
+
+    return null;
+  }
+
+  if (normalized[0] === 'Multiply' && normalized.length >= 3) {
+    let matchedCarrier: ReducedSingleFamilyCarrierKind | null = null;
+    for (const child of normalized.slice(1)) {
+      const childCarrier = matchReducedSingleFamilyPeriodicCarrier(child);
+      if (childCarrier) {
+        if (matchedCarrier) {
+          return null;
+        }
+        matchedCarrier = childCarrier;
+        continue;
+      }
+
+      if (!isVariableFreeCarrierNode(child)) {
+        return null;
+      }
+    }
+
+    return matchedCarrier;
+  }
+
+  if (normalized[0] === 'Divide' && normalized.length === 3) {
+    if (!isVariableFreeCarrierNode(normalized[2])) {
+      return null;
+    }
+
+    return matchReducedSingleFamilyPeriodicCarrier(normalized[1]);
+  }
+
+  return null;
+}
+
+function buildReducedCarrierExactFamily(
+  carrierNode: unknown,
+  branches: SymbolicFamilyBranch[],
+) {
+  const reducedCarrierLatex = boxLatex(normalizeAst(carrierNode));
+  return createPeriodicFamily({
+    carrierLatex: reducedCarrierLatex,
+    branchesLatex: branches.map((branch) => branch.latex),
+    reducedCarrierLatex,
+  });
+}
+
 function buildTrigPeriodNode(kind: 'sin' | 'cos' | 'tan', angleUnit: AngleUnit): unknown {
   if (angleUnit === 'rad') {
     return kind === 'tan' ? 'Pi' : normalizeAst(['Multiply', 2, 'Pi']);
@@ -2830,11 +2982,7 @@ function resolveCarrierPeriodicFamily(
   if (reducedPolynomialCarrier) {
     return {
       kind: 'solved',
-      family: createPeriodicFamily({
-        carrierLatex: boxLatex(normalized),
-        branchesLatex: branches.map((branch) => branch.latex),
-        reducedCarrierLatex: boxLatex(normalized),
-      }),
+      family: buildReducedCarrierExactFamily(normalized, branches),
       domainConstraints: constraints,
       supplementLatex,
       summaryText: '',
@@ -2945,6 +3093,17 @@ function resolveCarrierPeriodicFamily(
         executionBudget,
       );
     }
+  }
+
+  const reducedSingleFamilyCarrier = matchReducedSingleFamilyPeriodicCarrier(normalized);
+  if (reducedSingleFamilyCarrier) {
+    return {
+      kind: 'solved',
+      family: buildReducedCarrierExactFamily(normalized, branches),
+      domainConstraints: constraints,
+      supplementLatex,
+      summaryText: '',
+    };
   }
 
   const family = buildPeriodicFamilyInfo(boxLatex(normalized), branches, constraints, angleUnit, normalized);

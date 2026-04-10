@@ -277,6 +277,37 @@ describe('runEquationMode', () => {
     expect(result.periodicFamily?.branchesLatex.length ?? 0).toBeGreaterThan(1);
   });
 
+  it('returns exact reduced-carrier composition families for shifted radical carriers after COMP12A', () => {
+    const result = runEquationMode({
+      ...makeRequest(),
+      equationScreen: 'symbolic',
+      equationLatex: '\\arcsin\\left(\\sin\\left(\\sqrt{x+1}-2\\right)\\right)=\\frac{1}{2}',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.exactLatex ?? '').toContain('\\sqrt{x+1}-2');
+    expect(result.periodicFamily?.reducedCarrierLatex ?? '').toContain('\\sqrt{x+1}-2');
+    expect(result.periodicFamily?.piecewiseBranches?.length ?? 0).toBeGreaterThan(1);
+  });
+
+  it('keeps explicit-x composition closure when sin(ln(x+1))=1/2 can still solve back to x', () => {
+    const result = runEquationMode({
+      ...makeRequest(),
+      equationScreen: 'symbolic',
+      equationLatex: '\\sin\\left(\\ln\\left(x+1\\right)\\right)=\\frac{1}{2}',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected a success outcome');
+    }
+    expect(result.periodicFamily?.carrierLatex).toBe('x');
+    expect(result.exactLatex ?? '').not.toContain('\\ln\\left(x+1\\right)');
+  });
+
   it('solves linear 2x2 systems', () => {
     const result = runEquationMode({
       ...makeRequest(),

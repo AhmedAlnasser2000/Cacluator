@@ -1186,6 +1186,44 @@ describe('AppMain UI automation flows', () => {
     expect(screen.getByTestId('display-outcome-periodic-piecewise')).toHaveTextContent(/arcsin/);
   });
 
+  it('returns reduced-carrier exact periodic families for shifted radical carriers after COMP12A', async () => {
+    const { user } = await renderAppMain();
+
+    await user.click(screen.getByTestId('settings-toggle'));
+    await screen.findByTestId('settings-panel');
+    await user.click(screen.getByTestId('settings-angle-unit-rad'));
+    await user.click(screen.getByTestId('settings-toggle'));
+    await waitFor(() => expect(screen.queryByTestId('settings-panel')).not.toBeInTheDocument());
+
+    await openEquationSymbolic(user);
+    setMathFieldLatex('main-editor', '\\sin\\left(\\sqrt{x+1}-2\\right)=\\frac{1}{2}');
+    await user.click(screen.getByTestId('soft-action-solve'));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expect(screen.getByText('Periodic Family')).toBeInTheDocument();
+    expectMathStaticLatex(screen.getByTestId('display-outcome-exact'), /\\sqrt\{x\+1\}-2/);
+    expectMathStaticLatex(screen.getByTestId('display-outcome-periodic-family'), /\\sqrt\{x\+1\}-2/);
+  });
+
+  it('returns reduced-carrier exact sawtooth families for abs-backed carriers after COMP12A', async () => {
+    const { user } = await renderAppMain();
+
+    await user.click(screen.getByTestId('settings-toggle'));
+    await screen.findByTestId('settings-panel');
+    await user.click(screen.getByTestId('settings-angle-unit-rad'));
+    await user.click(screen.getByTestId('settings-toggle'));
+    await waitFor(() => expect(screen.queryByTestId('settings-panel')).not.toBeInTheDocument());
+
+    await openEquationSymbolic(user);
+    setMathFieldLatex('main-editor', '\\arcsin\\left(\\sin\\left(\\left|x-1\\right|\\right)\\right)=\\frac{1}{2}');
+    await user.click(screen.getByTestId('soft-action-solve'));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expect(screen.getAllByText('Principal Range').length).toBeGreaterThan(0);
+    expectMathStaticLatex(screen.getByTestId('display-outcome-exact'), /\\vert x-1\\vert/);
+    expect(screen.getByTestId('display-outcome-periodic-piecewise')).toHaveTextContent(/arcsin/);
+  });
+
   it('shows the new PRL3 Equation transforms without auto-solving the rewritten equation', async () => {
     const { user } = await renderAppMain();
 

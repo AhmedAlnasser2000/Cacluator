@@ -20,6 +20,7 @@
 - Post workflow and memory infrastructure overhaul to Memory V2.
 - Track `R` decomposition sweep is closed and regression-verified.
 - Post second shared algebra-core extraction for transform and branch handling.
+- Post `COMP12A` cross-lane reduced-carrier composition closure.
 - Post `COMP11` deep periodic and sawtooth closure over reduced polynomial carriers.
 
 ## Stable Architecture Snapshot
@@ -49,6 +50,20 @@
 - Extracted `src/app/*`, `src/styles/app/*`, and decomposition facades under solver/guide/types are in-tree and passing regression.
 
 ## Most Recent Completed Milestone
+- Completed `COMP12A` as the cross-lane reduced-carrier composition closure milestone:
+  - widened `src/lib/equation/composition-stage.ts` so direct periodic and inverse/direct trig sawtooth families can now finish exactly over admitted bounded single-family carriers beyond reduced polynomials, including shifted radical carriers, shifted rational-power carriers, abs-backed carriers, and selected shifted logarithmic carriers
+  - kept explicit `x` closure preferred by placing the new reduced-carrier matcher after the existing affine/power/quadratic/log/exponential continuation paths, so already-shipped explicit solves like `\sin(\ln(x+1))=\frac{1}{2}` still solve back to `x` instead of regressing to reduced-carrier output
+  - preserved principal-range and piecewise sawtooth metadata on the new reduced-carrier exact successes, so cases like `\arcsin(\sin(\sqrt{x+1}-2))=\frac{1}{2}` and `\arcsin(\sin(|x-1|))=\frac{1}{2}` now stay exact without losing readback context
+  - kept mixed poly-rad carriers and broader cross-family continuations on honest guidance instead of widening into mixed-carrier periodic search
+  - updated guarded Equation, Equation mode, and `AppMain` UI coverage for the new carrier families and verified cleanly with a full `npm run test:gate`
+  - primary_agent: `codex`
+  - primary_agent_model: `gpt-5.4`
+- Regression checks:
+  - `npm run test:unit -- src/lib/equation/guarded-solve.test.ts src/lib/modes/equation.test.ts`
+  - `npm run test:ui -- src/AppMain.ui.test.tsx`
+  - `npm run lint -- src/lib/equation/composition-stage.ts src/lib/equation/guarded-solve.test.ts src/lib/modes/equation.test.ts src/AppMain.ui.test.tsx`
+  - `npm run test:memory-protocol`
+  - `npm run test:gate`
 - Completed `COMP11` as the deep periodic and sawtooth closure over reduced polynomial carriers milestone:
   - widened `src/lib/equation/composition-stage.ts` so direct periodic and inverse/direct trig sawtooth families can now finish as exact reduced-carrier families when the reduced carrier is an exact one-variable polynomial on the existing bounded surface instead of stopping on guidance once explicit `x` back-solve is unavailable
   - raised the shared Equation composition budgets in `src/lib/kernel/runtime-profile.ts` by one bounded step (`maxCompositionInversionDepth = 3`, `maxPeriodicReductionDepth = 3`) and updated guarded composition messaging to describe the new three-step bounded cap without widening into open-ended recursive search
@@ -597,12 +612,14 @@
   - further architecture work is no longer the blocker for the algebra lane
 - Next preferred decision:
   1. choose whether to pause architecture again now that both `transform-core` and `branch-core` are extracted
-  2. if product work resumes first, choose whether the next algebra milestone should stay in the composition lane as `COMP12` or return to the abs lane as `ABS5`
-  3. keep either next lane bounded: composition should avoid open-ended multi-parameter periodic search, and abs should avoid widening into nested abs, inequalities, or general piecewise search
-  4. if architecture work resumes later, prefer a thin algebra registry only if shared-core orchestration pressure becomes real
+  2. if product work resumes first, choose whether the next algebra slice should start with `COMP12A` or return to the abs lane with `ABS5A`
+  3. apply the new two-slice milestone rule on heavier math lanes: slice `A` delivers the capability expansion, and slice `B` follows as the immediate polish/trust/readback/guidance pass
+  4. keep either next lane bounded: composition should avoid open-ended multi-parameter periodic search, and abs should avoid widening into nested abs, inequalities, or general piecewise search
+  5. if architecture work resumes later, prefer a thin algebra registry only if shared-core orchestration pressure becomes real
 - Reason:
   - `ARCH6B` removed duplicated branch-array and periodic/principal-range merge plumbing without changing product behavior, so the next architecture question is whether shared-core extraction should pause until another concrete reuse bottleneck appears
   - `COMP11` now broadens exact composition closure across reduced polynomial carriers, adds one more bounded composition/periodic depth step, and introduces selected exact two-parameter periodic closure, so the next product question is whether to press the composition lane further or to return to the abs lane after the recent `ABS1`-`ABS4` run
+  - the new roadmap rule is to split heavier math milestones into capability slice `A` plus immediate polish slice `B`, which should reduce “polish later” drift while keeping milestone boundaries honest
   - the architecture direction is now more concrete too: one runtime kernel plus reusable algebra cores, not per-engine microkernels unless a later real plugin/runtime need appears
 
 ## Recent Verified Context

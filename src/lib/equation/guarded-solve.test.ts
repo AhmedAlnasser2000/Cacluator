@@ -885,6 +885,91 @@ describe('runGuardedEquationSolve', () => {
     expect(result.exactLatex ?? '').toContain('\\pi');
   });
 
+  it('returns exact reduced-carrier periodic families for shifted radical carriers like sin(sqrt(x+1)-2)=1/2', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      angleUnit: 'rad',
+      originalLatex: '\\sin\\left(\\sqrt{x+1}-2\\right)=\\frac{1}{2}',
+      resolvedLatex: '\\sin\\left(\\sqrt{x+1}-2\\right)=\\frac{1}{2}',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected shifted radical reduced-carrier periodic success');
+    }
+    expect(result.solveBadges).toContain('Periodic Family');
+    expect(result.exactLatex ?? '').toContain('\\sqrt{x+1}-2');
+    expect(result.periodicFamily?.reducedCarrierLatex ?? '').toContain('\\sqrt{x+1}-2');
+  });
+
+  it('returns exact reduced-carrier periodic families for abs-backed carriers like sin(|x-1|)=1/2', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      angleUnit: 'rad',
+      originalLatex: '\\sin\\left(\\left|x-1\\right|\\right)=\\frac{1}{2}',
+      resolvedLatex: '\\sin\\left(\\left|x-1\\right|\\right)=\\frac{1}{2}',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected abs-backed reduced-carrier periodic success');
+    }
+    expect(result.solveBadges).toContain('Periodic Family');
+    expect(result.exactLatex ?? '').toContain('\\vert x-1\\vert');
+    expect(result.periodicFamily?.reducedCarrierLatex ?? '').toContain('\\vert x-1\\vert');
+  });
+
+  it('returns exact reduced-carrier periodic families for shifted rational-power carriers like sin(x^(1/3)-1)=1/2', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      angleUnit: 'rad',
+      originalLatex: '\\sin\\left(x^{\\frac{1}{3}}-1\\right)=\\frac{1}{2}',
+      resolvedLatex: '\\sin\\left(x^{\\frac{1}{3}}-1\\right)=\\frac{1}{2}',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected shifted rational-power reduced-carrier periodic success');
+    }
+    expect(result.solveBadges).toContain('Periodic Family');
+    expect(result.exactLatex ?? '').toMatch(/(\\sqrt\[3\]\{x\}|x\^\{\\frac\{1\}\{3\}\})/);
+    expect(result.exactLatex ?? '').toContain('-1');
+  });
+
+  it('returns exact reduced-carrier periodic families for shifted logarithmic carriers like sin(ln(x+1)-2)=1/2', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      angleUnit: 'rad',
+      originalLatex: '\\sin\\left(\\ln\\left(x+1\\right)-2\\right)=\\frac{1}{2}',
+      resolvedLatex: '\\sin\\left(\\ln\\left(x+1\\right)-2\\right)=\\frac{1}{2}',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected shifted logarithmic reduced-carrier periodic success');
+    }
+    expect(result.solveBadges).toContain('Periodic Family');
+    expect(result.exactLatex ?? '').toContain('\\ln(x+1)-2');
+    expect(result.periodicFamily?.reducedCarrierLatex ?? '').toContain('\\ln(x+1)-2');
+  });
+
+  it('still prefers explicit x closure when sin(ln(x+1))=1/2 can be solved back to x exactly', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      angleUnit: 'rad',
+      originalLatex: '\\sin\\left(\\ln\\left(x+1\\right)\\right)=\\frac{1}{2}',
+      resolvedLatex: '\\sin\\left(\\ln\\left(x+1\\right)\\right)=\\frac{1}{2}',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected explicit-x periodic-family success');
+    }
+    expect(result.solveBadges).toContain('Periodic Family');
+    expect(result.periodicFamily?.carrierLatex).toBe('x');
+    expect(result.exactLatex ?? '').not.toContain('\\ln\\left(x+1\\right)');
+  });
+
   it('keeps inverse-trig follow-ons outside the affine/power templates recognized but unresolved', () => {
     const result = runGuardedEquationSolve({
       ...request,
@@ -1122,22 +1207,23 @@ describe('runGuardedEquationSolve', () => {
     expect(result.exactLatex ?? '').toContain('\\ln');
   });
 
-  it('keeps bounded root-form inverse/direct trig sawtooth identities on structured guidance when exact closure stays unsupported', () => {
+  it('returns exact reduced-carrier sawtooth families for shifted radical carriers like arcsin(sin(sqrt(x+1)-2))=1/2', () => {
     const result = runGuardedEquationSolve({
       ...request,
-      angleUnit: 'deg',
-      originalLatex: '\\arccos\\left(\\cos\\left(\\sqrt[3]{2x+1}\\right)\\right)=45',
-      resolvedLatex: '\\arccos\\left(\\cos\\left(\\sqrt[3]{2x+1}\\right)\\right)=45',
+      angleUnit: 'rad',
+      originalLatex: '\\arcsin\\left(\\sin\\left(\\sqrt{x+1}-2\\right)\\right)=\\frac{1}{2}',
+      resolvedLatex: '\\arcsin\\left(\\sin\\left(\\sqrt{x+1}-2\\right)\\right)=\\frac{1}{2}',
     });
 
-    expect(result.kind).toBe('error');
-    if (result.kind !== 'error') {
-      throw new Error('Expected root-form sawtooth bounded guidance');
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected shifted radical reduced-carrier sawtooth success');
     }
     expect(result.solveBadges).toContain('Outer Inversion');
     expect(result.solveBadges).toContain('Principal Range');
-    expect(result.solveBadges).toContain('Nested Recursion');
-    expect(result.error).toContain('outside the current exact bounded solve set');
+    expect(result.periodicFamily?.reducedCarrierLatex ?? '').toContain('\\sqrt{x+1}-2');
+    expect(result.periodicFamily?.piecewiseBranches?.length ?? 0).toBeGreaterThan(1);
+    expect(result.exactLatex ?? '').toContain('\\sqrt{x+1}-2');
   });
 
   it('closes quadratic inverse/direct trig sawtooth identities exactly', () => {
@@ -1232,6 +1318,42 @@ describe('runGuardedEquationSolve', () => {
     expect(result.exactLatex ?? '').toContain('x^3+x');
   });
 
+  it('returns exact reduced-carrier sawtooth families for abs-backed carriers like arcsin(sin(|x-1|))=1/2', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      angleUnit: 'rad',
+      originalLatex: '\\arcsin\\left(\\sin\\left(\\left|x-1\\right|\\right)\\right)=\\frac{1}{2}',
+      resolvedLatex: '\\arcsin\\left(\\sin\\left(\\left|x-1\\right|\\right)\\right)=\\frac{1}{2}',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected abs-backed reduced-carrier sawtooth success');
+    }
+    expect(result.solveBadges).toContain('Principal Range');
+    expect(result.periodicFamily?.reducedCarrierLatex ?? '').toContain('\\vert x-1\\vert');
+    expect(result.periodicFamily?.piecewiseBranches?.length ?? 0).toBeGreaterThan(1);
+    expect(result.exactLatex ?? '').toContain('\\vert x-1\\vert');
+  });
+
+  it('returns exact reduced-carrier sawtooth families for shifted rational-power carriers like arcsin(sin(x^(1/3)-1))=1/2', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      angleUnit: 'rad',
+      originalLatex: '\\arcsin\\left(\\sin\\left(x^{\\frac{1}{3}}-1\\right)\\right)=\\frac{1}{2}',
+      resolvedLatex: '\\arcsin\\left(\\sin\\left(x^{\\frac{1}{3}}-1\\right)\\right)=\\frac{1}{2}',
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error('Expected shifted rational-power reduced-carrier sawtooth success');
+    }
+    expect(result.solveBadges).toContain('Principal Range');
+    expect(result.periodicFamily?.piecewiseBranches?.length ?? 0).toBeGreaterThan(1);
+    expect(result.exactLatex ?? '').toMatch(/(\\sqrt\[3\]\{x\}|x\^\{\\frac\{1\}\{3\}\})/);
+    expect(result.exactLatex ?? '').toContain('-1');
+  });
+
   it('closes selected direct trig nested families like sin(tan(x))=1/2 with two periodic parameters', () => {
     const result = runGuardedEquationSolve({
       ...request,
@@ -1323,6 +1445,41 @@ describe('runGuardedEquationSolve', () => {
     expect(result.periodicFamily?.structuredStopReason).toBe('multi-parameter-periodic-family');
     expect(result.periodicFamily?.discoveredFamilies?.length ?? 0).toBeGreaterThan(1);
     expect(result.periodicFamily?.discoveredFamilies?.some((family) => family.includes('\\tan'))).toBe(true);
+  });
+
+  it('keeps mixed poly-rad periodic carriers on structured guidance because mixed reduced carriers stay out of scope', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      angleUnit: 'rad',
+      originalLatex: '\\sin\\left(\\sqrt{x+1}+x^{\\frac{1}{3}}\\right)=\\frac{1}{2}',
+      resolvedLatex: '\\sin\\left(\\sqrt{x+1}+x^{\\frac{1}{3}}\\right)=\\frac{1}{2}',
+    });
+
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') {
+      throw new Error('Expected mixed-carrier bounded guidance');
+    }
+    expect(result.solveBadges).toContain('Periodic Family');
+    expect(result.error).toContain('currently unsupported exact solving');
+    expect(result.exactLatex ?? '').toContain('\\sqrt{x+1}');
+  });
+
+  it('keeps mixed single-family continuations honest when sawtooth reduction leaves the shipped exact sink set', () => {
+    const result = runGuardedEquationSolve({
+      ...request,
+      angleUnit: 'rad',
+      originalLatex: '\\arcsin\\left(\\sin\\left(\\ln\\left(\\sqrt{x+1}+\\sqrt{x}\\right)\\right)\\right)=\\frac{1}{2}',
+      resolvedLatex: '\\arcsin\\left(\\sin\\left(\\ln\\left(\\sqrt{x+1}+\\sqrt{x}\\right)\\right)\\right)=\\frac{1}{2}',
+    });
+
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') {
+      throw new Error('Expected bounded sawtooth guidance when continuation leaves the sink set');
+    }
+    expect(result.solveBadges).toContain('Outer Inversion');
+    expect(result.solveBadges).toContain('Principal Range');
+    expect(result.error).toContain('currently unsupported exact solving');
+    expect(result.periodicFamily?.piecewiseBranches?.length ?? 0).toBeGreaterThan(0);
   });
 
   it('stops on the bounded periodic depth cap before attempting a third periodic reduction', () => {
