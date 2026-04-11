@@ -134,7 +134,7 @@ describe('runNumericIntervalSolve', () => {
     if (result.kind !== 'error') {
       throw new Error('Expected numeric solve error');
     }
-    expect(result.error).toContain('absolute-value family splits into');
+    expect(result.error).toContain('absolute-value family and generates');
     expect(result.error).toContain('x+1=\\exponentialE^{x}');
   });
 
@@ -149,7 +149,7 @@ describe('runNumericIntervalSolve', () => {
     if (result.kind !== 'error') {
       throw new Error('Expected numeric solve error');
     }
-    expect(result.error).toContain('absolute-value family splits into');
+    expect(result.error).toContain('absolute-value family and generates');
     expect(result.error).toContain('x+1=\\frac{-x}{2}-\\frac{3}{2}');
   });
 
@@ -179,7 +179,7 @@ describe('runNumericIntervalSolve', () => {
     if (result.kind !== 'error') {
       throw new Error('Expected numeric solve error');
     }
-    expect(result.error).toContain('absolute-value family splits into');
+    expect(result.error).toContain('absolute-value family and generates');
     expect(result.error).toContain('x-1=2');
     expect(result.error).toContain('x-1=-3');
   });

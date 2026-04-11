@@ -299,12 +299,15 @@ describe('runEquationMode', () => {
       throw new Error('Expected a success outcome');
     }
     expect(logarithmic.exactLatex ?? '').toContain('\\exponentialE^{2}-1');
+    expect(logarithmic.solveSummaryText).toBe('Solved a bounded outer non-periodic absolute-value family');
+    expect(logarithmic.detailSections?.[0]?.title).toBe('Absolute-Value Reduction');
 
     expect(stacked.kind).toBe('success');
     if (stacked.kind !== 'success') {
       throw new Error('Expected a success outcome');
     }
     expect(stacked.exactLatex ?? '').toContain('\\exponentialE^{4}');
+    expect(stacked.solveSummaryText).toBe('Solved a bounded outer non-periodic absolute-value family');
 
     expect(composition.kind).toBe('success');
     if (composition.kind !== 'success') {
@@ -312,6 +315,8 @@ describe('runEquationMode', () => {
     }
     expect(composition.exactLatex ?? '').toContain('x^3+x');
     expect(composition.periodicFamily?.branchesLatex.length ?? 0).toBeGreaterThan(1);
+    expect(composition.solveSummaryText).toBe('Solved a bounded outer non-periodic absolute-value family');
+    expect(composition.detailSections?.some((section) => section.title === 'Generated Branches')).toBe(true);
   });
 
   it('keeps deeper outer non-periodic abs families numeric-follow-up eligible when they exceed the bounded placeholder depth or downstream exact sink set', () => {
@@ -334,6 +339,7 @@ describe('runEquationMode', () => {
     expect(depthLimited.runtimeAdvisories?.equationNumericSolve).toEqual({
       kind: 'suggest-on-error',
     });
+    expect(depthLimited.detailSections?.some((section) => section.title === 'Exact Closure Boundary')).toBe(true);
 
     expect(unresolvedComposition.kind).toBe('error');
     if (unresolvedComposition.kind !== 'error') {
@@ -343,6 +349,8 @@ describe('runEquationMode', () => {
     expect(unresolvedComposition.runtimeAdvisories?.equationNumericSolve).toEqual({
       kind: 'suggest-on-error',
     });
+    expect(unresolvedComposition.solveSummaryText).toBe('Solved a bounded outer non-periodic absolute-value family');
+    expect(unresolvedComposition.detailSections?.some((section) => section.title === 'Exact Closure Boundary')).toBe(true);
   });
 
   it('returns exact reduced-carrier composition families for shifted radical carriers after COMP12A', () => {

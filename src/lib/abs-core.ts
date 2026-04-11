@@ -6,6 +6,7 @@ import type {
   AbsoluteValueNormalizationResult,
   AbsoluteValueTargetDescriptor,
   AngleUnit,
+  DisplayDetailSection,
   SolveDomainConstraint,
 } from '../types/calculator';
 import {
@@ -41,6 +42,12 @@ export type RecognizedAbsoluteValueEquationFamily = AbsoluteValueEquationFamily 
   blockOnGuidedBranchError?: boolean;
   emptyBranchError?: string;
 };
+
+type AbsoluteValueBoundaryReason =
+  | 'outer-sink'
+  | 'outer-depth'
+  | 'no-roots'
+  | 'guided-branch';
 
 type AbsoluteValueExpressionSupportKind =
   | 'constant'
@@ -1205,12 +1212,137 @@ function buildAbsoluteValueFamilyLabel(family: AbsoluteValueEquationFamily) {
     : 'absolute-value family';
 }
 
+function toInlineSummaryMath(latex: string) {
+  const inline = latex
+    .replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, '($1)/($2)')
+    .replace(/\\left\|/g, '|')
+    .replace(/\\right\|/g, '|')
+    .replace(/\\vert\b/g, '|')
+    .replace(/\\left/g, '')
+    .replace(/\\right/g, '')
+    .replace(/\\ln\b/g, 'ln')
+    .replace(/\\log\b/g, 'log')
+    .replace(/\\sin\b/g, 'sin')
+    .replace(/\\cos\b/g, 'cos')
+    .replace(/\\tan\b/g, 'tan')
+    .replace(/\\pi\b/g, 'pi')
+    .replace(/\\cdot/g, '*')
+    .replace(/\\times/g, '*')
+    .replace(/\^\{([^{}]+)\}/g, '^($1)')
+    .replace(/\{([^{}]+)\}/g, '($1)')
+    .replace(/\\/g, '')
+    .replace(/\\,/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\(\s+/g, '(')
+    .replace(/\s+\)/g, ')')
+    .replace(/\|\s+/g, '|')
+    .replace(/\s+\|/g, '|')
+    .replace(/\s*=\s*/g, '=')
+    .trim();
+
+  return inline.replace(/[-+]?\d[\d,]*(?:\.\d[\d,]*)?(?:e[-+]?\d+)?/gi, (token) => {
+    const normalized = token.replace(/,/g, '');
+    const value = Number(normalized);
+    if (!Number.isFinite(value)) {
+      return token;
+    }
+
+    for (let denominator = 1; denominator <= 16; denominator += 1) {
+      const numerator = Math.round(value * denominator);
+      if (Math.abs(value - numerator / denominator) <= 1e-12) {
+        if (denominator === 1) {
+          return `${numerator}`;
+        }
+        return `(${numerator})/(${denominator})`;
+      }
+    }
+
+    return token;
+  });
+}
+
+function absoluteValuePlaceholderInline(family: RecognizedAbsoluteValueEquationFamily) {
+  return `t = ${toInlineSummaryMath(boxLatex(['Abs', normalizeAst(family.target.base)]))}`;
+}
+
+function shouldIncludeGeneratedBranchSection(family: RecognizedAbsoluteValueEquationFamily) {
+  if (family.normalizationKind !== 'outer-nonperiodic' || family.branchEquations.length <= 1) {
+    return false;
+  }
+
+  return family.branchEquations.some((equationLatex) => !/^x\s*=/.test(toInlineSummaryMath(equationLatex)));
+}
+
+function buildAbsoluteValueBoundaryText(
+  family: RecognizedAbsoluteValueEquationFamily,
+  reason: AbsoluteValueBoundaryReason,
+) {
+  const placeholder = absoluteValuePlaceholderInline(family);
+  switch (reason) {
+    case 'outer-depth':
+      return `${placeholder} would need more than one extra bounded non-periodic outer layer before returning to exact abs branches.`;
+    case 'no-roots':
+      return `${placeholder} produced no admissible real values with t >= 0 after the outer non-periodic reduction.`;
+    case 'guided-branch':
+      return `At least one generated branch from ${placeholder} reaches only guided periodic/composition output, so the full abs family stays unresolved.`;
+    case 'outer-sink':
+    default:
+      return `The outer non-periodic reduction over ${placeholder} succeeded, but at least one resulting abs branch leaves the current exact sink set.`;
+  }
+}
+
+export function buildAbsoluteValueSolveSummary(family: RecognizedAbsoluteValueEquationFamily) {
+  if (family.normalizationKind === 'outer-nonperiodic') {
+    return 'Solved a bounded outer non-periodic absolute-value family';
+  }
+
+  if (family.normalizationKind === 'outer-polynomial') {
+    return 'Solved a bounded outer-polynomial absolute-value family';
+  }
+
+  return 'Solved a bounded absolute-value family through exact branch closure';
+}
+
+export function buildAbsoluteValueDetailSections(
+  family: RecognizedAbsoluteValueEquationFamily,
+  options: {
+    boundaryReason?: AbsoluteValueBoundaryReason;
+  } = {},
+): DisplayDetailSection[] {
+  const sections: DisplayDetailSection[] = [];
+
+  if (family.normalizationKind === 'outer-nonperiodic') {
+    sections.push({
+      title: 'Absolute-Value Reduction',
+      lines: [
+        `Reduced the equation to ${absoluteValuePlaceholderInline(family)} with t >= 0 and solved the bounded outer non-periodic layer before returning to exact abs branches.`,
+      ],
+    });
+
+    if (shouldIncludeGeneratedBranchSection(family)) {
+      sections.push({
+        title: 'Generated Branches',
+        lines: family.branchEquations.map((equationLatex) => `Branch: ${toInlineSummaryMath(equationLatex)}`),
+      });
+    }
+  }
+
+  if (options.boundaryReason) {
+    sections.push({
+      title: 'Exact Closure Boundary',
+      lines: [buildAbsoluteValueBoundaryText(family, options.boundaryReason)],
+    });
+  }
+
+  return sections;
+}
+
 export function buildAbsoluteValueUnresolvedError(family: AbsoluteValueEquationFamily) {
   if ('normalizationKind' in family && family.normalizationKind === 'outer-polynomial') {
     return buildOuterPolynomialUnresolvedError(buildAbsoluteValueFamilyLabel(family));
   }
   if ('normalizationKind' in family && family.normalizationKind === 'outer-nonperiodic') {
-    return buildOuterNonPeriodicUnresolvedError(buildAbsoluteValueFamilyLabel(family));
+    return `This recognized ${buildAbsoluteValueFamilyLabel(family)} reduces through a bounded non-periodic outer layer, but at least one resulting abs branch cannot close through the current exact bounded sink set. Use Numeric Solve with an interval in Equation mode.`;
   }
   return `This recognized ${buildAbsoluteValueFamilyLabel(family)} is outside the current exact bounded solve set. Use Numeric Solve with an interval in Equation mode.`;
 }
@@ -1831,6 +1963,9 @@ export function buildAbsoluteValueNumericGuidance(
   }
 
   const familyLabel = buildAbsoluteValueFamilyLabel(family);
+  const guidanceLead = family.normalizationKind === 'outer-nonperiodic'
+    ? `This recognized ${familyLabel} reduces through a bounded outer non-periodic layer over ${absoluteValuePlaceholderInline(family)}`
+    : `This recognized ${familyLabel}`;
 
   if (family.branchEquations.length === 0) {
     return family.emptyBranchError
@@ -1847,7 +1982,7 @@ export function buildAbsoluteValueNumericGuidance(
     );
 
     if (comparisonValues.length > 0 && comparisonValues.every((value) => value < -ABS_NUMERIC_EPSILON)) {
-      return `This recognized ${familyLabel} requires ${boxLatex(family.comparisonNode)}\\ge0, but it stays negative across the chosen interval.`;
+      return `${guidanceLead} and requires ${boxLatex(family.comparisonNode)}\\ge0, but it stays negative across the chosen interval.`;
     }
   }
 
@@ -1857,22 +1992,22 @@ export function buildAbsoluteValueNumericGuidance(
   const domainBlockedBranches = branchPotentials.filter((entry) => entry.finiteSampleCount === 0);
 
   if (family.branchEquations.length === 1) {
-    return `This recognized ${familyLabel} reduces to the single branch ${family.branchEquations[0]}. Shift the interval toward that branch if you want numeric confirmation.`;
+    return `${guidanceLead} and reduces to the single branch ${family.branchEquations[0]}. Shift the interval toward that branch if you want numeric confirmation.`;
   }
 
   if (activeBranches.length === 0) {
     const domainText = domainBlockedBranches.length > 0
       ? ' One or more branches leave the real-domain carrier range across the chosen interval.'
       : '';
-    return `This recognized ${familyLabel} splits into ${family.branchEquations.join(' and ')}, but the chosen interval does not sample a sign change or near-zero hit on either branch.${domainText}`;
+    return `${guidanceLead} and generates ${family.branchEquations.join(' and ')}, but the chosen interval does not sample a sign change or near-zero hit on any admissible branch.${domainText}`;
   }
 
   if (activeBranches.length === 1) {
     const domainText = domainBlockedBranches.some((entry) => entry.branchEquation !== activeBranches[0].branchEquation)
       ? ' The other branch leaves the real-domain carrier range over this interval.'
       : '';
-    return `This recognized ${familyLabel} splits into ${family.branchEquations.join(' and ')}; the chosen interval only samples the ${activeBranches[0].branchEquation} branch.${domainText}`;
+    return `${guidanceLead} and generates ${family.branchEquations.join(' and ')}; the chosen interval only samples the ${activeBranches[0].branchEquation} branch.${domainText}`;
   }
 
-  return `This recognized ${familyLabel} splits into ${family.branchEquations.join(' and ')}. Try isolating one branch with a narrower interval or shifting the interval center.`;
+  return `${guidanceLead} and generates ${family.branchEquations.join(' and ')}. Try isolating one branch with a narrower interval or shifting the interval center.`;
 }

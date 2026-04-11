@@ -20,6 +20,7 @@
 - Post workflow and memory infrastructure overhaul to Memory V2.
 - Track `R` decomposition sweep is closed and regression-verified.
 - Post second shared algebra-core extraction for transform and branch handling.
+- Post `ABS5B` outer-nonperiodic absolute-value readback/guidance/result-surface polish.
 - Post `ABS5A` deep single-placeholder absolute-value closure through non-periodic outer sinks.
 - Post `COMP12B` reduced-carrier composition readback/guidance polish.
 - Post `COMP12A` cross-lane reduced-carrier composition closure.
@@ -52,6 +53,25 @@
 - Extracted `src/app/*`, `src/styles/app/*`, and decomposition facades under solver/guide/types are in-tree and passing regression.
 
 ## Most Recent Completed Milestone
+- Completed `ABS5B` as the outer-nonperiodic absolute-value readback, guidance, and result-surface polish milestone:
+  - polished `src/lib/abs-core.ts` so outer-nonperiodic abs exact wins now use a stable short solve summary, canonical `t = |u|` readback, and compact detail-section builders instead of repeating reduction facts across summary and body text
+  - kept the `ABS5A` math surface unchanged while sharpening abs-specific boundary messaging for:
+    - outer non-periodic depth-cap stops
+    - no admissible real nonnegative `t` values
+    - outer reductions that leave the current exact sink set
+    - downstream branches that reach only guided periodic/composition output
+    - mixed multi-family / multi-abs structures outside the single-placeholder abs surface
+  - improved `src/lib/equation/guarded/algebra-stage.ts` so outer-nonperiodic abs transforms attach exact-context and closure-boundary detail sections through the existing `DisplayOutcome.detailSections` surface without introducing an abs-only result card
+  - polished branch-aware abs numeric guidance so interval follow-up now reuses recognized `t = |u|` reduction context and distinguishes single-branch hits from intervals that miss all admissible branches
+  - updated focused regression coverage in `src/lib/abs-core.test.ts`, `src/lib/equation/shared-solve.test.ts`, `src/lib/equation/numeric-interval-solve.test.ts`, `src/lib/modes/equation.test.ts`, and `src/AppMain.ui.test.tsx`, and verified cleanly with a full `npm run test:gate`
+  - primary_agent: `codex`
+  - primary_agent_model: `gpt-5.4`
+- Regression checks:
+  - `npm run test:unit -- src/lib/abs-core.test.ts src/lib/equation/shared-solve.test.ts src/lib/modes/equation.test.ts src/lib/equation/numeric-interval-solve.test.ts`
+  - `npm run test:ui -- src/AppMain.ui.test.tsx`
+  - `npm run lint -- src/lib/abs-core.ts src/lib/abs-core.test.ts src/lib/equation/guarded/algebra-stage.ts src/lib/equation/shared-solve.test.ts src/lib/modes/equation.test.ts src/lib/equation/numeric-interval-solve.test.ts src/AppMain.ui.test.tsx`
+  - `npm run test:memory-protocol`
+  - `npm run test:gate`
 - Completed `ABS5A` as the deep single-placeholder absolute-value closure through non-periodic outer sinks milestone:
   - widened `src/lib/abs-core.ts` so the abs lane now treats `t = |u|` as a reusable bounded placeholder across shipped non-periodic outer sinks including logarithmic, exponential/same-base, radical/root, and rational-power follow-ons, while keeping the existing `u = \pm c` branch model unchanged
   - added a bounded outer-placeholder solver for one exact abs target that can isolate admissible real nonnegative `t` values, route accepted values back through the existing abs-family branch path, and stop honestly when a recognized outer family would require more than one extra non-periodic outer layer

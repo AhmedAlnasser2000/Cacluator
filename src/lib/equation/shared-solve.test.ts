@@ -715,6 +715,9 @@ describe('runSharedEquationSolve', () => {
     }
     expect(logarithmic.exactLatex).toContain('\\exponentialE^{2}-1');
     expect(logarithmic.exactLatex).toContain('1-\\exponentialE^{2}');
+    expect(logarithmic.solveSummaryText).toBe('Solved a bounded outer non-periodic absolute-value family');
+    expect(logarithmic.detailSections?.[0]?.title).toBe('Absolute-Value Reduction');
+    expect(logarithmic.detailSections?.[0]?.lines.join(' ')).toContain('t = |x|');
 
     expect(exponential.kind).toBe('success');
     if (exponential.kind !== 'success') {
@@ -729,6 +732,8 @@ describe('runSharedEquationSolve', () => {
     }
     expect(stacked.exactLatex).toContain('\\exponentialE^{4}');
     expect(stacked.exactLatex).toContain('2-\\exponentialE^{4}');
+    expect(stacked.solveSummaryText).toBe('Solved a bounded outer non-periodic absolute-value family');
+    expect(stacked.detailSections?.[0]?.title).toBe('Absolute-Value Reduction');
   });
 
   it('solves deeper polynomial and composition-backed inner carriers after outer non-periodic placeholder reduction', () => {
@@ -757,6 +762,9 @@ describe('runSharedEquationSolve', () => {
     expect(composition.exactLatex ?? '').toContain('x^3+x');
     expect(composition.solveBadges).toContain('Periodic Family');
     expect(composition.solveBadges).toContain('Composition Branch');
+    expect(composition.solveSummaryText).toBe('Solved a bounded outer non-periodic absolute-value family');
+    expect(composition.detailSections?.[0]?.title).toBe('Absolute-Value Reduction');
+    expect(composition.detailSections?.[1]?.title).toBe('Generated Branches');
   });
 
   it('keeps deeper outer non-periodic abs families honest when they exceed the bounded placeholder depth or downstream exact sink set', () => {
@@ -776,6 +784,8 @@ describe('runSharedEquationSolve', () => {
       throw new Error('Expected a bounded-depth error outcome');
     }
     expect(depthLimited.error).toContain('more than one extra bounded non-periodic outer layer');
+    expect(depthLimited.solveSummaryText).toBe('Solved a bounded outer non-periodic absolute-value family');
+    expect(depthLimited.detailSections?.some((section) => section.title === 'Exact Closure Boundary')).toBe(true);
 
     expect(unresolvedComposition.kind).toBe('error');
     if (unresolvedComposition.kind !== 'error') {
@@ -783,7 +793,8 @@ describe('runSharedEquationSolve', () => {
     }
     expect(unresolvedComposition.error).toContain('bounded non-periodic outer layer');
     expect(unresolvedComposition.solveBadges).toContain('Periodic Family');
-    expect(unresolvedComposition.solveSummaryText).toContain('x^5+x exceeds the current bounded reduced-polynomial degree-4 surface');
+    expect(unresolvedComposition.solveSummaryText).toBe('Solved a bounded outer non-periodic absolute-value family');
+    expect(unresolvedComposition.detailSections?.some((section) => section.title === 'Exact Closure Boundary')).toBe(true);
   });
 
   it('solves bounded radical equations that polynomialize into algebraic biquadratic follow-ons', () => {

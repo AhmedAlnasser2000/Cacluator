@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildAbsoluteValueDetailSections,
   buildAbsoluteValueNumericGuidance,
+  buildAbsoluteValueSolveSummary,
   matchDirectAbsoluteValueEquationLatex,
   normalizeExactAbsoluteValueNode,
 } from './abs-core';
@@ -55,6 +57,23 @@ describe('abs-core', () => {
     expect(family?.branchEquations).toContain('x=1-\\exponentialE^{2}');
   });
 
+  it('builds canonical outer non-periodic abs summaries and detail sections', () => {
+    const family = matchDirectAbsoluteValueEquationLatex('2^{\\left|\\sin\\left(x^3+x\\right)\\right|}=2^{\\frac{1}{2}}');
+
+    expect(family).not.toBeNull();
+    if (!family) {
+      throw new Error('Expected an outer non-periodic family');
+    }
+
+    expect(buildAbsoluteValueSolveSummary(family)).toBe('Solved a bounded outer non-periodic absolute-value family');
+
+    const sections = buildAbsoluteValueDetailSections(family);
+    expect(sections[0]?.title).toBe('Absolute-Value Reduction');
+    expect(sections[0]?.lines.join(' ')).toContain('t = |sin(x^3+x)|');
+    expect(sections[1]?.title).toBe('Generated Branches');
+    expect(sections[1]?.lines.join(' ')).toContain('sin(x^3+x)=(1)/(2)');
+  });
+
   it('normalizes direct bounded abs identities for simplify-only reuse', () => {
     const normalized = normalizeExactAbsoluteValueNode(['Power', ['Abs', 'x'], 2]);
 
@@ -72,7 +91,7 @@ describe('abs-core', () => {
       'rad',
     );
 
-    expect(guidance).toContain('absolute-value family splits into');
+    expect(guidance).toContain('absolute-value family and generates');
     expect(guidance).toContain('x+1=\\exponentialE^{x}');
   });
 
@@ -85,7 +104,7 @@ describe('abs-core', () => {
       'rad',
     );
 
-    expect(guidance).toContain('absolute-value family splits into');
+    expect(guidance).toContain('absolute-value family and generates');
     expect(guidance).toContain('x+1=\\frac{-x}{2}-\\frac{3}{2}');
   });
 
@@ -111,7 +130,7 @@ describe('abs-core', () => {
       'rad',
     );
 
-    expect(guidance).toContain('absolute-value family splits into');
+    expect(guidance).toContain('absolute-value family and generates');
     expect(guidance).toContain('x-1=2');
     expect(guidance).toContain('x-1=-3');
   });
@@ -125,6 +144,7 @@ describe('abs-core', () => {
       'rad',
     );
 
+    expect(guidance).toContain('reduces through a bounded outer non-periodic layer over t = |x|');
     expect(guidance).toContain('only samples the x=\\exponentialE^{2}-1 branch');
   });
 

@@ -1,7 +1,9 @@
 import { ComputeEngine, expand } from '@cortex-js/compute-engine';
 import {
+  buildAbsoluteValueDetailSections,
   buildAbsoluteValueEquationFamily,
   buildAbsoluteValueNonnegativeConstraint as buildSharedAbsNonnegativeConstraint,
+  buildAbsoluteValueSolveSummary,
   buildAbsoluteValueUnresolvedError,
   collectAbsoluteValueTargets as collectSharedAbsoluteValueTargets,
   isSupportedAbsoluteValueExpression as isSharedAbsoluteValueExpression,
@@ -31,6 +33,7 @@ import { evaluateRealNumericExpression } from '../../real-numeric-eval';
 import { solveBoundedPolynomialCarrierEquationAst } from '../polynomial-carrier-follow-on';
 import type {
   AbsoluteValueTargetDescriptor,
+  DisplayDetailSection,
   DisplayOutcome,
   EquationExecutionBudget,
   GuardedSolveRequest,
@@ -228,6 +231,11 @@ type AlgebraTransform = {
   domainConstraints?: SolveDomainConstraint[];
   solveBadges: SolveBadge[];
   solveSummaryText: string;
+  summaryMergeMode?: 'prepend' | 'replace';
+  detailSections?: DisplayDetailSection[];
+  unresolvedDetailSections?: DisplayDetailSection[];
+  emptyDetailSections?: DisplayDetailSection[];
+  guidedBranchDetailSections?: DisplayDetailSection[];
   unresolvedError: string;
   emptyBranchError?: string;
   blockOnGuidedBranchError?: boolean;
@@ -738,20 +746,29 @@ function appendSolveMetadata(
   outcome: DisplayOutcome,
   badges: SolveBadge[],
   summary: string,
+  detailSections: DisplayDetailSection[] = [],
+  summaryMergeMode: 'prepend' | 'replace' = 'prepend',
 ): DisplayOutcome {
   if (outcome.kind === 'prompt') {
     return outcome;
   }
 
   const solveBadges = dedupe([...(outcome.solveBadges ?? []), ...badges]);
-  const solveSummaryText = outcome.solveSummaryText
-    ? `${summary}; ${outcome.solveSummaryText}`
-    : summary;
+  const solveSummaryText = summaryMergeMode === 'replace'
+    ? summary
+    : outcome.solveSummaryText
+      ? `${summary}; ${outcome.solveSummaryText}`
+      : summary;
+  const mergedDetailSections = dedupe([
+    ...detailSections.map((section) => JSON.stringify(section)),
+    ...(outcome.detailSections ?? []).map((section) => JSON.stringify(section)),
+  ]).map((section) => JSON.parse(section) as DisplayDetailSection);
 
   return {
     ...outcome,
     solveBadges,
     solveSummaryText,
+    detailSections: mergedDetailSections.length > 0 ? mergedDetailSections : outcome.detailSections,
   };
 }
 
@@ -1143,12 +1160,35 @@ function buildAbsoluteValueRadicalTransform(
 }
 
 function buildAbsoluteValueBranchTransform(family: RecognizedAbsoluteValueEquationFamily): AlgebraTransform {
+  const detailSections = buildAbsoluteValueDetailSections(family);
+  const unresolvedDetailSections = family.normalizationKind === 'outer-nonperiodic'
+    ? buildAbsoluteValueDetailSections(family, { boundaryReason: 'outer-sink' })
+    : undefined;
+  const emptyDetailSections = family.normalizationKind === 'outer-nonperiodic' && family.emptyBranchError
+    ? buildAbsoluteValueDetailSections(
+        family,
+        {
+          boundaryReason: family.emptyBranchError.includes('more than one extra bounded non-periodic outer layer')
+            ? 'outer-depth'
+            : 'no-roots',
+        },
+      )
+    : undefined;
+  const guidedBranchDetailSections = family.normalizationKind === 'outer-nonperiodic'
+    ? buildAbsoluteValueDetailSections(family, { boundaryReason: 'guided-branch' })
+    : undefined;
+
   return {
     equationLatex: family.branchEquations[0] ?? '',
     branchEquations: family.branchEquations,
     domainConstraints: family.branchConstraints,
     solveBadges: [],
-    solveSummaryText: 'Branched a bounded absolute-value family into exact cases',
+    solveSummaryText: buildAbsoluteValueSolveSummary(family),
+    summaryMergeMode: family.normalizationKind === 'outer-nonperiodic' ? 'replace' : 'prepend',
+    detailSections,
+    unresolvedDetailSections,
+    emptyDetailSections,
+    guidedBranchDetailSections,
     unresolvedError: buildAbsoluteValueUnresolvedError(family),
     emptyBranchError: family.emptyBranchError,
     blockOnGuidedBranchError: family.blockOnGuidedBranchError,
@@ -1795,6 +1835,12 @@ function buildBlockedAbsBranchOutcome(
           : [{ latex: outcome.exactSupplementLatex, source: 'legacy' as const }]),
     { constraints: newTransformConstraints, source: 'transform' },
   );
+  const detailSections = dedupe([
+    ...(transform.guidedBranchDetailSections ?? []).map((section) => JSON.stringify(section)),
+    ...recursiveOutcomes
+      .flatMap((outcome) => outcome.kind === 'prompt' ? [] : outcome.detailSections ?? [])
+      .map((section) => JSON.stringify(section)),
+  ]).map((section) => JSON.parse(section) as DisplayDetailSection);
 
   return {
     kind: 'error',
@@ -1803,13 +1849,16 @@ function buildBlockedAbsBranchOutcome(
     warnings,
     plannerBadges,
     solveBadges,
-    solveSummaryText: dedupe([
-      transform.solveSummaryText,
-      ...recursiveOutcomes
-        .flatMap((outcome) => (outcome.kind !== 'prompt' && outcome.solveSummaryText ? [outcome.solveSummaryText] : [])),
-    ]).join('; '),
+    solveSummaryText: transform.summaryMergeMode === 'replace'
+      ? transform.solveSummaryText
+      : dedupe([
+        transform.solveSummaryText,
+        ...recursiveOutcomes
+          .flatMap((outcome) => (outcome.kind !== 'prompt' && outcome.solveSummaryText ? [outcome.solveSummaryText] : [])),
+      ]).join('; '),
     periodicFamily,
     exactSupplementLatex: exactSupplementLatex.length > 0 ? exactSupplementLatex : undefined,
+    detailSections: detailSections.length > 0 ? detailSections : undefined,
     rejectedCandidateCount: recursiveOutcomes.reduce(
       (total, outcome) => total + (outcome.kind === 'prompt' ? 0 : outcome.rejectedCandidateCount ?? 0),
       0,
@@ -1870,14 +1919,21 @@ function recurseTransform(
   );
   if (branchEquations.length === 0) {
     if (transform.emptyBranchError) {
-      return errorOutcome(
+      const outcome = errorOutcome(
         'Solve',
         transform.emptyBranchError,
         [],
         [],
         transform.solveBadges,
         transform.solveSummaryText,
-      );
+      ) as Extract<DisplayOutcome, { kind: 'error' }>;
+      if (transform.emptyDetailSections?.length) {
+        return {
+          ...outcome,
+          detailSections: transform.emptyDetailSections,
+        };
+      }
+      return outcome;
     }
     return null;
   }
@@ -1907,11 +1963,13 @@ function recurseTransform(
     : mergeDisplayOutcomes(
         recursiveOutcomes,
         transform.solveBadges,
-        dedupe([
-          transform.solveSummaryText,
-          ...recursiveOutcomes
-          .flatMap((outcome) => (outcome.kind !== 'prompt' && outcome.solveSummaryText ? [outcome.solveSummaryText] : [])),
-        ]).join('; '),
+        transform.summaryMergeMode === 'replace'
+          ? transform.solveSummaryText
+          : dedupe([
+            transform.solveSummaryText,
+            ...recursiveOutcomes
+              .flatMap((outcome) => (outcome.kind !== 'prompt' && outcome.solveSummaryText ? [outcome.solveSummaryText] : [])),
+          ]).join('; '),
       );
 
   if (
@@ -1930,7 +1988,7 @@ function recurseTransform(
       return null;
     }
 
-    return errorOutcome(
+    const outcome = errorOutcome(
       'Solve',
       transform.unresolvedError,
       recursiveOutcome.warnings,
@@ -1940,7 +1998,17 @@ function recurseTransform(
       recursiveOutcome.rejectedCandidateCount,
       recursiveOutcome.substitutionDiagnostics,
       recursiveOutcome.numericMethod,
-    );
+    ) as Extract<DisplayOutcome, { kind: 'error' }>;
+    if (transform.unresolvedDetailSections?.length) {
+      return {
+        ...outcome,
+        detailSections: dedupe([
+          ...transform.unresolvedDetailSections.map((section) => JSON.stringify(section)),
+          ...(recursiveOutcome.detailSections ?? []).map((section) => JSON.stringify(section)),
+        ]).map((section) => JSON.parse(section) as DisplayDetailSection),
+      };
+    }
+    return outcome;
   }
 
   const supplementedOutcome: DisplayOutcome =
@@ -1962,10 +2030,22 @@ function recurseTransform(
       : recursiveOutcome;
 
   if (recursiveOutcomes.length > 1) {
-    return supplementedOutcome;
+    return appendSolveMetadata(
+      supplementedOutcome,
+      transform.solveBadges,
+      transform.solveSummaryText,
+      transform.detailSections,
+      transform.summaryMergeMode,
+    );
   }
 
-  return appendSolveMetadata(supplementedOutcome, transform.solveBadges, transform.solveSummaryText);
+  return appendSolveMetadata(
+    supplementedOutcome,
+    transform.solveBadges,
+    transform.solveSummaryText,
+    transform.detailSections,
+    transform.summaryMergeMode,
+  );
 }
 
 function algebraTransformSolve(

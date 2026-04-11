@@ -1251,6 +1251,40 @@ describe('AppMain UI automation flows', () => {
     expect(screen.queryByTestId('display-outcome-periodic-stop-reason')).not.toBeInTheDocument();
   });
 
+  it('renders exact outer-nonperiodic abs context through detail sections after ABS5B', async () => {
+    const { user } = await renderAppMain();
+
+    await openEquationSymbolic(user);
+    setMathFieldLatex('main-editor', '\\ln\\left(\\left|x\\right|+1\\right)=2');
+    await user.click(screen.getByTestId('soft-action-solve'));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expect(screen.getByTestId('display-outcome-solve-summary')).toHaveTextContent(/outer non-periodic absolute-value family/i);
+    expect(screen.getByText('Absolute-Value Reduction')).toBeInTheDocument();
+    expect(screen.getByTestId('display-outcome-detail-sections')).toHaveTextContent(/t = \|x\|/i);
+    expect(screen.queryByText('Exact Closure Boundary')).not.toBeInTheDocument();
+  });
+
+  it('renders guided outer-nonperiodic abs boundaries separately from periodic-family context after ABS5B', async () => {
+    const { user } = await renderAppMain();
+
+    await user.click(screen.getByTestId('settings-toggle'));
+    await screen.findByTestId('settings-panel');
+    await user.click(screen.getByTestId('settings-angle-unit-rad'));
+    await user.click(screen.getByTestId('settings-toggle'));
+    await waitFor(() => expect(screen.queryByTestId('settings-panel')).not.toBeInTheDocument());
+
+    await openEquationSymbolic(user);
+    setMathFieldLatex('main-editor', '2^{\\left|\\sin\\left(x^5+x\\right)\\right|}=2^{\\frac{1}{2}}');
+    await user.click(screen.getByTestId('soft-action-solve'));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-error')).toBeInTheDocument());
+    expect(screen.getByText('Periodic Family')).toBeInTheDocument();
+    expect(screen.getByTestId('display-outcome-solve-summary')).toHaveTextContent(/outer non-periodic absolute-value family/i);
+    expect(screen.getByText('Exact Closure Boundary')).toBeInTheDocument();
+    expect(screen.getByTestId('display-outcome-detail-sections')).toHaveTextContent(/guided periodic\/composition output/i);
+  });
+
   it('shows the new PRL3 Equation transforms without auto-solving the rewritten equation', async () => {
     const { user } = await renderAppMain();
 
