@@ -30,6 +30,7 @@
 - Post `PGL2` canonical Playground experiment records with shared checklists, lightweight YAML companion manifests, a records index, and one seeded symbolic-search starter experiment.
 - Post `PGL3` symbolic-search lab with replayable guarded-stage ordering, a dedicated Playground Vitest harness, and a first real experiment result that keeps `sym-search-planner-ordering` at `level-0-research` because both alternate whole-stage orderings introduced one honesty regression and no exact improvements.
 - Post `PGL4` external compute foundations lab with provider-neutral runner/job/artifact contracts, ignored local SSH-shaped profile support, a local harness over the real symbolic-search workload, and explicit non-executable SSH behavior.
+- Post `PGL5` user-owned SSH remote pilot with real `ssh`/`scp` orchestration, pulled-back remote artifacts under `.task_tmp/pgl5-external-compute/`, and a local parity report over the reused symbolic-search workload.
 - Post capture of `PGL-VIS` as a separate post-`PGL` roadmap family for any future calculator-visible Playground surface; visible Playground work is now explicitly sequenced after the core incubation ladder rather than being implied inside `PGL1` through `PGL6`.
 
 ## Stable Architecture Snapshot
@@ -65,10 +66,24 @@
   - `PGL2` now makes the record system canonical with Markdown-as-source-of-truth, tiny YAML companion manifests, promotion/retirement checklist templates, a records index, and a seeded Level 0 symbolic-search experiment
   - `PGL3` now adds a dedicated `npm run test:playground` lab harness plus an export-only guarded-stage replay seam for non-product experimentation, and the first symbolic-search pilot remains active at `level-0-research` after the initial run found no exact improvements and one honesty regression in each alternate ordering
   - `PGL4` now adds an `external-compute` foundations lane inside Playground with provider-neutral runner/job/artifact contracts, checked-in JSON templates, ignored local `*.local.json` profiles, and a local harness that proves the contract over the real `sym-search-planner-ordering` workload while keeping SSH execution intentionally non-executable
+  - `PGL5` now reuses the same external-compute lane for one real VM-first SSH pilot, adding a dedicated remote Playground entrypoint, JSON upload/pullback flow over `ssh`/`scp`, and parity reporting against a local baseline while keeping provider-host work deferred
   - calculator-visible Playground is now explicitly treated as a separate follow-on roadmap family (`PGL-VIS`) that starts only after the core `PGL` ladder is sufficiently complete; it is not part of the current incubation milestones
   - Playground still does not have schema validation, automation, or product integration infrastructure; those remain explicitly out of scope
 
 ## Most Recent Completed Milestone
+- Completed `PGL5` as the user-owned SSH remote Playground pilot milestone:
+  - turned the `PGL4` SSH branch from a structural stub into one bounded real remote execution flow over `ssh`/`scp`
+  - extended the SSH runner profile with explicit `remoteProjectPath` and added local manifest metadata for remote execution, pulled-back outputs, and parity-report location
+  - added a dedicated remote Playground entrypoint that reads uploaded JSON inputs on the VM and executes the registered workload locally from the remote repo
+  - kept the workload scope intentionally narrow to `sym-search-planner-ordering`, then pulled back the remote manifest and summary into `.task_tmp/pgl5-external-compute/`
+  - added a local parity baseline and deterministic parity-report classification for `match`, `mismatch`, `remote-failed`, and `pullback-failed`
+  - promoted `ext-compute-ssh-foundations` as the completed PGL4 record, created the new active `ext-compute-ssh-vm-pilot` record, and added the required `TRACK-PGL4` manual verification checklist before opening the new track
+  - primary_agent: `codex`
+  - primary_agent_model: `gpt-5.4`
+- Regression checks:
+  - `npm run test:playground`
+  - `npx eslint eslint.config.js src playground`
+  - `npm run test:memory-protocol`
 - Completed `PGL4` as the external-compute foundations Playground milestone:
   - reinterpreted `PGL4` as a foundations-only external-compute pass rather than an early provider integration milestone
   - added a new `playground/level-0-research/external-compute/` lane with provider-neutral runner/job/artifact contracts shaped for future SSH-backed remote execution

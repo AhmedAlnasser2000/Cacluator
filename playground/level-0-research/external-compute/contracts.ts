@@ -15,6 +15,7 @@ const LocalRunnerDetailsSchema = z.object({
 const SshRunnerDetailsSchema = z.object({
   hostAlias: z.string().min(1),
   remoteWorkspaceRoot: z.string().min(1),
+  remoteProjectPath: z.string().min(1),
   remoteShell: z.string().min(1).default('bash'),
 }).strict();
 
@@ -61,6 +62,13 @@ export const ExternalComputeArtifactManifestSchema = z.object({
   summaryPath: z.string().min(1),
   outputPaths: z.array(z.string()),
   note: z.string().min(1).optional(),
+  remoteExecution: z.object({
+    hostAlias: z.string().min(1),
+    remoteProjectPath: z.string().min(1),
+    remoteJobDirectory: z.string().min(1),
+    pulledBackOutputPaths: z.array(z.string()),
+    parityReportPath: z.string().min(1),
+  }).strict().optional(),
 }).strict();
 
 export type ExternalComputeRunnerKind = z.infer<typeof ExternalComputeRunnerKindSchema>;
@@ -68,6 +76,9 @@ export type ExternalComputeRunnerProfile = z.infer<typeof ExternalComputeRunnerP
 export type ExternalComputeJobSpec = z.infer<typeof ExternalComputeJobSpecSchema>;
 export type ExternalComputeRunStatus = z.infer<typeof ExternalComputeRunStatusSchema>;
 export type ExternalComputeArtifactManifest = z.infer<typeof ExternalComputeArtifactManifestSchema>;
+export type ExternalComputeRemoteExecutionMetadata = NonNullable<
+  ExternalComputeArtifactManifest['remoteExecution']
+>;
 
 export function parseExternalComputeRunnerProfile(input: unknown): ExternalComputeRunnerProfile {
   return ExternalComputeRunnerProfileSchema.parse(input);

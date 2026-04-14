@@ -142,3 +142,9 @@
   - both alternate orderings failed that bar because they each introduced one honesty regression
   - neither alternate ordering produced any exact improvement
 - Next review should focus on narrower guardrail-preserving heuristics, not broader whole-stage reordering.
+
+## External Compute Reuse Note
+
+- `sym-search-planner-ordering` is now reused as the first remote workload proof for `ext-compute-ssh-vm-pilot`.
+- That reuse does not change the symbolic-search result recorded above.
+- The symbolic-search lane remains `level-0-research` until a later review proves safer heuristics or a better pilot direction.

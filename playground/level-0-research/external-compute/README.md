@@ -1,17 +1,24 @@
-# External Compute Foundations Lab
+# External Compute Lab
 
-This folder holds `PGL4` foundations work for future external compute.
+This folder now spans two bounded incubation steps:
 
-- It is foundations-first, not provider integration.
-- SSH is the first expected future transport.
-- Real provider execution is deferred to a later milestone.
+- `PGL4`: provider-neutral external-compute foundations
+- `PGL5`: first real SSH execution pilot on a user-owned VM target
+
+Fixed rules:
+- SSH is the only remote transport in scope here.
+- Provider APIs and rented-host integrations stay out of scope.
 - No stable product/runtime authority lives here.
+- Tracked config remains template-only.
 
-For `PGL4`, this lane provides:
+Current capabilities:
 - provider-neutral runner/job/artifact contracts
-- a tiny workload registry
-- a local harness that proves the contract over one real existing Playground workload
-- structural validation for future SSH profiles without attempting network execution
+- a workload registry with one real Playground workload
+- local harness proof from `PGL4`
+- one SSH pilot flow in `PGL5` that:
+  - uploads JSON inputs
+  - runs a dedicated remote Playground entrypoint
+  - pulls artifacts back locally
+  - compares the remote summary against a local parity baseline
 
-Tracked config is template-only.
-Real local profiles must live in `profiles/*.local.json` and remain ignored by git.
+Real operator profiles must live in `profiles/*.local.json` and remain ignored by git.

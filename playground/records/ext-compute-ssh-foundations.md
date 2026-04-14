@@ -7,10 +7,10 @@
 - owner: `unassigned`
 - lane_topic: `external-compute`
 - current_level: `level-0-research`
-- status: `active`
+- status: `promoted`
 - date_started: `2026-04-14`
 - last_reviewed: `2026-04-14`
-- next_review: `2026-04-21`
+- next_review: `closed - promoted into ext-compute-ssh-vm-pilot`
 - candidate_stable_home: `future remote execution adapters / orchestration layer`
 - companion_manifest: `playground/manifests/ext-compute-ssh-foundations.yaml`
 
@@ -64,3 +64,18 @@
 - The local harness provides no useful execution or artifact signal.
 - The contract proves too abstract to guide a real future pilot.
 - Another external-compute incubation approach clearly supersedes this foundations lane.
+
+## Result Summary
+
+- `PGL4` delivered the provider-neutral contract, JSON templates, workload registry, and local harness exactly as intended.
+- The real symbolic-search workload proved that the contract was useful enough to carry forward.
+- The next review is no longer about contract shape; it is about taking one bounded real SSH step.
+
+## Promotion Decision
+
+- Decision: promote the foundations lane into the first real SSH pilot record.
+- Follow-on record: `ext-compute-ssh-vm-pilot`
+- Rationale:
+  - the foundations contract produced a real local harness proof
+  - SSH profile shape and ignored local-profile rules were stable enough to support one real remote target
+  - the next bounded question became remote execution parity, not contract invention

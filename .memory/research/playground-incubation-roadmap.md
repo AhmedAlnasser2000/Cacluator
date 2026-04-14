@@ -223,29 +223,40 @@ Exit criteria:
 - the repo has a provider-neutral contract and a real local harness proof
 - the next sequencing decision is whether to take a first real SSH/provider pilot, not whether the foundations still need to be invented
 
-### `PGL5` — Bounded Prototype Contract
+### `PGL5` — User-Owned SSH Remote Pilot
 
 Purpose:
-- choose one promising pilot and make it bounded enough to discuss serious adoption
+- take the `PGL4` SSH contract into one real bounded remote run without introducing provider complexity
+
+Interpretation:
+- `PGL5` stays singular and VM-first
+- the first real remote target is a user-owned SSH-accessible machine
+- provider/rented-host execution stays deferred until after this pilot proves useful
 
 Scope:
-- narrow one promising experiment
-- define explicit I/O contract
-- define stop reasons
-- define performance or cost expectations
-- propose stable ownership layer
+- execute one real Playground workload over `ssh`
+- upload JSON runner/job inputs to the remote target
+- run a dedicated remote Playground entrypoint from the remote repo
+- pull the resulting manifest and summary back locally
+- compare the pulled-back summary against a fresh local parity baseline
 
 Deliverables:
-- one bounded prototype contract
-- one adoption-placement proposal
-- one rejection/deferral explanation for what still cannot graduate
+- one active SSH pilot record and manifest
+- remote-execution support in the external-compute runner for `ssh`
+- one parity report shape for remote versus local comparison
+- one explicit operator profile path that stays local-only and ignored
 
 Out of scope:
+- no provider APIs
+- no queueing, retry orchestration, or cancellation controls
 - no direct app dependency on incubation code
-- no broad rollout of multiple pilots at once
+- no broad rollout of multiple remote pilots at once
 
 Exit criteria:
-- at least one candidate reaches Level 2 or Level 3 with enough clarity to support an architecture decision
+- one real SSH target completes an end-to-end run
+- remote artifacts are pulled back into the local repo under `.task_tmp/`
+- the local parity report can classify the run as `match`, `mismatch`, `remote-failed`, or `pullback-failed`
+- the next sequencing decision becomes provider/rented-host follow-up versus another bounded refinement pass
 
 ### `PGL6` — Graduation Workflow
 

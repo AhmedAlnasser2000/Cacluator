@@ -8,7 +8,8 @@
   },
   "ssh": {
     "hostAlias": "replace-with-your-ssh-config-alias",
-    "remoteWorkspaceRoot": "~/calcwiz-playground",
+    "remoteWorkspaceRoot": "/home/replace-with-user/calcwiz-playground",
+    "remoteProjectPath": "/home/replace-with-user/calcwiz-playground/Calculator",
     "remoteShell": "bash"
   }
 }
