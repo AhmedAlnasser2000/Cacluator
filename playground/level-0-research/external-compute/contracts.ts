@@ -19,6 +19,15 @@ const SshRunnerDetailsSchema = z.object({
   remoteShell: z.string().min(1).default('bash'),
 }).strict();
 
+export const ExternalComputeSshReliabilitySchema = z.object({
+  preflightTimeoutSeconds: z.number().int().positive(),
+  uploadTimeoutSeconds: z.number().int().positive(),
+  remoteRunTimeoutSeconds: z.number().int().positive(),
+  pullbackTimeoutSeconds: z.number().int().positive(),
+  uploadRetries: z.number().int().nonnegative(),
+  pullbackRetries: z.number().int().nonnegative(),
+}).strict();
+
 export const ExternalComputeRunnerProfileSchema = z.discriminatedUnion('runnerKind', [
   z.object({
     profileId: z.string().min(1),
@@ -33,6 +42,7 @@ export const ExternalComputeRunnerProfileSchema = z.discriminatedUnion('runnerKi
     description: z.string().min(1),
     budgets: ExternalComputeBudgetSchema.optional(),
     ssh: SshRunnerDetailsSchema,
+    reliability: ExternalComputeSshReliabilitySchema,
   }).strict(),
 ]);
 
@@ -47,8 +57,58 @@ export const ExternalComputeJobSpecSchema = z.object({
 export const ExternalComputeRunStatusSchema = z.enum([
   'completed',
   'failed',
-  'not-implemented',
+  'cancelled',
 ]);
+
+export const ExternalComputeFailureClassSchema = z.enum([
+  'preflight-failed',
+  'upload-failed',
+  'remote-launch-failed',
+  'remote-timeout',
+  'remote-workload-failed',
+  'pullback-failed',
+  'parity-mismatch',
+  'cancelled',
+]);
+
+export const ExternalComputeStepNameSchema = z.enum([
+  'preflight',
+  'upload',
+  'remote-run',
+  'pullback',
+  'local-parity',
+]);
+
+export const ExternalComputeStepStatusSchema = z.enum([
+  'completed',
+  'failed',
+  'cancelled',
+]);
+
+const ExternalComputeStepResultSchema = z.object({
+  step: ExternalComputeStepNameSchema,
+  status: ExternalComputeStepStatusSchema,
+  attempts: z.number().int().positive(),
+  startedAt: z.string().min(1),
+  finishedAt: z.string().min(1),
+  durationMs: z.number().int().nonnegative(),
+  note: z.string().min(1).optional(),
+}).strict();
+
+const ExternalComputePreflightSummarySchema = z.object({
+  sshAvailable: z.boolean(),
+  scpAvailable: z.boolean(),
+  batchModeEcho: z.boolean(),
+  remoteProjectPathExists: z.boolean(),
+  remoteEntrypointExists: z.boolean(),
+  remoteVitestConfigExists: z.boolean(),
+}).strict();
+
+const ExternalComputeProvenanceSchema = z.object({
+  gitCommitHash: z.string().min(1),
+  nodeVersion: z.string().min(1),
+  npmVersion: z.string().min(1),
+}).strict();
 
 export const ExternalComputeArtifactManifestSchema = z.object({
   jobId: z.string().min(1),
@@ -56,12 +116,17 @@ export const ExternalComputeArtifactManifestSchema = z.object({
   runnerKind: ExternalComputeRunnerKindSchema,
   profileId: z.string().min(1),
   status: ExternalComputeRunStatusSchema,
+  failureClass: ExternalComputeFailureClassSchema.optional(),
   startedAt: z.string().min(1),
   finishedAt: z.string().min(1),
   durationMs: z.number().int().nonnegative(),
   summaryPath: z.string().min(1),
   outputPaths: z.array(z.string()),
   note: z.string().min(1).optional(),
+  stepResults: z.array(ExternalComputeStepResultSchema).default([]),
+  preflight: ExternalComputePreflightSummarySchema.optional(),
+  localProvenance: ExternalComputeProvenanceSchema.optional(),
+  remoteProvenance: ExternalComputeProvenanceSchema.optional(),
   remoteExecution: z.object({
     hostAlias: z.string().min(1),
     remoteProjectPath: z.string().min(1),
@@ -75,10 +140,17 @@ export type ExternalComputeRunnerKind = z.infer<typeof ExternalComputeRunnerKind
 export type ExternalComputeRunnerProfile = z.infer<typeof ExternalComputeRunnerProfileSchema>;
 export type ExternalComputeJobSpec = z.infer<typeof ExternalComputeJobSpecSchema>;
 export type ExternalComputeRunStatus = z.infer<typeof ExternalComputeRunStatusSchema>;
+export type ExternalComputeFailureClass = z.infer<typeof ExternalComputeFailureClassSchema>;
+export type ExternalComputeStepName = z.infer<typeof ExternalComputeStepNameSchema>;
+export type ExternalComputeStepStatus = z.infer<typeof ExternalComputeStepStatusSchema>;
 export type ExternalComputeArtifactManifest = z.infer<typeof ExternalComputeArtifactManifestSchema>;
 export type ExternalComputeRemoteExecutionMetadata = NonNullable<
   ExternalComputeArtifactManifest['remoteExecution']
 >;
+export type ExternalComputeSshReliability = z.infer<typeof ExternalComputeSshReliabilitySchema>;
+export type ExternalComputeStepResult = z.infer<typeof ExternalComputeStepResultSchema>;
+export type ExternalComputePreflightSummary = z.infer<typeof ExternalComputePreflightSummarySchema>;
+export type ExternalComputeProvenance = z.infer<typeof ExternalComputeProvenanceSchema>;
 
 export function parseExternalComputeRunnerProfile(input: unknown): ExternalComputeRunnerProfile {
   return ExternalComputeRunnerProfileSchema.parse(input);

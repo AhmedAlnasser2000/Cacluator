@@ -11,5 +11,13 @@
     "remoteWorkspaceRoot": "/home/replace-with-user/calcwiz-playground",
     "remoteProjectPath": "/home/replace-with-user/calcwiz-playground/Calculator",
     "remoteShell": "bash"
+  },
+  "reliability": {
+    "preflightTimeoutSeconds": 15,
+    "uploadTimeoutSeconds": 30,
+    "remoteRunTimeoutSeconds": 120,
+    "pullbackTimeoutSeconds": 30,
+    "uploadRetries": 1,
+    "pullbackRetries": 1
   }
 }

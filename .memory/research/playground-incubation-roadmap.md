@@ -258,6 +258,54 @@ Exit criteria:
 - the local parity report can classify the run as `match`, `mismatch`, `remote-failed`, or `pullback-failed`
 - the next sequencing decision becomes provider/rented-host follow-up versus another bounded refinement pass
 
+### `PGL5+` — SSH VM Hardening Gate
+
+Purpose:
+- harden the already-proven VM-first SSH lane enough to support a real adoption-or-retire discussion
+
+Interpretation:
+- `PGL5+` is not provider-host expansion
+- `PGL5+` is not `PGL6` graduation
+- it is the bounded hardening pass between the live `PGL5` proof and any later adoption or provider-host decision
+
+Scope:
+- keep exactly one real workload:
+  - `sym-search-planner-ordering`
+- add preflight checks for local `ssh` / `scp`, batch-mode SSH, and remote repo layout
+- add bounded step-level timeouts for preflight, upload, remote run, and pullback
+- add one retry on upload and one retry on pullback only
+- add explicit failure classes, provenance, and step-result metadata to the local SSH manifest
+- replace handwritten `.task_tmp` live-gate scripts with one checked-in operator command
+
+Deliverables:
+- one level-3 integration-candidate record and manifest for SSH VM hardening
+- one checked-in operator entrypoint:
+  - `npm run playground:ssh-vm -- --profile <path> --job <path>`
+- explicit failure classes for:
+  - `preflight-failed`
+  - `upload-failed`
+  - `remote-launch-failed`
+  - `remote-timeout`
+  - `remote-workload-failed`
+  - `pullback-failed`
+  - `parity-mismatch`
+  - `cancelled`
+- manifest provenance for local and remote commit / Node / npm state
+
+Out of scope:
+- no provider-specific host integration
+- no second workload
+- no queueing or dashboard layer
+- no stable app dependency on incubation code
+
+Exit criteria:
+- one successful live `calcwiz-box` run still returns parity `match`
+- at least two induced failure paths classify correctly
+- the next sequencing decision becomes:
+  - provider-host expansion
+  - or no-adopt / retire
+  rather than basic SSH reliability uncertainty
+
 ### `PGL6` — Graduation Workflow
 
 Purpose:

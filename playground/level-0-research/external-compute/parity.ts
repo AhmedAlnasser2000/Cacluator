@@ -33,8 +33,18 @@ export type ExternalComputeParityReport = {
   workloadId: string;
   remoteSummaryPath?: string;
   localSummaryPath?: string;
+  comparisonProvenance?: {
+    comparedFieldPaths: string[];
+    remoteSummaryPath?: string;
+    localSummaryPath?: string;
+  };
   comparedFields?: string[];
   mismatchFields?: string[];
+  firstMismatch?: {
+    field: string;
+    remoteValue: unknown;
+    localValue: unknown;
+  };
   note?: string;
 };
 
@@ -117,21 +127,42 @@ export function compareSymbolicSearchParity(
       resultClass: 'match',
       workloadId,
       comparedFields,
+      comparisonProvenance: {
+        comparedFieldPaths: comparedFields,
+      },
     };
   }
 
   const mismatchFields: string[] = [];
+  let firstMismatch:
+    | ExternalComputeParityReport['firstMismatch']
+    | undefined;
   if (remoteSummary.corpusSize !== localSummary.corpusSize) {
     mismatchFields.push('corpusSize');
+    firstMismatch ??= {
+      field: 'corpusSize',
+      remoteValue: remoteSummary.corpusSize,
+      localValue: localSummary.corpusSize,
+    };
   }
   if (
     JSON.stringify(remoteSummary.baselineParityMismatches)
     !== JSON.stringify(localSummary.baselineParityMismatches)
   ) {
     mismatchFields.push('baselineParityMismatches');
+    firstMismatch ??= {
+      field: 'baselineParityMismatches',
+      remoteValue: remoteSummary.baselineParityMismatches,
+      localValue: localSummary.baselineParityMismatches,
+    };
   }
   if (JSON.stringify(remoteSummary.orderings) !== JSON.stringify(localSummary.orderings)) {
     mismatchFields.push('orderings');
+    firstMismatch ??= {
+      field: 'orderings',
+      remoteValue: remoteSummary.orderings,
+      localValue: localSummary.orderings,
+    };
   }
 
   return {
@@ -139,6 +170,10 @@ export function compareSymbolicSearchParity(
     workloadId,
     comparedFields,
     mismatchFields,
+    comparisonProvenance: {
+      comparedFieldPaths: comparedFields,
+    },
+    firstMismatch,
     note: 'The pulled-back remote summary does not match the local parity baseline.',
   };
 }

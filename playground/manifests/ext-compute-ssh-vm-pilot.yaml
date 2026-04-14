@@ -3,9 +3,9 @@ title: External Compute SSH VM Pilot With Artifact Pullback
 owner: unassigned
 lane_topic: external-compute
 current_level: level-2-bounded-prototypes
-status: active
+status: promoted
 record_path: playground/records/ext-compute-ssh-vm-pilot.md
 started_on: 2026-04-14
 last_reviewed: 2026-04-14
-next_review: 2026-04-21
+next_review: closed - promoted into ext-compute-ssh-vm-hardening
 candidate_stable_home: future remote execution adapters / orchestration layer

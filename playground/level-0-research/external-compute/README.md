@@ -4,6 +4,7 @@ This folder now spans two bounded incubation steps:
 
 - `PGL4`: provider-neutral external-compute foundations
 - `PGL5`: first real SSH execution pilot on a user-owned VM target
+- `PGL5+`: SSH VM hardening before any adoption or provider-host decision
 
 Fixed rules:
 - SSH is the only remote transport in scope here.
@@ -20,5 +21,10 @@ Current capabilities:
   - runs a dedicated remote Playground entrypoint
   - pulls artifacts back locally
   - compares the remote summary against a local parity baseline
+- one hardening path in `PGL5+` that:
+  - runs preflight checks before upload
+  - records step-level retries, timeouts, provenance, and failure classes
+  - exposes one repeatable operator command:
+    - `npm run playground:ssh-vm -- --profile <path> --job <path>`
 
 Real operator profiles must live in `profiles/*.local.json` and remain ignored by git.

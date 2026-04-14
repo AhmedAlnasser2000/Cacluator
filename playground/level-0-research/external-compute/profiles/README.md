@@ -11,8 +11,14 @@ Rules:
 The first real remote transport is SSH-backed.
 The tracked template should stay generic, while the actual operator profile stays local-only.
 
-For `PGL5`, the current verified operator values are:
+For `PGL5+`, the current verified operator values are:
 - host alias: `calcwiz-box`
 - remote project path: `/home/ahmed/calcwiz-playground/Calculator`
+
+The SSH profile now also carries a required `reliability` block for:
+- preflight timeout
+- upload timeout + retries
+- remote-run timeout
+- pullback timeout + retries
 
 Do not check those operator-specific values into tracked profile files.

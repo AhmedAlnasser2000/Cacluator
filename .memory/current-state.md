@@ -4,6 +4,7 @@
 - Workspace: `Calcwiz`
 - Active branch context: `main` tracking `origin/main` with local milestone commits.
 - Workflow default: commit-first with meaningful verified gates and explicit approval before commit or push.
+- `PGL5+` SSH VM hardening is verified locally and on `calcwiz-box`; the repo is waiting on commit approval, not on another implementation/debug pass.
 
 ## Agent Ownership
 - `AGENTS.md` is the authoritative cross-agent workflow file for this repo; `CLAUDE.md` and `GEMINI.md` are compatibility stubs only.
@@ -31,6 +32,7 @@
 - Post `PGL3` symbolic-search lab with replayable guarded-stage ordering, a dedicated Playground Vitest harness, and a first real experiment result that keeps `sym-search-planner-ordering` at `level-0-research` because both alternate whole-stage orderings introduced one honesty regression and no exact improvements.
 - Post `PGL4` external compute foundations lab with provider-neutral runner/job/artifact contracts, ignored local SSH-shaped profile support, a local harness over the real symbolic-search workload, and explicit non-executable SSH behavior.
 - Post `PGL5` user-owned SSH remote pilot with real `ssh`/`scp` orchestration, pulled-back remote artifacts under `.task_tmp/pgl5-external-compute/`, and a local parity report over the reused symbolic-search workload.
+- Post `PGL5+` SSH VM hardening gate with a checked-in operator entrypoint, preflight checks, bounded retries/timeouts, step-level manifest evidence, provenance capture, and live `calcwiz-box` proof for both success and classified failure paths.
 - Post capture of `PGL-VIS` as a separate post-`PGL` roadmap family for any future calculator-visible Playground surface; visible Playground work is now explicitly sequenced after the core incubation ladder rather than being implied inside `PGL1` through `PGL6`.
 
 ## Stable Architecture Snapshot
@@ -67,10 +69,35 @@
   - `PGL3` now adds a dedicated `npm run test:playground` lab harness plus an export-only guarded-stage replay seam for non-product experimentation, and the first symbolic-search pilot remains active at `level-0-research` after the initial run found no exact improvements and one honesty regression in each alternate ordering
   - `PGL4` now adds an `external-compute` foundations lane inside Playground with provider-neutral runner/job/artifact contracts, checked-in JSON templates, ignored local `*.local.json` profiles, and a local harness that proves the contract over the real `sym-search-planner-ordering` workload while keeping SSH execution intentionally non-executable
   - `PGL5` now reuses the same external-compute lane for one real VM-first SSH pilot, adding a dedicated remote Playground entrypoint, JSON upload/pullback flow over `ssh`/`scp`, and parity reporting against a local baseline while keeping provider-host work deferred
+  - `PGL5+` now hardens that same VM-first SSH lane with a checked-in operator entrypoint, batch-mode preflight, step-level timeout/retry controls, explicit failure classes, and provenance-rich manifests so the next review can judge trust/cost instead of basic transport reliability
   - calculator-visible Playground is now explicitly treated as a separate follow-on roadmap family (`PGL-VIS`) that starts only after the core `PGL` ladder is sufficiently complete; it is not part of the current incubation milestones
   - Playground still does not have schema validation, automation, or product integration infrastructure; those remain explicitly out of scope
 
 ## Most Recent Completed Milestone
+- Completed `PGL5+` as the SSH VM hardening gate before any adoption decision:
+  - added a checked-in operator entrypoint:
+    - `npm run playground:ssh-vm -- --profile <path> --job <path>`
+  - extended SSH runner profiles with a required `reliability` block covering preflight/upload/remote-run/pullback timeout budgets plus upload/pullback retries
+  - extended SSH manifests with:
+    - `failureClass`
+    - `stepResults`
+    - `preflight`
+    - `localProvenance`
+    - `remoteProvenance`
+    - richer `remoteExecution` metadata
+  - strengthened parity reports with explicit compared-field provenance and first-mismatch detail
+  - promoted `ext-compute-ssh-vm-pilot`, opened the new `ext-compute-ssh-vm-hardening` record, and added the required `TRACK-PGL5` manual verification checklist before the new track
+  - verified the new live operator flow on `calcwiz-box`:
+    - one success path returned manifest `status: completed` and parity `resultClass: match`
+    - one induced bad-path profile returned `failureClass: preflight-failed`
+    - one induced tiny timeout profile returned `failureClass: remote-timeout`
+  - primary_agent: `codex`
+  - primary_agent_model: `gpt-5.4`
+- Regression checks:
+  - `npm run test:playground`
+  - `npx eslint eslint.config.js src playground`
+  - `npx tsc -b --pretty false`
+  - `npm run test:memory-protocol`
 - Completed `PGL5` as the user-owned SSH remote Playground pilot milestone:
   - turned the `PGL4` SSH branch from a structural stub into one bounded real remote execution flow over `ssh`/`scp`
   - extended the SSH runner profile with explicit `remoteProjectPath` and added local manifest metadata for remote execution, pulled-back outputs, and parity-report location

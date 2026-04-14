@@ -81,17 +81,27 @@ function createMockWorkloadRegistry(summary = createSampleSymbolicSearchSummary(
       laneTopic: 'symbolic-search',
       executeLocal: () => ({
         summary,
-        note: 'Executed through a mock symbolic-search workload for PGL5 lab coverage.',
+        note: 'Executed through a mock symbolic-search workload for external-compute lab coverage.',
       }),
     },
   ]);
 }
 
-function createSshRunnerProfile() {
+function createSshRunnerProfile(overrides: Partial<{
+  remoteProjectPath: string;
+  reliability: Partial<{
+    preflightTimeoutSeconds: number;
+    uploadTimeoutSeconds: number;
+    remoteRunTimeoutSeconds: number;
+    pullbackTimeoutSeconds: number;
+    uploadRetries: number;
+    pullbackRetries: number;
+  }>;
+}> = {}) {
   return parseExternalComputeRunnerProfile({
     profileId: 'ssh-vm-pilot-template',
     runnerKind: 'ssh',
-    description: 'User-owned VM SSH profile for PGL5.',
+    description: 'User-owned VM SSH profile for PGL5+.',
     budgets: {
       maxRuntimeSeconds: 1800,
       maxOutputBytes: 1048576,
@@ -99,8 +109,17 @@ function createSshRunnerProfile() {
     ssh: {
       hostAlias: 'calcwiz-box',
       remoteWorkspaceRoot: '/home/ahmed/calcwiz-playground',
-      remoteProjectPath: '/home/ahmed/calcwiz-playground/Calculator',
+      remoteProjectPath: overrides.remoteProjectPath ?? '/home/ahmed/calcwiz-playground/Calculator',
       remoteShell: 'bash',
+    },
+    reliability: {
+      preflightTimeoutSeconds: 5,
+      uploadTimeoutSeconds: 5,
+      remoteRunTimeoutSeconds: 5,
+      pullbackTimeoutSeconds: 5,
+      uploadRetries: 1,
+      pullbackRetries: 1,
+      ...overrides.reliability,
     },
   });
 }
@@ -115,6 +134,46 @@ function createSshJobSpec(jobId: string) {
   });
 }
 
+function createTimeoutError(message: string) {
+  return Object.assign(new Error(message), { timedOut: true });
+}
+
+async function writeRemoteArtifacts(
+  destinationDirectory: string,
+  jobId: string,
+  summary = createSampleSymbolicSearchSummary(),
+  manifestStatus: 'completed' | 'failed' = 'completed',
+) {
+  await mkdir(destinationDirectory, { recursive: true });
+  await writeFile(
+    path.join(destinationDirectory, 'artifact-manifest.json'),
+    `${JSON.stringify({
+      jobId,
+      workloadId: 'sym-search-planner-ordering',
+      runnerKind: 'ssh',
+      profileId: 'ssh-vm-pilot-template',
+      status: manifestStatus,
+      startedAt: '2026-04-14T12:00:00.000Z',
+      finishedAt: '2026-04-14T12:00:01.000Z',
+      durationMs: 1000,
+      summaryPath: `/remote/${jobId}/summary.json`,
+      outputPaths: [`/remote/${jobId}/summary.json`],
+      note: manifestStatus === 'completed' ? 'Remote ssh pilot completed.' : 'Remote ssh pilot failed.',
+    }, null, 2)}\n`,
+  );
+  await writeFile(
+    path.join(destinationDirectory, 'summary.json'),
+    `${JSON.stringify({
+      jobId,
+      workloadId: 'sym-search-planner-ordering',
+      runnerKind: 'ssh',
+      status: manifestStatus,
+      note: manifestStatus === 'completed' ? 'Remote ssh pilot completed.' : 'Remote ssh pilot failed.',
+      summary,
+    }, null, 2)}\n`,
+  );
+}
+
 describe('external compute lab', () => {
   it('parses the checked-in runner profile and job spec templates', async () => {
     const runnerProfileTemplate = await readJsonFile(
@@ -123,21 +182,29 @@ describe('external compute lab', () => {
         'playground/level-0-research/external-compute/profiles/runner-profile.template.json',
       ),
     );
-    const jobSpecTemplate = await readJsonFile(
+    const localJobSpecTemplate = await readJsonFile(
       path.resolve(
         process.cwd(),
         'playground/level-0-research/external-compute/jobs/job-spec.template.json',
       ),
     );
+    const sshJobSpecTemplate = await readJsonFile(
+      path.resolve(
+        process.cwd(),
+        'playground/level-0-research/external-compute/jobs/job-spec.ssh-vm.template.json',
+      ),
+    );
 
     const parsedRunnerProfile = parseExternalComputeRunnerProfile(runnerProfileTemplate);
-    const parsedJobSpec = parseExternalComputeJobSpec(jobSpecTemplate);
+    const parsedLocalJobSpec = parseExternalComputeJobSpec(localJobSpecTemplate);
+    const parsedSshJobSpec = parseExternalComputeJobSpec(sshJobSpecTemplate);
 
     expect(parsedRunnerProfile.runnerKind).toBe('ssh');
     expect(parsedRunnerProfile.ssh.hostAlias).toContain('replace-with-your-ssh-config-alias');
-    expect(parsedRunnerProfile.ssh.remoteProjectPath).toContain('/Calculator');
-    expect(parsedJobSpec.workloadId).toBe('sym-search-planner-ordering');
-    expect(parsedJobSpec.runnerKind).toBe('local');
+    expect(parsedRunnerProfile.reliability.remoteRunTimeoutSeconds).toBeGreaterThan(0);
+    expect(parsedLocalJobSpec.runnerKind).toBe('local');
+    expect(parsedSshJobSpec.runnerKind).toBe('ssh');
+    expect(parsedSshJobSpec.workloadId).toBe('sym-search-planner-ordering');
   });
 
   it('rejects missing remoteProjectPath for ssh profiles', () => {
@@ -149,6 +216,14 @@ describe('external compute lab', () => {
         hostAlias: 'calcwiz-box',
         remoteWorkspaceRoot: '/home/ahmed/calcwiz-playground',
         remoteShell: 'bash',
+      },
+      reliability: {
+        preflightTimeoutSeconds: 5,
+        uploadTimeoutSeconds: 5,
+        remoteRunTimeoutSeconds: 5,
+        pullbackTimeoutSeconds: 5,
+        uploadRetries: 1,
+        pullbackRetries: 1,
       },
     })).toThrow();
   });
@@ -233,9 +308,9 @@ describe('external compute lab', () => {
     await expect(stat(result.summaryPath)).resolves.toBeDefined();
   });
 
-  it('executes one ssh pilot run, pulls back remote artifacts, and writes a parity match report', async () => {
+  it('executes one ssh hardening run, pulls back remote artifacts, and writes a parity match report', async () => {
     const artifactRoot = path.resolve(process.cwd(), DEFAULT_EXTERNAL_COMPUTE_SSH_ARTIFACT_ROOT);
-    const jobId = 'sym-search-planner-ordering-ssh-pilot-match';
+    const jobId = 'sym-search-planner-ordering-ssh-hardening-match';
     const jobDirectory = path.join(artifactRoot, jobId);
     const sampleSummary = createSampleSymbolicSearchSummary();
     const workloadRegistry = createMockWorkloadRegistry(sampleSummary);
@@ -252,6 +327,21 @@ describe('external compute lab', () => {
         commandRunner: async (command, args) => {
           commandCalls.push({ command, args });
 
+          if (command === 'where') {
+            return { stdout: 'C:\\Windows\\System32\\OpenSSH\\ssh.exe', stderr: '' };
+          }
+
+          if (command === 'ssh' && args[0] === '-o') {
+            return { stdout: 'ok\n', stderr: '' };
+          }
+
+          if (command === 'ssh' && args.join(' ').includes('__PGL_PREFLIGHT__')) {
+            return {
+              stdout: '__PGL_PREFLIGHT__:ok\nremote-commit\nv22.22.2\n10.9.7\n',
+              stderr: '',
+            };
+          }
+
           if (
             command === 'scp'
             && args.some((value) => value.includes(':') && value.endsWith('/artifact-manifest.json'))
@@ -261,40 +351,10 @@ describe('external compute lab', () => {
               throw new Error('Missing scp pullback destination.');
             }
 
-            await mkdir(destinationDirectory, { recursive: true });
-            await writeFile(
-              path.join(destinationDirectory, 'artifact-manifest.json'),
-              `${JSON.stringify({
-                jobId,
-                workloadId: 'sym-search-planner-ordering',
-                runnerKind: 'ssh',
-                profileId: 'ssh-vm-pilot-template',
-                status: 'completed',
-                startedAt: '2026-04-14T12:00:00.000Z',
-                finishedAt: '2026-04-14T12:00:01.000Z',
-                durationMs: 1000,
-                summaryPath: '/home/ahmed/calcwiz-playground/Calculator/.task_tmp/pgl5-external-compute/sym-search-planner-ordering-ssh-pilot-match/summary.json',
-                outputPaths: ['/home/ahmed/calcwiz-playground/Calculator/.task_tmp/pgl5-external-compute/sym-search-planner-ordering-ssh-pilot-match/summary.json'],
-                note: 'Remote ssh pilot completed.',
-              }, null, 2)}\n`,
-            );
-            await writeFile(
-              path.join(destinationDirectory, 'summary.json'),
-              `${JSON.stringify({
-                jobId,
-                workloadId: 'sym-search-planner-ordering',
-                runnerKind: 'ssh',
-                status: 'completed',
-                note: 'Remote ssh pilot completed.',
-                summary: sampleSummary,
-              }, null, 2)}\n`,
-            );
+            await writeRemoteArtifacts(destinationDirectory, jobId, sampleSummary);
           }
 
-          return {
-            stdout: '',
-            stderr: '',
-          };
+          return { stdout: '', stderr: '' };
         },
       },
     );
@@ -305,12 +365,19 @@ describe('external compute lab', () => {
     );
 
     expect(manifest.status).toBe('completed');
-    expect(manifest.summaryPath).toContain(path.join('pulled-back', 'summary.json'));
-    expect(manifest.remoteExecution?.hostAlias).toBe('calcwiz-box');
-    expect(manifest.remoteExecution?.remoteProjectPath).toBe('/home/ahmed/calcwiz-playground/Calculator');
-    expect(manifest.remoteExecution?.pulledBackOutputPaths).toContain(
-      path.join(jobDirectory, 'pulled-back', 'summary.json'),
-    );
+    expect(manifest.preflight).toMatchObject({
+      sshAvailable: true,
+      scpAvailable: true,
+      batchModeEcho: true,
+      remoteProjectPathExists: true,
+      remoteEntrypointExists: true,
+      remoteVitestConfigExists: true,
+    });
+    expect(manifest.remoteProvenance).toMatchObject({
+      gitCommitHash: 'remote-commit',
+      nodeVersion: 'v22.22.2',
+      npmVersion: '10.9.7',
+    });
     expect(parityReport).toMatchObject({
       resultClass: 'match',
       workloadId: 'sym-search-planner-ordering',
@@ -325,40 +392,9 @@ describe('external compute lab', () => {
     ))).toBe(true);
   });
 
-  it('classifies ssh launch failures as remote-failed', async () => {
+  it('classifies preflight failures before upload starts', async () => {
     const artifactRoot = path.resolve(process.cwd(), DEFAULT_EXTERNAL_COMPUTE_SSH_ARTIFACT_ROOT);
-    const jobId = 'sym-search-planner-ordering-ssh-launch-failure';
-    const jobDirectory = path.join(artifactRoot, jobId);
-
-    await rm(jobDirectory, { recursive: true, force: true });
-
-    const result = await executeExternalComputeJob(
-      createSshJobSpec(jobId),
-      createSshRunnerProfile(),
-      {
-        artifactRoot,
-        workloadRegistry: createMockWorkloadRegistry(),
-        commandRunner: async () => {
-          throw new Error('ssh unreachable');
-        },
-      },
-    );
-
-    const manifest = parseExternalComputeArtifactManifest(await readJsonFile(result.manifestPath));
-    const parityReport = await readJsonFile(path.join(jobDirectory, 'parity-report.json'));
-
-    expect(manifest.status).toBe('failed');
-    expect(manifest.note).toContain('SSH launch failure');
-    expect(parityReport).toMatchObject({
-      resultClass: 'remote-failed',
-      workloadId: 'sym-search-planner-ordering',
-    });
-  });
-
-  it('classifies remote workload failures as remote-failed', async () => {
-    const artifactRoot = path.resolve(process.cwd(), DEFAULT_EXTERNAL_COMPUTE_SSH_ARTIFACT_ROOT);
-    const jobId = 'sym-search-planner-ordering-remote-failure';
-    let sshInvocationCount = 0;
+    const jobId = 'sym-search-planner-ordering-preflight-failure';
 
     await rm(path.join(artifactRoot, jobId), { recursive: true, force: true });
 
@@ -368,68 +404,212 @@ describe('external compute lab', () => {
       {
         artifactRoot,
         workloadRegistry: createMockWorkloadRegistry(),
-        commandRunner: async (command) => {
+        commandRunner: async (command, args) => {
+          if (command === 'where') {
+            return { stdout: 'C:\\Windows\\System32\\OpenSSH\\ssh.exe', stderr: '' };
+          }
+          if (command === 'ssh' && args[0] === '-o') {
+            throw new Error('batch mode ssh failed');
+          }
+          return { stdout: '', stderr: '' };
+        },
+      },
+    );
+
+    expect(result.manifest.status).toBe('failed');
+    expect(result.manifest.failureClass).toBe('preflight-failed');
+    expect(result.manifest.stepResults.at(-1)?.step).toBe('preflight');
+  });
+
+  it('retries upload once and succeeds on the second attempt', async () => {
+    const artifactRoot = path.resolve(process.cwd(), DEFAULT_EXTERNAL_COMPUTE_SSH_ARTIFACT_ROOT);
+    const jobId = 'sym-search-planner-ordering-upload-retry';
+    let uploadAttempts = 0;
+
+    await rm(path.join(artifactRoot, jobId), { recursive: true, force: true });
+
+    const result = await executeExternalComputeJob(
+      createSshJobSpec(jobId),
+      createSshRunnerProfile(),
+      {
+        artifactRoot,
+        workloadRegistry: createMockWorkloadRegistry(),
+        commandRunner: async (command, args) => {
+          if (command === 'where') {
+            return { stdout: 'C:\\Windows\\System32\\OpenSSH\\ssh.exe', stderr: '' };
+          }
+          if (command === 'ssh' && args[0] === '-o') {
+            return { stdout: 'ok\n', stderr: '' };
+          }
+          if (command === 'ssh' && args.join(' ').includes('__PGL_PREFLIGHT__')) {
+            return { stdout: '__PGL_PREFLIGHT__:ok\nremote-commit\nv22.22.2\n10.9.7\n', stderr: '' };
+          }
+          if (
+            command === 'scp'
+            && args.some((value) => value.endsWith('/input/'))
+          ) {
+            uploadAttempts += 1;
+            if (uploadAttempts === 1) {
+              throw new Error('temporary upload failure');
+            }
+          }
+          if (
+            command === 'scp'
+            && args.some((value) => value.includes(':') && value.endsWith('/artifact-manifest.json'))
+          ) {
+            const destinationDirectory = args.at(-1);
+            if (!destinationDirectory) {
+              throw new Error('Missing pullback destination.');
+            }
+            await writeRemoteArtifacts(destinationDirectory, jobId);
+          }
+
+          return { stdout: '', stderr: '' };
+        },
+      },
+    );
+
+    const uploadStep = result.manifest.stepResults.find((step) => step.step === 'upload');
+    expect(result.manifest.status).toBe('completed');
+    expect(uploadStep?.attempts).toBe(2);
+    expect(uploadAttempts).toBe(2);
+  });
+
+  it('retries pullback once and succeeds on the second attempt', async () => {
+    const artifactRoot = path.resolve(process.cwd(), DEFAULT_EXTERNAL_COMPUTE_SSH_ARTIFACT_ROOT);
+    const jobId = 'sym-search-planner-ordering-pullback-retry';
+    let pullbackAttempts = 0;
+
+    await rm(path.join(artifactRoot, jobId), { recursive: true, force: true });
+
+    const result = await executeExternalComputeJob(
+      createSshJobSpec(jobId),
+      createSshRunnerProfile(),
+      {
+        artifactRoot,
+        workloadRegistry: createMockWorkloadRegistry(),
+        commandRunner: async (command, args) => {
+          if (command === 'where') {
+            return { stdout: 'C:\\Windows\\System32\\OpenSSH\\ssh.exe', stderr: '' };
+          }
+          if (command === 'ssh' && args[0] === '-o') {
+            return { stdout: 'ok\n', stderr: '' };
+          }
+          if (command === 'ssh' && args.join(' ').includes('__PGL_PREFLIGHT__')) {
+            return { stdout: '__PGL_PREFLIGHT__:ok\nremote-commit\nv22.22.2\n10.9.7\n', stderr: '' };
+          }
+          if (
+            command === 'scp'
+            && args.some((value) => value.includes(':') && value.endsWith('/artifact-manifest.json'))
+          ) {
+            pullbackAttempts += 1;
+            if (pullbackAttempts === 1) {
+              throw new Error('temporary pullback failure');
+            }
+
+            const destinationDirectory = args.at(-1);
+            if (!destinationDirectory) {
+              throw new Error('Missing pullback destination.');
+            }
+            await writeRemoteArtifacts(destinationDirectory, jobId);
+          }
+
+          return { stdout: '', stderr: '' };
+        },
+      },
+    );
+
+    const pullbackStep = result.manifest.stepResults.find((step) => step.step === 'pullback');
+    expect(result.manifest.status).toBe('completed');
+    expect(pullbackStep?.attempts).toBe(2);
+    expect(pullbackAttempts).toBe(2);
+  });
+
+  it('classifies remote timeouts distinctly from other remote failures', async () => {
+    const artifactRoot = path.resolve(process.cwd(), DEFAULT_EXTERNAL_COMPUTE_SSH_ARTIFACT_ROOT);
+    const jobId = 'sym-search-planner-ordering-remote-timeout';
+
+    await rm(path.join(artifactRoot, jobId), { recursive: true, force: true });
+
+    const result = await executeExternalComputeJob(
+      createSshJobSpec(jobId),
+      createSshRunnerProfile(),
+      {
+        artifactRoot,
+        workloadRegistry: createMockWorkloadRegistry(),
+        commandRunner: async (command, args) => {
+          if (command === 'where') {
+            return { stdout: 'C:\\Windows\\System32\\OpenSSH\\ssh.exe', stderr: '' };
+          }
+          if (command === 'ssh' && args[0] === '-o') {
+            return { stdout: 'ok\n', stderr: '' };
+          }
+          if (command === 'ssh' && args.join(' ').includes('__PGL_PREFLIGHT__')) {
+            return { stdout: '__PGL_PREFLIGHT__:ok\nremote-commit\nv22.22.2\n10.9.7\n', stderr: '' };
+          }
+          if (command === 'ssh' && args.join(' ').includes('mkdir -p')) {
+            return { stdout: '', stderr: '' };
+          }
           if (command === 'ssh') {
-            sshInvocationCount += 1;
-            if (sshInvocationCount === 2) {
-              throw new Error('remote entrypoint failed');
-            }
+            throw createTimeoutError('remote run timed out');
           }
-          return {
-            stdout: '',
-            stderr: '',
-          };
+
+          return { stdout: '', stderr: '' };
         },
       },
     );
 
-    const parityReport = await readJsonFile(path.join(artifactRoot, jobId, 'parity-report.json'));
-
     expect(result.manifest.status).toBe('failed');
-    expect(result.manifest.note).toContain('Remote workload failure');
-    expect(parityReport).toMatchObject({
-      resultClass: 'remote-failed',
-      workloadId: 'sym-search-planner-ordering',
-    });
+    expect(result.manifest.failureClass).toBe('remote-timeout');
   });
 
-  it('classifies pullback failures as pullback-failed', async () => {
+  it('marks the run as cancelled when the caller aborts locally', async () => {
     const artifactRoot = path.resolve(process.cwd(), DEFAULT_EXTERNAL_COMPUTE_SSH_ARTIFACT_ROOT);
-    const jobId = 'sym-search-planner-ordering-pullback-failure';
-    let scpInvocationCount = 0;
+    const jobId = 'sym-search-planner-ordering-cancelled';
+    const abortController = new AbortController();
 
     await rm(path.join(artifactRoot, jobId), { recursive: true, force: true });
 
-    const result = await executeExternalComputeJob(
+    const resultPromise = executeExternalComputeJob(
       createSshJobSpec(jobId),
       createSshRunnerProfile(),
       {
         artifactRoot,
         workloadRegistry: createMockWorkloadRegistry(),
-        commandRunner: async (command) => {
-          if (command === 'scp') {
-            scpInvocationCount += 1;
-            if (scpInvocationCount === 2) {
-              throw new Error('unable to pull artifacts');
-            }
+        signal: abortController.signal,
+        commandRunner: async (command, args, options) => {
+          if (command === 'where') {
+            return { stdout: 'C:\\Windows\\System32\\OpenSSH\\ssh.exe', stderr: '' };
           }
-          return {
-            stdout: '',
-            stderr: '',
-          };
+          if (command === 'ssh' && args[0] === '-o') {
+            return { stdout: 'ok\n', stderr: '' };
+          }
+          if (command === 'ssh' && args.join(' ').includes('__PGL_PREFLIGHT__')) {
+            return { stdout: '__PGL_PREFLIGHT__:ok\nremote-commit\nv22.22.2\n10.9.7\n', stderr: '' };
+          }
+          if (command === 'scp' && args.some((value) => value.endsWith('/input/'))) {
+            await new Promise<void>((resolve, reject) => {
+              if (options?.signal?.aborted) {
+                reject(Object.assign(new Error('cancelled'), { cancelled: true }));
+                return;
+              }
+              options?.signal?.addEventListener('abort', () => {
+                reject(Object.assign(new Error('cancelled'), { cancelled: true }));
+              }, { once: true });
+            });
+          }
+          return { stdout: '', stderr: '' };
         },
       },
     );
 
-    const parityReport = await readJsonFile(path.join(artifactRoot, jobId, 'parity-report.json'));
+    setTimeout(() => abortController.abort(new Error('Interrupted by operator.')), 25);
+    const result = await resultPromise;
 
-    expect(result.manifest.status).toBe('failed');
-    expect(result.manifest.note).toContain('Pullback failure');
-    expect(parityReport).toMatchObject({
-      resultClass: 'pullback-failed',
-      workloadId: 'sym-search-planner-ordering',
-    });
-  });
+    expect(result.manifest.status).toBe('cancelled');
+    expect(result.manifest.failureClass).toBe('cancelled');
+    expect(result.manifest.stepResults.some((step) => step.status === 'cancelled')).toBe(true);
+  }, 10_000);
 
   it('classifies parity mismatches after a successful pullback', async () => {
     const artifactRoot = path.resolve(process.cwd(), DEFAULT_EXTERNAL_COMPUTE_SSH_ARTIFACT_ROOT);
@@ -446,60 +626,41 @@ describe('external compute lab', () => {
         artifactRoot,
         workloadRegistry: createMockWorkloadRegistry(createSampleSymbolicSearchSummary()),
         commandRunner: async (command, args) => {
+          if (command === 'where') {
+            return { stdout: 'C:\\Windows\\System32\\OpenSSH\\ssh.exe', stderr: '' };
+          }
+          if (command === 'ssh' && args[0] === '-o') {
+            return { stdout: 'ok\n', stderr: '' };
+          }
+          if (command === 'ssh' && args.join(' ').includes('__PGL_PREFLIGHT__')) {
+            return { stdout: '__PGL_PREFLIGHT__:ok\nremote-commit\nv22.22.2\n10.9.7\n', stderr: '' };
+          }
           if (
             command === 'scp'
             && args.some((value) => value.includes(':') && value.endsWith('/artifact-manifest.json'))
           ) {
             const destinationDirectory = args.at(-1);
             if (!destinationDirectory) {
-              throw new Error('Missing scp pullback destination.');
+              throw new Error('Missing pullback destination.');
             }
-
-            await mkdir(destinationDirectory, { recursive: true });
-            await writeFile(
-              path.join(destinationDirectory, 'artifact-manifest.json'),
-              `${JSON.stringify({
-                jobId,
-                workloadId: 'sym-search-planner-ordering',
-                runnerKind: 'ssh',
-                profileId: 'ssh-vm-pilot-template',
-                status: 'completed',
-                startedAt: '2026-04-14T12:00:00.000Z',
-                finishedAt: '2026-04-14T12:00:01.000Z',
-                durationMs: 1000,
-                summaryPath: '/home/ahmed/calcwiz-playground/Calculator/.task_tmp/pgl5-external-compute/sym-search-planner-ordering-parity-mismatch/summary.json',
-                outputPaths: ['/home/ahmed/calcwiz-playground/Calculator/.task_tmp/pgl5-external-compute/sym-search-planner-ordering-parity-mismatch/summary.json'],
-                note: 'Remote ssh pilot completed.',
-              }, null, 2)}\n`,
-            );
-            await writeFile(
-              path.join(destinationDirectory, 'summary.json'),
-              `${JSON.stringify({
-                jobId,
-                workloadId: 'sym-search-planner-ordering',
-                runnerKind: 'ssh',
-                status: 'completed',
-                note: 'Remote ssh pilot completed.',
-                summary: remoteSummary,
-              }, null, 2)}\n`,
-            );
+            await writeRemoteArtifacts(destinationDirectory, jobId, remoteSummary);
           }
 
-          return {
-            stdout: '',
-            stderr: '',
-          };
+          return { stdout: '', stderr: '' };
         },
       },
     );
 
-    const manifest = parseExternalComputeArtifactManifest(await readJsonFile(result.manifestPath));
     const parityReport = await readJsonFile(path.join(artifactRoot, jobId, 'parity-report.json'));
 
-    expect(manifest.status).toBe('failed');
+    expect(result.manifest.status).toBe('failed');
+    expect(result.manifest.failureClass).toBe('parity-mismatch');
     expect(parityReport).toMatchObject({
       resultClass: 'mismatch',
       workloadId: 'sym-search-planner-ordering',
+      firstMismatch: {
+        field: 'orderings',
+      },
     });
   });
 });

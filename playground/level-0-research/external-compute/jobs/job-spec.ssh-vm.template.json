@@ -1,0 +1,7 @@
+{
+  "jobId": "sym-search-planner-ordering-ssh-vm-hardening",
+  "workloadId": "sym-search-planner-ordering",
+  "runnerKind": "ssh",
+  "profileId": "replace-with-ssh-profile-id",
+  "input": {}
+}

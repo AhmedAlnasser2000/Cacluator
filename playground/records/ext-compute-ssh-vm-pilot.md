@@ -7,10 +7,10 @@
 - owner: `unassigned`
 - lane_topic: `external-compute`
 - current_level: `level-2-bounded-prototypes`
-- status: `active`
+- status: `promoted`
 - date_started: `2026-04-14`
 - last_reviewed: `2026-04-14`
-- next_review: `2026-04-21`
+- next_review: `closed - promoted into ext-compute-ssh-vm-hardening`
 - candidate_stable_home: `future remote execution adapters / orchestration layer`
 - companion_manifest: `playground/manifests/ext-compute-ssh-vm-pilot.yaml`
 
@@ -59,6 +59,15 @@
 - Remote artifacts are pulled back locally under `.task_tmp/pgl5-external-compute/`.
 - The local parity report compares deterministic symbolic-search fields only.
 - At least one real run returns `match`.
+
+## Live Result
+
+- The live `calcwiz-box` backend gate completed successfully.
+- The pulled-back local `artifact-manifest.json` recorded:
+  - `status: completed`
+- The pulled-back local `parity-report.json` recorded:
+  - `resultClass: match`
+- The pilot is therefore promoted into the `PGL5+` SSH VM hardening gate rather than remaining an open transport-proof question.
 
 ## Promotion Criteria
 

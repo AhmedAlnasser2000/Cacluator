@@ -102,6 +102,15 @@ Promotion and retirement reviews should use the shared checklist templates.
 - a local harness that proves the contract over the real `sym-search-planner-ordering` workload
 - structural SSH validation only; no real remote execution yet
 
+`PGL5` now adds:
+- one real VM-first SSH pilot over `sym-search-planner-ordering`
+- JSON upload, remote execution, artifact pullback, and local parity reporting
+
+`PGL5+` now adds:
+- SSH preflight checks and step-level timeout/retry handling
+- explicit failure classes and provenance on the local SSH manifest
+- one checked-in operator command for live VM runs instead of handwritten `.task_tmp` scripts
+
 `PGL1` and `PGL2` intentionally do not include:
 - workflow automation
 - schema validation

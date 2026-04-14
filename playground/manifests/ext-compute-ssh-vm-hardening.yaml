@@ -1,0 +1,11 @@
+experiment_id: ext-compute-ssh-vm-hardening
+title: External Compute SSH VM Hardening and Adoption Gate
+owner: unassigned
+lane_topic: external-compute
+current_level: level-3-integration-candidates
+status: active
+record_path: playground/records/ext-compute-ssh-vm-hardening.md
+started_on: 2026-04-14
+last_reviewed: 2026-04-14
+next_review: 2026-04-21
+candidate_stable_home: future remote execution adapters / orchestration layer
