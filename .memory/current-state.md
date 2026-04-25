@@ -2,7 +2,7 @@
 
 ## Active Context
 - Workspace: `Calcwiz`
-- Active branch context: `main` is ahead of `origin/main` by the docs refresh checkpoint `6bf33a0`; current working tree contains roadmap-sync memory updates awaiting user-approved commit.
+- Active branch context: `main` is aligned with `origin/main` at the committed calculus-roadmap sync checkpoint `ae92d14`; current working tree contains `CALC-LIM1` code and memory updates awaiting user-approved commit.
 - Workflow default: commit-first with meaningful verified gates and explicit approval before commit or push.
 - Version 1 platform direction has shifted to Linux-first while keeping cross-platform ground for Windows/macOS through Tauri, TypeScript, Rust, and repo-owned validation.
 - `PGL5+` SSH VM hardening is verified and committed, but external compute is intentionally postponed rather than adopted or retired; the lane should wait until core calculator stability and additional solver work make remote execution worth revisiting.
@@ -44,6 +44,7 @@
 - Post `CALC-CORE3` backend unification gate; Basic Calculus and Advanced Calc now share the same app-owned symbolic integration backend for shared indefinite-integral behavior, with Advanced-only workflows kept separate.
 - Post `CALC-COMP1` bounded composition antiderivative leap; shared Basic/Advanced indefinite integration now supports broader verified `u`-substitution cases and visible integration strategy badges.
 - Post `CALC-DIFF1` derivative leap; Calculate free-form derivatives and guided Calculus derivatives now share derivative strategy metadata, visible derivative badges, powered-function/general-power differentiation, and known inverse-family derivative rules.
+- Post `CALC-LIM1` finite-limit leap; shared Basic/Advanced finite limits now have bounded composition-aware known-form rules and clearer finite-domain one-sided stops.
 
 ## Stable Architecture Snapshot
 - Desktop-first calculator with Tauri shell and React/TypeScript frontend.
@@ -85,6 +86,24 @@
   - Playground still does not have schema validation, automation, or product integration infrastructure; those remain explicitly out of scope
 
 ## Most Recent Completed Milestone
+- Completed `CALC-LIM1` as the composition-aware finite-limit and domain-honesty milestone after `CALC-DIFF1`:
+  - extended the shared finite-limit resolver behind both Basic Calculus and Advanced Calc
+  - added app-owned rule-based symbolic wins for bounded known forms where `u -> 0`: `sin(u)/u`, `tan(u)/u`, `(1-cos(u))/u^2`, `(e^u-1)/u`, `ln(1+u)/u`, and `(sqrt(1+u)-1)/u`
+  - reused existing rational normalization/cancellation for simple removable polynomial-rational holes such as `(x^2-1)/(x-1)` at `x=1`
+  - preserved capped L'Hopital as a heuristic fallback for supported forms outside the explicit known-rule matcher
+  - added clearer one-sided real-domain stop behavior for finite log/square-root boundary cases
+  - preserved `|x|/x` two-sided mismatch and directional `-1`/`1` behavior
+  - kept `ResultOrigin` values stable and added no limit strategy badge surface
+  - added `.memory/research/TRACK-CALC-LIM1-MANUAL-VERIFICATION-CHECKLIST.md`
+  - next recommended calculus milestone is `CALC-INT1`, but only after reviewing endpoint/domain trust requirements for exact definite integrals
+  - primary_agent: `codex`
+  - primary_agent_model: `gpt-5.5`
+- Regression checks:
+  - `npm run test:unit -- src/lib/symbolic-engine/limits.test.ts src/lib/calculus-core.test.ts src/lib/advanced-calc/limits.test.ts src/lib/math-engine.test.ts`
+  - `npx eslint src/lib/symbolic-engine/limits.ts src/lib/symbolic-engine/limits.test.ts src/lib/calculus-core.ts src/lib/calculus-core.test.ts src/lib/calculus-eval.ts src/lib/advanced-calc/limits.ts src/lib/advanced-calc/limits.test.ts src/lib/math-engine.test.ts e2e/calc-audit0-smoke.spec.ts`
+  - `npx playwright test e2e/calc-audit0-smoke.spec.ts --project=chromium`
+  - `npm run build`
+  - `npm run test:memory-protocol`
 - Completed `CALC-DIFF1` as the first derivative-focused calculus leap after `CALC-COMP1`:
   - added internal derivative strategy metadata alongside stable `differentiateAst` / `differentiateLatex` outputs
   - surfaced visible derivative strategy badges for Basic Calculate free-form derivatives and guided `Calculus > Derivative` successes

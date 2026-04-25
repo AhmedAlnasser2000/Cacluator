@@ -95,6 +95,14 @@ test('CALC-AUDIT0 Advanced Calc smoke covers integrals and limits', async ({ pag
 
   await expect(page.getByTestId('display-outcome-success')).toBeVisible();
   await expect(page.getByTestId('display-outcome-root')).toContainText(/0\.5|\\frac\{1\}\{2\}/);
+
+  await setVisibleSecondaryMathFieldLatex(page, '\\frac{\\ln(1+x)}{x}');
+  await page.getByTestId('keypad-execute').click();
+
+  await expect(page.getByTestId('display-outcome-success')).toBeVisible();
+  await expect(page.getByTestId('display-outcome-root')).toContainText('Rule-based symbolic');
+  await expect(page.getByTestId('display-outcome-root')).not.toContainText('Numeric fallback');
+  await expect(page.getByTestId('display-outcome-root')).toContainText(/1(?:\.0+)?/);
 });
 
 test('CALC-AUDIT0 Advanced Calc smoke covers series and partials', async ({ page }) => {

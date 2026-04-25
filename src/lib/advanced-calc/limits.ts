@@ -63,6 +63,8 @@ export function evaluateAdvancedFiniteLimit(
           'Symbolic limit unavailable; showing a numeric finite limit approximation.',
         oneSidedUnboundedError: (side) =>
           `${finiteTargetLabel(side)} limit appears unbounded near the target.`,
+        oneSidedDomainError: (side) =>
+          `${finiteTargetLabel(side)} behavior is outside the real domain near the target.`,
       },
     });
   } catch {

@@ -47,6 +47,7 @@ export type BoxedLike = {
 type OneSidedLimitResult =
   | { kind: 'success'; value: number }
   | { kind: 'unbounded' }
+  | { kind: 'domain-error' }
   | { kind: 'unstable' };
 
 type FiniteLimitMessages = {
@@ -54,6 +55,7 @@ type FiniteLimitMessages = {
   unstableError: string;
   numericFallbackWarning: (direction: LimitDirection) => string;
   oneSidedUnboundedError: (direction: Exclude<LimitDirection, 'two-sided'>) => string;
+  oneSidedDomainError?: (direction: Exclude<LimitDirection, 'two-sided'>) => string;
 };
 
 type InfiniteLimitMessages = {
@@ -210,6 +212,32 @@ function isUnboundedTrend(samples: number[]) {
     && previous > older * 1.5;
 }
 
+function isZeroTrend(samples: number[]) {
+  if (samples.length < 3) {
+    return false;
+  }
+
+  const magnitudes = samples.map((sample) => Math.abs(sample));
+  const last = magnitudes.at(-1) ?? 0;
+  const previous = magnitudes.at(-2) ?? 0;
+  const older = magnitudes.at(-3) ?? 0;
+
+  return last <= 5e-2 && last < previous && previous < older;
+}
+
+function containsFiniteDomainBoundary(node: unknown): boolean {
+  if (!Array.isArray(node)) {
+    return false;
+  }
+
+  const [head, ...children] = node;
+  if (head === 'Ln' || head === 'Log' || head === 'Sqrt') {
+    return true;
+  }
+
+  return children.some(containsFiniteDomainBoundary);
+}
+
 function numericOneSidedLimit(
   body: unknown,
   variable: string,
@@ -217,12 +245,14 @@ function numericOneSidedLimit(
   direction: 'left' | 'right',
 ): OneSidedLimitResult {
   const samples: number[] = [];
+  let skippedSamples = 0;
 
   for (const step of LIMIT_STEPS) {
     const samplePoint = direction === 'left' ? target - step : target + step;
     const value = evaluateBodyAt(body, variable, samplePoint);
 
     if (value === undefined) {
+      skippedSamples += 1;
       continue;
     }
 
@@ -233,9 +263,17 @@ function numericOneSidedLimit(
     samples.push(value);
   }
 
+  if (samples.length === 0 && skippedSamples > 0 && containsFiniteDomainBoundary(body)) {
+    return { kind: 'domain-error' };
+  }
+
   const stabilized = stabilizeSamples(samples);
   if (stabilized !== undefined) {
     return { kind: 'success', value: stabilized };
+  }
+
+  if (isZeroTrend(samples)) {
+    return { kind: 'success', value: 0 };
   }
 
   if (isUnboundedTrend(samples)) {
@@ -263,6 +301,9 @@ function numericFiniteLimit(
   if (left.kind === 'unbounded') {
     return { kind: 'left-unbounded' as const };
   }
+  if (left.kind === 'domain-error') {
+    return { kind: 'left-domain-error' as const };
+  }
   if (left.kind === 'unstable') {
     return { kind: 'unstable' as const };
   }
@@ -270,6 +311,9 @@ function numericFiniteLimit(
   const right = numericOneSidedLimit(body, variable, target, 'right');
   if (right.kind === 'unbounded') {
     return { kind: 'right-unbounded' as const };
+  }
+  if (right.kind === 'domain-error') {
+    return { kind: 'right-domain-error' as const };
   }
   if (right.kind === 'unstable') {
     return { kind: 'unstable' as const };
@@ -301,6 +345,39 @@ export function evaluateFiniteLimitFromAst(input: {
   direction: LimitDirection;
   messages: FiniteLimitMessages;
 }): CalculusCoreEvaluation {
+  if (containsFiniteDomainBoundary(input.body)) {
+    const domainProbe =
+      input.direction === 'left'
+        ? { side: 'left' as const, result: numericOneSidedLimit(input.body, input.variable, input.target, 'left') }
+        : input.direction === 'right'
+          ? { side: 'right' as const, result: numericOneSidedLimit(input.body, input.variable, input.target, 'right') }
+          : undefined;
+
+    if (domainProbe?.result.kind === 'domain-error') {
+      return {
+        warnings: [],
+        error: input.messages.oneSidedDomainError?.(domainProbe.side) ?? input.messages.unstableError,
+      };
+    }
+
+    if (input.direction === 'two-sided') {
+      const left = numericOneSidedLimit(input.body, input.variable, input.target, 'left');
+      if (left.kind === 'domain-error') {
+        return {
+          warnings: [],
+          error: input.messages.oneSidedDomainError?.('left') ?? input.messages.unstableError,
+        };
+      }
+      const right = numericOneSidedLimit(input.body, input.variable, input.target, 'right');
+      if (right.kind === 'domain-error') {
+        return {
+          warnings: [],
+          error: input.messages.oneSidedDomainError?.('right') ?? input.messages.unstableError,
+        };
+      }
+    }
+  }
+
   const symbolic = resolveFiniteLimitRule(input.body, input.target, input.variable);
   if (symbolic.kind === 'success') {
     return {
@@ -321,12 +398,32 @@ export function evaluateFiniteLimitFromAst(input: {
   if (numeric.kind === 'right-unbounded') {
     return { warnings: [], error: input.messages.oneSidedUnboundedError('right') };
   }
+  if (numeric.kind === 'left-domain-error') {
+    return {
+      warnings: [],
+      error: input.messages.oneSidedDomainError?.('left') ?? input.messages.unstableError,
+    };
+  }
+  if (numeric.kind === 'right-domain-error') {
+    return {
+      warnings: [],
+      error: input.messages.oneSidedDomainError?.('right') ?? input.messages.unstableError,
+    };
+  }
   if (numeric.kind === 'unbounded') {
     return {
       warnings: [],
       error: input.messages.oneSidedUnboundedError(
         input.direction === 'right' ? 'right' : 'left',
       ),
+    };
+  }
+  if (numeric.kind === 'domain-error') {
+    return {
+      warnings: [],
+      error: input.messages.oneSidedDomainError?.(
+        input.direction === 'right' ? 'right' : 'left',
+      ) ?? input.messages.unstableError,
     };
   }
   if (numeric.kind === 'mismatch') {

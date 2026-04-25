@@ -374,6 +374,8 @@ export function resolveCalculusEvaluation(
           numericFallbackWarning: basicFiniteLimitWarning,
           oneSidedUnboundedError: (side) =>
             `${side === 'left' ? 'Left-hand' : 'Right-hand'} limit appears unbounded near the target.`,
+          oneSidedDomainError: (side) =>
+            `${side === 'left' ? 'Left-hand' : 'Right-hand'} behavior is outside the real domain near the target.`,
         },
       });
       if (resolved.error) {

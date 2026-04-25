@@ -813,15 +813,15 @@ describe('runExpressionAction', () => {
     expect(missingDerivative.error).toContain('could not be determined symbolically')
   })
 
-  it('falls back numerically for supported limits', () => {
+  it('uses rule-based symbolic resolution for supported known-form limits', () => {
     const result = runExpressionAction(
       { ...request, document: { latex: '\\lim_{x\\to 0} \\frac{\\sin(x)}{x}' } },
       'evaluate',
     )
 
     expect(result.error).toBeUndefined()
-    expect(result.resultOrigin).toBe('heuristic-symbolic')
-    expect(result.warnings).toContain("Rule-based limit resolution used capped L'Hopital on a supported ratio form.")
+    expect(result.resultOrigin).toBe('rule-based-symbolic')
+    expect(result.warnings).toEqual([])
     expect(result.exactLatex).toBe('1')
   })
 

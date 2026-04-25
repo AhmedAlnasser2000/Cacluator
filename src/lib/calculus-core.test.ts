@@ -20,6 +20,8 @@ const finiteMessages = {
   numericFallbackWarning: () => 'Symbolic limit unavailable; showing a numeric limit approximation.',
   oneSidedUnboundedError: (side: 'left' | 'right') =>
     `${side === 'left' ? 'Left-hand' : 'Right-hand'} limit appears unbounded near the target.`,
+  oneSidedDomainError: (side: 'left' | 'right') =>
+    `${side === 'left' ? 'Left-hand' : 'Right-hand'} behavior is outside the real domain near the target.`,
 };
 
 describe('calculus core', () => {
@@ -70,8 +72,20 @@ describe('calculus core', () => {
     });
 
     expect(sinOverX.error).toBeUndefined();
-    expect(sinOverX.resultOrigin).toBe('heuristic-symbolic');
+    expect(sinOverX.resultOrigin).toBe('rule-based-symbolic');
     expect(sinOverX.exactLatex).toBe('1');
+
+    const logKnownForm = evaluateFiniteLimitFromAst({
+      body: parse('\\frac{\\ln(1+x)}{x}').json,
+      variable: 'x',
+      target: 0,
+      direction: 'two-sided',
+      messages: finiteMessages,
+    });
+
+    expect(logKnownForm.error).toBeUndefined();
+    expect(logKnownForm.resultOrigin).toBe('rule-based-symbolic');
+    expect(logKnownForm.exactLatex).toBe('1');
 
     const mismatch = evaluateFiniteLimitFromAst({
       body: parse('\\frac{|x|}{x}').json,
@@ -100,6 +114,30 @@ describe('calculus core', () => {
 
     expect(left.exactLatex).toBe('-1');
     expect(right.exactLatex).toBe('1');
+  });
+
+  it('classifies clear one-sided finite-domain gaps', () => {
+    const sqrtBoundary = evaluateFiniteLimitFromAst({
+      body: parse('\\sqrt{x}').json,
+      variable: 'x',
+      target: 0,
+      direction: 'two-sided',
+      messages: finiteMessages,
+    });
+
+    expect(sqrtBoundary.error).toBe('Left-hand behavior is outside the real domain near the target.');
+
+    const right = evaluateFiniteLimitFromAst({
+      body: parse('\\sqrt{x}').json,
+      variable: 'x',
+      target: 0,
+      direction: 'right',
+      messages: finiteMessages,
+    });
+
+    expect(right.error).toBeUndefined();
+    expect(right.exactLatex).toBe('0');
+    expect(right.resultOrigin).toBe('symbolic');
   });
 
   it('aligns infinite-limit heuristic provenance as rule-based symbolic', () => {

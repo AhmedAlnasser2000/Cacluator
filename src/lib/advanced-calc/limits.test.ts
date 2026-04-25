@@ -21,6 +21,15 @@ describe('advanced calc limits', () => {
     });
     expect(cosCase.error).toBeUndefined();
     expect(Number(cosCase.approxText)).toBeCloseTo(0.5, 2);
+
+    const logKnownForm = evaluateAdvancedFiniteLimit({
+      bodyLatex: '\\frac{\\ln(1+x)}{x}',
+      target: '0',
+      direction: 'two-sided',
+    });
+    expect(logKnownForm.error).toBeUndefined();
+    expect(logKnownForm.resultOrigin).toBe('rule-based-symbolic');
+    expect(Number(logKnownForm.approxText)).toBeCloseTo(1, 6);
   });
 
   it('handles directional mismatch and unbounded cases', () => {
@@ -37,6 +46,13 @@ describe('advanced calc limits', () => {
       direction: 'left',
     });
     expect(unbounded.error).toContain('Left-hand');
+
+    const domainGap = evaluateAdvancedFiniteLimit({
+      bodyLatex: '\\sqrt{x}',
+      target: '0',
+      direction: 'two-sided',
+    });
+    expect(domainGap.error).toContain('outside the real domain');
   });
 
   it('handles infinite target limits', () => {
