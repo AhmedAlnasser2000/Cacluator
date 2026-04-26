@@ -2,13 +2,15 @@
 
 ## Active Context
 - Workspace: `Calcwiz`
-- Active branch context: `main` is at the committed `CALC-INT1` checkpoint; current working tree contains completed `REL0` public repo guardrails and Linux preview release foundations awaiting user review/commit.
+- Active branch context: `main` is at the committed and pushed `REL0` public repo guardrails checkpoint.
 - Workflow default: commit-first with meaningful verified gates and explicit approval before commit or push.
 - Version 1 platform direction has shifted to Linux-first while keeping cross-platform ground for Windows/macOS through Tauri, TypeScript, Rust, and repo-owned validation.
 - `PGL5+` SSH VM hardening is verified and committed, but external compute is intentionally postponed rather than adopted or retired; the lane should wait until core calculator stability and additional solver work make remote execution worth revisiting.
 - Near-term product direction is now to pause broad algebra expansion and advance bounded calculus milestones on top of the shared calculus evaluation and verification boundary, with every post-`CALC-CORE1` calculus capability gated by explicit algebra/core dependency readiness.
 - Public tracked memory should use stable placeholders for exact local paths, private operator names, and local SSH target aliases; exact local mappings belong only in ignored scratchpads.
 - Public release posture: protect `main`, require PR review and `ci-linux`, keep Linux preview releases manual/tag-triggered, and keep Playground/external compute out of first public artifacts.
+- Current sequencing note: finish the `REL/PILLARS` clean-base lane before major new math breadth or FriCAS research; after `CALC-INT1`, the remaining near-term calculus item is `CALC-POLISH1`.
+- FriCAS context research is captured as a future isolated `FRICAS-CTX0` lane only, but the incubation system should be strengthened before that lane starts; no direct dependency, no submodule, no code copying by default, and any translated idea must pass through Playground/incubation before stable adoption.
 
 ## Agent Ownership
 - `AGENTS.md` is the authoritative cross-agent workflow file for this repo; `CLAUDE.md` and `GEMINI.md` are compatibility stubs only.
@@ -52,6 +54,7 @@
 - Post `domain-range-CORE1` shared substrate; equation, calculus, and future definite-integral trust work now have a bounded real-domain/range core for constraints, range proofs, one-sided domain checks, and interval-safety readiness.
 - Post `CALC-INT1` definite-integral trust pass; Calculate, Basic Calculus, and Advanced Calc finite definite integrals now share exact verified antiderivative evaluation, interval-safety gates, numeric fallback honesty, and method/safety detail notes.
 - Post `REL0` public repository guardrail foundation; CI/release workflows, CODEOWNERS, contribution/security docs, issue/PR templates, README preview-release notes, and first Linux preview checklist are now in place without product math changes.
+- Post sequencing capture for `REL/PILLARS`, remaining calculus follow-through, and future FriCAS context research; the next clean-base priority is `REL1`, then `PILLARS0` / `MATH-GOLDEN0`, before returning to `CALC-POLISH1`, strengthening incubation, and only then starting `FRICAS-CTX0`.
 
 ## Stable Architecture Snapshot
 - Desktop-first calculator with Tauri shell and React/TypeScript frontend.
@@ -93,6 +96,13 @@
   - Playground still does not have schema validation, automation, or product integration infrastructure; those remain explicitly out of scope
 
 ## Most Recent Completed Milestone
+- Captured the post-`REL0` sequencing base:
+  - added `.memory/research/rel-pillars-calculus-fricas-sequencing.md`
+  - recorded that `REL1`, `PILLARS0`, and `MATH-GOLDEN0` are the preferred clean-base work before another major math leap
+  - recorded that `CALC-POLISH1` is the immediate remaining calculus follow-through after `CALC-INT1`
+  - recorded `FRICAS-CTX0` as a future isolated context-mirror research lane, not a dependency, submodule, code-copy path, or product identity shift
+  - recorded that the incubation system needs another strengthening pass before it carries a large FriCAS-derived context lane
+  - preserved the rule that FriCAS-derived ideas must be translated into Calcwiz-native bounded forms and pass through Playground/incubation before stable adoption
 - Completed `REL0` as the public repo guardrails and first Linux preview release foundation:
   - added `.github/workflows/ci.yml` with required Linux-first `ci-linux` checks for memory protocol, unit tests, UI tests, lint, frontend build, and Rust `cargo check`
   - added a separate `e2e-linux` browser-smoke job for the focused Playwright smoke suite, intended to be observed before making it required

@@ -444,6 +444,8 @@ These are intentionally not first in the lane:
 10. `CALC-INT1`
 11. `CALC-POLISH1`
 
-`CALC-COMP2` remains a parked derivative-polish label only. It should not interrupt the active calculus lane unless a specific derivative readback/domain issue blocks the next selected milestone. After `CALC-INT1`, the default next milestone is `CALC-POLISH1` unless a concrete integration/domain blocker is found first.
+`CALC-COMP2` remains a parked derivative-polish label only. It should not interrupt the active calculus lane unless a specific derivative readback/domain issue blocks the next selected milestone. After `CALC-INT1`, the default next calculus milestone is `CALC-POLISH1` unless a concrete integration/domain blocker is found first.
+
+As of 2026-04-27, public-release clean-base work temporarily has priority over new calculus breadth. The preferred near-term project order is `REL1`, `PILLARS0`, and `MATH-GOLDEN0` before returning to `CALC-POLISH1`, unless public app usage exposes an urgent calculus UX blocker.
 
 The order can change after `CALC-CORE2`, but the principle should not: audit first, consolidate only where needed, then ship bounded calculus capability only through trustworthy existing exact algebra foundations. When a calculus milestone reveals that an algebra or derivative substrate is not ready, pause calculus and address that prerequisite explicitly.
