@@ -43,6 +43,16 @@ describe('detectRealRangeImpossibility', () => {
     expect(result.error).toContain('always positive');
   });
 
+  it('proves principal root and absolute-value nonnegative impossibility', () => {
+    const root = detectRealRangeImpossibility('\\sqrt{x}=-1');
+    const absolute = detectRealRangeImpossibility('\\left|x\\right|=-2');
+
+    expect(root.kind).toBe('impossible');
+    expect(root.kind === 'impossible' ? root.error : '').toContain('square roots are always nonnegative');
+    expect(absolute.kind).toBe('impossible');
+    expect(absolute.kind === 'impossible' ? absolute.error : '').toContain('absolute values are always nonnegative');
+  });
+
   it('does not mark supported or still-unknown equations as impossible', () => {
     expect(detectRealRangeImpossibility('\\sin\\left(x\\right)=\\frac{1}{2}').kind).toBe('none');
     expect(detectRealRangeImpossibility('\\sin\\left(x\\right)+\\cos\\left(x\\right)=1').kind).toBe('none');

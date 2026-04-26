@@ -4,6 +4,7 @@ import type {
   CandidateValidationResult,
   SolveDomainConstraint,
 } from '../../types/calculator';
+import { checkDomainConstraintAtValue } from '../algebra/domain-range-core';
 import { parseSupportedRatio } from '../trigonometry/angles';
 import { evaluateRealNumericExpression } from '../real-numeric-eval';
 
@@ -166,42 +167,9 @@ export function evaluateLatexAt(latex: string, value: number, angleUnit: AngleUn
 }
 
 function checkConstraint(constraint: SolveDomainConstraint, value: number, angleUnit: AngleUnit): string | null {
-  switch (constraint.kind) {
-    case 'interval':
-      if (constraint.min !== undefined) {
-        if (constraint.minInclusive ? value < constraint.min : value <= constraint.min) {
-          return 'outside the permitted interval';
-        }
-      }
-      if (constraint.max !== undefined) {
-        if (constraint.maxInclusive ? value > constraint.max : value >= constraint.max) {
-          return 'outside the permitted interval';
-        }
-      }
-      return null;
-    case 'nonzero': {
-      const numeric = evaluateLatexAt(constraint.expressionLatex, value, angleUnit).value;
-      return numeric === null || Math.abs(numeric) < RESIDUAL_TOLERANCE ? 'would make a denominator zero' : null;
-    }
-    case 'positive': {
-      const numeric = evaluateLatexAt(constraint.expressionLatex, value, angleUnit).value;
-      return numeric === null || numeric <= 0 ? 'would make a logarithm or constrained expression non-positive' : null;
-    }
-    case 'nonnegative': {
-      const numeric = evaluateLatexAt(constraint.expressionLatex, value, angleUnit).value;
-      return numeric === null || numeric < 0 ? 'would make an even root negative' : null;
-    }
-    case 'carrier-range':
-      return value < constraint.min - RESIDUAL_TOLERANCE || value > constraint.max + RESIDUAL_TOLERANCE
-        ? 'lies outside the real range of the trig carrier'
-        : null;
-    case 'carrier-square-range':
-      return value < constraint.min - RESIDUAL_TOLERANCE || value > constraint.max + RESIDUAL_TOLERANCE
-        ? 'lies outside the real range of the trig square carrier'
-        : null;
-    case 'exp-positive':
-      return value <= 0 ? 'must stay positive for an exponential carrier' : null;
-  }
+  return checkDomainConstraintAtValue(constraint, value, {
+    evaluateLatex: (expressionLatex, point) => evaluateLatexAt(expressionLatex, point, angleUnit).value,
+  })?.message ?? null;
 }
 
 export function checkCandidateAgainstConstraints(

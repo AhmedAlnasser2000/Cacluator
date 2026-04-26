@@ -8,7 +8,7 @@ Status: near-term roadmap recommendation. Each milestone still needs its own imp
 
 `CALC-DIFF1` was inserted after `CALC-COMP1` to handle the derivative-readiness work that the original `CALC-COMP2` slot described. As shipped, `CALC-DIFF1` covers powered-function notation, nested chain-rule derivatives, general powers, known inverse derivative families, and visible derivative strategy badges.
 
-The old `CALC-COMP2` slot is therefore no longer the next active milestone. Its remaining intent is limited to future derivative readback/domain polish if a later milestone discovers a concrete gap. `CALC-LIM1`, `CALC-LIM2`, and `CALC-LIM3` now cover the finite-limit strengthening arc: bounded composition/domain honesty first, typed directional targets and signed infinities second, then local rational behavior, elementary equivalents, rational dominance, and accurate limit method notes. The next major calculus candidate is `CALC-INT1` unless a new explicit limit polish milestone is chosen later.
+The old `CALC-COMP2` slot is therefore no longer the next active milestone. Its remaining intent is limited to future derivative readback/domain polish if a later milestone discovers a concrete gap. `CALC-LIM1`, `CALC-LIM2`, and `CALC-LIM3` now cover the finite-limit strengthening arc: bounded composition/domain honesty first, typed directional targets and signed infinities second, then local rational behavior, elementary equivalents, rational dominance, and accurate limit method notes. `domain-range-CORE1` is inserted before `CALC-INT1` so definite-integral trust can depend on a shared real-domain/range substrate instead of calculus-local domain checks.
 
 ## Roadmap Thesis
 
@@ -331,6 +331,37 @@ Still out of scope:
 - new `ResultOrigin` values
 - speculative search or Playground dependency
 
+### `domain-range-CORE1` - Shared Real Domain And Range Core
+
+Purpose:
+- create a shared bounded real-domain/range substrate before definite-integral trust work
+- consolidate scattered equation, calculus, and range-guard logic without expanding `branch-core`
+- give `CALC-INT1` endpoint and interval-safety readiness APIs
+
+Scope:
+- collect domain constraints for denominators, logarithms, principal roots, negative powers, and inverse-trig inputs
+- prove simple real ranges for constants, sin/cos carriers, trig squares, positive exponentials, principal roots, absolute values, bounded sums, and bounded products
+- check point, one-sided-neighborhood, and bounded-interval real-domain safety
+- rewire existing equation domain/range guards and calculus finite-limit domain checks to use the shared substrate
+- add limited visible honesty wins for impossible nonnegative-range equations such as `sqrt(x)=-1` and `abs(x)=-2`
+
+Out of scope:
+- no general inequality solver
+- no full interval-proof system
+- no broad domain display feature
+- no piecewise engine
+- no symbolic definite-integral trust changes
+
+Exit criteria:
+- equation and calculus consumers share the same bounded domain/range facts
+- `CALC-INT1` can query endpoint and interval safety without inventing a new calculus-local domain layer
+
+Recommended verification:
+- domain-range core unit tests
+- equation domain/range guard regression tests
+- calculus finite-limit domain regression tests
+- memory protocol check
+
 ### `CALC-INT1` - Definite Integral Trust Pass
 
 Purpose:
@@ -401,8 +432,9 @@ These are intentionally not first in the lane:
 6. `CALC-LIM1`
 7. `CALC-LIM2`
 8. `CALC-LIM3`
-9. `CALC-INT1`
-10. `CALC-POLISH1`
+9. `domain-range-CORE1`
+10. `CALC-INT1`
+11. `CALC-POLISH1`
 
 `CALC-COMP2` remains a parked derivative-polish label only. It should not interrupt the active calculus lane unless a specific derivative readback/domain issue blocks the next selected milestone.
 

@@ -38,6 +38,7 @@ import { parsePartialDerivativeLatex, resolvePartialDerivative } from './symboli
 import { normalizeExactPowerLogNode } from './symbolic-engine/power-log';
 import { normalizeExactRadicalNode } from './symbolic-engine/radical';
 import { normalizeExactRationalNode } from './symbolic-engine/rational';
+import { detectRealRangeImpossibility } from './equation/range-impossibility';
 
 export type SymbolicAction =
   | CalculateAction
@@ -694,6 +695,15 @@ function executePreparedExpressionAction(
     }
 
     if (action === 'solve') {
+      const rangeImpossibility = detectRealRangeImpossibility(sourceLatex);
+      if (rangeImpossibility.kind === 'impossible') {
+        return {
+          warnings: [],
+          normalizedMathJson: expr.json,
+          error: rangeImpossibility.error,
+        };
+      }
+
       const solutions = expr.solve?.('x');
       if (!Array.isArray(solutions) || solutions.length === 0) {
         return {

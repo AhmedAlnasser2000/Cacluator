@@ -59,6 +59,8 @@ export type RangeProofReason =
   | 'bounded-product'
   | 'bounded-sum'
   | 'positive-exponential'
+  | 'principal-root'
+  | 'absolute-value'
   | 'affine-bounded'
   | 'composition-image';
 
@@ -126,6 +128,7 @@ export type SolveDomainConstraint =
   | { kind: 'nonzero'; expressionLatex: string }
   | { kind: 'positive'; expressionLatex: string }
   | { kind: 'nonnegative'; expressionLatex: string }
+  | { kind: 'expression-interval'; expressionLatex: string; min?: number; minInclusive: boolean; max?: number; maxInclusive: boolean }
   | { kind: 'carrier-range'; carrier: 'sin' | 'cos'; min: -1; max: 1 }
   | { kind: 'carrier-square-range'; carrier: 'sin2' | 'cos2'; min: 0; max: 1 }
   | { kind: 'exp-positive' };

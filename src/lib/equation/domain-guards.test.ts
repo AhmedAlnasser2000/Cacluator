@@ -23,6 +23,16 @@ describe('equation domain guards', () => {
     expect(
       checkCandidateAgainstConstraints(1, [{ kind: 'positive', expressionLatex: 'x-1' }]),
     ).toContain('non-positive');
+    expect(
+      checkCandidateAgainstConstraints(2, [{
+        kind: 'expression-interval',
+        expressionLatex: 'x',
+        min: -1,
+        minInclusive: true,
+        max: 1,
+        maxInclusive: true,
+      }]),
+    ).toContain('outside the permitted expression range');
 
     const residual = validateResidual('x-2', 1);
     expect(residual.kind).toBe('rejected');

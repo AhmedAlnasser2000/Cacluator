@@ -2,7 +2,7 @@
 
 ## Active Context
 - Workspace: `Calcwiz`
-- Active branch context: `main` is at the committed `CALC-LIM2` checkpoint `8a6da4d`; current working tree contains `CALC-LIM3` code, tests, and memory updates awaiting user-approved commit.
+- Active branch context: `main` is at the committed `domain-range-CORE1` checkpoint `c3aaf04`; current working tree is ready for `CALC-INT1` planning.
 - Workflow default: commit-first with meaningful verified gates and explicit approval before commit or push.
 - Version 1 platform direction has shifted to Linux-first while keeping cross-platform ground for Windows/macOS through Tauri, TypeScript, Rust, and repo-owned validation.
 - `PGL5+` SSH VM hardening is verified and committed, but external compute is intentionally postponed rather than adopted or retired; the lane should wait until core calculator stability and additional solver work make remote execution worth revisiting.
@@ -48,6 +48,7 @@
 - Post `CALC-LIM1` finite-limit leap; shared Basic/Advanced finite limits now have bounded composition-aware known-form rules and clearer finite-domain one-sided stops.
 - Post `CALC-LIM2` directional-limit leap; typed `0^+` / `0^-` finite targets work across Calculate, Basic Calculus, and Advanced Calc, and trustworthy one-sided divergence can return signed infinity as a successful limit result.
 - Post `CALC-LIM3` local-limit leap; shared Basic/Advanced limits now handle stronger rational/local-order behavior, bounded elementary-equivalent products, rational dominance at infinity, and accurate limit method detail notes.
+- Post `domain-range-CORE1` shared substrate; equation, calculus, and future definite-integral trust work now have a bounded real-domain/range core for constraints, range proofs, one-sided domain checks, and interval-safety readiness.
 
 ## Stable Architecture Snapshot
 - Desktop-first calculator with Tauri shell and React/TypeScript frontend.
@@ -89,6 +90,24 @@
   - Playground still does not have schema validation, automation, or product integration infrastructure; those remain explicitly out of scope
 
 ## Most Recent Completed Milestone
+- Completed `domain-range-CORE1` as the shared real-domain/range substrate before `CALC-INT1`:
+  - added `src/lib/algebra/domain-range-core.ts` for bounded real-domain constraint collection, simple range proofs, point checks, one-sided checks, and interval-safety readiness
+  - collected denominator nonzero, logarithm positive, principal-root nonnegative, negative-power nonzero, and inverse-trig input interval constraints
+  - proved simple real ranges for constants, sin/cos carriers, trig squares, positive exponentials, principal roots, absolute values, bounded sums, and bounded products
+  - rewired equation domain-constraint checking, equation range-impossibility guards, and calculus finite-limit domain checks onto the shared substrate
+  - added limited visible honesty wins for impossible nonnegative-range equations such as `\sqrt{x}=-1` and `|x|=-2`
+  - exposed bounded interval-safety readiness for `CALC-INT1` without changing definite-integral trust behavior yet
+  - kept `branch-core` scoped to branch/case bookkeeping and added no general inequality solver, full interval-proof system, broad domain display surface, piecewise engine, or new `ResultOrigin` values
+  - added `.memory/research/TRACK-DOMAIN-RANGE-CORE1-MANUAL-VERIFICATION-CHECKLIST.md`
+  - next major calculus candidate is `CALC-INT1`, now expected to consume the shared endpoint/interval safety APIs
+  - primary_agent: `codex`
+  - primary_agent_model: `gpt-5.5`
+- Regression checks:
+  - `npm run test:unit -- src/lib/algebra/domain-range-core.test.ts src/lib/equation/domain-guards.test.ts src/lib/equation/range-impossibility.test.ts src/lib/calculus-core.test.ts src/lib/advanced-calc/limits.test.ts src/lib/math-engine.test.ts`
+  - `npx playwright test e2e/calc-audit0-smoke.spec.ts --project=chromium`
+  - `npx eslint src/lib/algebra/domain-range-core.ts src/lib/algebra/domain-range-core.test.ts src/lib/equation/domain-guards.ts src/lib/equation/domain-guards.test.ts src/lib/equation/range-impossibility.ts src/lib/equation/range-impossibility.test.ts src/lib/calculus-core.ts src/lib/calculus-core.test.ts src/lib/math-engine.test.ts`
+  - `npm run build`
+  - `npm run test:memory-protocol`
 - Completed `CALC-LIM3` as a one-run, three-slice local-limit leap after `CALC-LIM2`:
   - `LIM3A` strengthened finite rational/local-order behavior, including removable holes like `3x/(x+x^2)` and `(x^3-1)/(x^2-1)`
   - `LIM3A` also added bounded rational dominance at `+infinity` and `-infinity`, including signed infinity when leading behavior determines the sign

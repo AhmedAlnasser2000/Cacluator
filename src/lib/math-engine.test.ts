@@ -19,6 +19,20 @@ describe('runExpressionAction', () => {
     expect(result.approxText).toContain('x ~=')
   })
 
+  it('surfaces shared domain-range nonnegative guards in equation solve', () => {
+    const root = runExpressionAction(
+      { ...request, mode: 'equation', document: { latex: '\\sqrt{x}=-1' } },
+      'solve',
+    )
+    const absolute = runExpressionAction(
+      { ...request, mode: 'equation', document: { latex: '\\left|x\\right|=-2' } },
+      'solve',
+    )
+
+    expect(root.error).toContain('square roots are always nonnegative')
+    expect(absolute.error).toContain('absolute values are always nonnegative')
+  })
+
   it('does not silently solve an equality when evaluating', () => {
     const evaluated = runExpressionAction({ ...request, mode: 'equation' }, 'evaluate')
     const solved = runExpressionAction({ ...request, mode: 'equation' }, 'solve')

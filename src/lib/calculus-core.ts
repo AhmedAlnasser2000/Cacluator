@@ -7,6 +7,10 @@ import {
 } from './limit-heuristics';
 import { getResultGuardError, MAX_RESULT_MAGNITUDE } from './result-guard';
 import {
+  checkOneSidedRealDomain,
+  collectRealDomainConstraints,
+} from './algebra/domain-range-core';
+import {
   backcheckAntiderivative,
   type AntiderivativeBackcheck,
 } from './calculus-verification';
@@ -265,16 +269,7 @@ function isZeroTrend(samples: number[]) {
 }
 
 function containsFiniteDomainBoundary(node: unknown): boolean {
-  if (!Array.isArray(node)) {
-    return false;
-  }
-
-  const [head, ...children] = node;
-  if (head === 'Ln' || head === 'Log' || head === 'Sqrt') {
-    return true;
-  }
-
-  return children.some(containsFiniteDomainBoundary);
+  return collectRealDomainConstraints(node).length > 0;
 }
 
 function numericOneSidedLimit(
@@ -395,12 +390,12 @@ export function evaluateFiniteLimitFromAst(input: {
   if (containsFiniteDomainBoundary(input.body)) {
     const domainProbe =
       input.direction === 'left'
-        ? { side: 'left' as const, result: numericOneSidedLimit(input.body, input.variable, input.target, 'left') }
+        ? { side: 'left' as const, result: checkOneSidedRealDomain({ node: input.body, variable: input.variable, target: input.target, direction: 'left' }) }
         : input.direction === 'right'
-          ? { side: 'right' as const, result: numericOneSidedLimit(input.body, input.variable, input.target, 'right') }
+          ? { side: 'right' as const, result: checkOneSidedRealDomain({ node: input.body, variable: input.variable, target: input.target, direction: 'right' }) }
           : undefined;
 
-    if (domainProbe?.result.kind === 'domain-error') {
+    if (domainProbe?.result.kind === 'outside-domain') {
       return {
         warnings: [],
         error: input.messages.oneSidedDomainError?.(domainProbe.side) ?? input.messages.unstableError,
@@ -408,15 +403,15 @@ export function evaluateFiniteLimitFromAst(input: {
     }
 
     if (input.direction === 'two-sided') {
-      const left = numericOneSidedLimit(input.body, input.variable, input.target, 'left');
-      if (left.kind === 'domain-error') {
+      const left = checkOneSidedRealDomain({ node: input.body, variable: input.variable, target: input.target, direction: 'left' });
+      if (left.kind === 'outside-domain') {
         return {
           warnings: [],
           error: input.messages.oneSidedDomainError?.('left') ?? input.messages.unstableError,
         };
       }
-      const right = numericOneSidedLimit(input.body, input.variable, input.target, 'right');
-      if (right.kind === 'domain-error') {
+      const right = checkOneSidedRealDomain({ node: input.body, variable: input.variable, target: input.target, direction: 'right' });
+      if (right.kind === 'outside-domain') {
         return {
           warnings: [],
           error: input.messages.oneSidedDomainError?.('right') ?? input.messages.unstableError,
