@@ -232,6 +232,4 @@ npm run test:gate
 
 ## License
 
-This repository does **not** currently include a license file.
-
-Until a license is added, treat the project as **all rights reserved** rather than assuming open reuse terms.
+This project is licensed under the MIT License. See [LICENSE](./LICENSE) for details.
