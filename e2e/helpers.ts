@@ -25,6 +25,15 @@ export async function setVisibleSecondaryMathFieldLatex(page: Page, latex: strin
   }, latex);
 }
 
+export async function getVisibleSecondaryMathFieldLatex(page: Page, index = 0) {
+  const editor = page.locator('math-field.secondary-mathfield:visible').nth(index);
+  await editor.waitFor();
+  return editor.evaluate((element) => {
+    const field = element as HTMLElement & { getValue?: (format?: string) => string };
+    return typeof field.getValue === 'function' ? field.getValue('latex') : '';
+  });
+}
+
 export async function getMathFieldLatex(page: Page, testId = 'main-editor') {
   const editor = page.getByTestId(testId);
   await editor.waitFor();
@@ -34,7 +43,16 @@ export async function getMathFieldLatex(page: Page, testId = 'main-editor') {
   });
 }
 
+export async function closeSidePanelIfOpen(page: Page) {
+  const backdrop = page.getByTestId('side-surface-overlay-backdrop');
+  if (await backdrop.isVisible()) {
+    await backdrop.click();
+    await expect(backdrop).toBeHidden();
+  }
+}
+
 export async function openLauncherApp(page: Page, categoryLabel: string, appLabel: string) {
+  await closeSidePanelIfOpen(page);
   await page.getByTestId('keypad-menu').click();
   await page.getByRole('button', { name: new RegExp(categoryLabel, 'i') }).click();
   await page.getByRole('button', { name: new RegExp(appLabel, 'i') }).click();

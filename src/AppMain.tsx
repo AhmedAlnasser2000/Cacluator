@@ -334,6 +334,7 @@ import {
   type PoissonState,
   type PeriodicFamilyInfo,
   type RegressionState,
+  type ResultOrigin,
   type RightTriangleState,
   type SineRuleState,
   type SeriesState,
@@ -392,6 +393,23 @@ function getPeriodicStopReasonText(reason: PeriodicFamilyInfo['structuredStopRea
     return 'Exact closure stops here because the remaining branches fall outside the usable principal range.';
   }
   return 'Exact closure stops here because finishing the remaining sawtooth branches would require broader principal-range pruning than this milestone allows.';
+}
+
+function getCalculusProvenanceLabel(origin?: ResultOrigin) {
+  switch (origin) {
+    case 'rule-based-symbolic':
+      return 'Rule-based symbolic';
+    case 'heuristic-symbolic':
+      return 'Heuristic symbolic';
+    case 'numeric-fallback':
+      return 'Numeric fallback';
+    case 'symbolic':
+    case 'symbolic-engine':
+    case 'compute-engine':
+      return 'Symbolic';
+    default:
+      return undefined;
+  }
 }
 
 export default function App() {
@@ -3602,11 +3620,134 @@ export default function App() {
     );
   }
 
+  function currentCalculateHistoryContext() {
+    if (calculateScreen === 'derivative') {
+      return {
+        calculateScreen,
+        calculateSeed: { ...derivativeWorkbench },
+      };
+    }
+
+    if (calculateScreen === 'derivativePoint') {
+      return {
+        calculateScreen,
+        calculateSeed: { ...derivativePointWorkbench },
+      };
+    }
+
+    if (calculateScreen === 'integral') {
+      return {
+        calculateScreen,
+        calculateSeed: { ...integralWorkbench },
+      };
+    }
+
+    if (calculateScreen === 'limit') {
+      return {
+        calculateScreen,
+        calculateSeed: { ...limitWorkbench },
+      };
+    }
+
+    return {};
+  }
+
+  function currentAdvancedCalcHistoryContext() {
+    if (advancedCalcScreen === 'indefiniteIntegral') {
+      return {
+        advancedCalcScreen,
+        advancedCalcSeed: { ...advancedIndefiniteIntegral },
+      };
+    }
+
+    if (advancedCalcScreen === 'definiteIntegral') {
+      return {
+        advancedCalcScreen,
+        advancedCalcSeed: { ...advancedDefiniteIntegral },
+      };
+    }
+
+    if (advancedCalcScreen === 'improperIntegral') {
+      return {
+        advancedCalcScreen,
+        advancedCalcSeed: { ...advancedImproperIntegral },
+      };
+    }
+
+    if (advancedCalcScreen === 'finiteLimit') {
+      return {
+        advancedCalcScreen,
+        advancedCalcSeed: { ...advancedFiniteLimit },
+      };
+    }
+
+    if (advancedCalcScreen === 'infiniteLimit') {
+      return {
+        advancedCalcScreen,
+        advancedCalcSeed: { ...advancedInfiniteLimit },
+      };
+    }
+
+    if (advancedCalcScreen === 'maclaurin') {
+      return {
+        advancedCalcScreen,
+        advancedCalcSeed: { ...maclaurinState },
+      };
+    }
+
+    if (advancedCalcScreen === 'taylor') {
+      return {
+        advancedCalcScreen,
+        advancedCalcSeed: { ...taylorState },
+      };
+    }
+
+    if (advancedCalcScreen === 'partialDerivative') {
+      return {
+        advancedCalcScreen,
+        advancedCalcSeed: { ...partialDerivativeState },
+      };
+    }
+
+    if (advancedCalcScreen === 'odeFirstOrder') {
+      return {
+        advancedCalcScreen,
+        advancedCalcSeed: { ...firstOrderOdeState },
+      };
+    }
+
+    if (advancedCalcScreen === 'odeSecondOrder') {
+      return {
+        advancedCalcScreen,
+        advancedCalcSeed: { ...secondOrderOdeState },
+      };
+    }
+
+    if (advancedCalcScreen === 'odeNumericIvp') {
+      return {
+        advancedCalcScreen,
+        advancedCalcSeed: { ...numericIvpState },
+      };
+    }
+
+    return {};
+  }
+
   function commitOutcome(
     outcome: DisplayOutcome,
     inputLatex: string,
     mode: ModeId,
-    context: Partial<Pick<HistoryEntry, 'geometryScreen' | 'trigScreen' | 'statisticsScreen' | 'numericInterval'>> = {},
+    context: Partial<Pick<
+      HistoryEntry,
+      | 'calculateScreen'
+      | 'calculateSeed'
+      | 'advancedCalcScreen'
+      | 'advancedCalcSeed'
+      | 'geometryScreen'
+      | 'trigScreen'
+      | 'statisticsScreen'
+      | 'numericInterval'
+    >> = {},
   ) {
     if (
       outcome.kind === 'prompt' &&
@@ -3637,6 +3778,12 @@ export default function App() {
       resolvedInputLatex: outcome.resolvedInputLatex,
       resultLatex: outcome.exactLatex,
       approxText: outcome.approxText,
+      ...(mode === 'calculate'
+        ? { ...currentCalculateHistoryContext(), ...context }
+        : {}),
+      ...(mode === 'advancedCalculus'
+        ? { ...currentAdvancedCalcHistoryContext(), ...context }
+        : {}),
       ...(mode === 'geometry'
         ? { geometryScreen: context.geometryScreen ?? geometryScreen }
         : {}),
@@ -5111,8 +5258,13 @@ export default function App() {
     }));
     setMode(entry.mode);
     if (entry.mode === 'calculate') {
-      openCalculateScreen('standard');
-      setCalculateLatex(entry.inputLatex);
+      if (entry.calculateScreen && entry.calculateScreen !== 'standard' && entry.calculateScreen !== 'calculusHome') {
+        openCalculateScreen(entry.calculateScreen);
+        applyCalculateSeed(entry.calculateScreen, entry.calculateSeed);
+      } else {
+        openCalculateScreen('standard');
+        setCalculateLatex(entry.inputLatex);
+      }
     }
     if (entry.mode === 'equation') {
       const replayTarget = inferEquationReplayTarget(entry);
@@ -5143,7 +5295,10 @@ export default function App() {
     }
 
     if (entry.mode === 'advancedCalculus') {
-      if (entry.inputLatex.startsWith('\\int_{-\\infty}') || entry.inputLatex.includes('\\infty')) {
+      if (entry.advancedCalcScreen) {
+        openAdvancedCalcScreen(entry.advancedCalcScreen);
+        applyAdvancedCalcSeed(entry.advancedCalcScreen, entry.advancedCalcSeed);
+      } else if (entry.inputLatex.startsWith('\\int_{-\\infty}') || entry.inputLatex.includes('\\infty')) {
         openAdvancedCalcScreen('improperIntegral');
       } else if (entry.inputLatex.startsWith('\\int_')) {
         openAdvancedCalcScreen('definiteIntegral');
@@ -5857,6 +6012,10 @@ export default function App() {
     currentMode === 'advancedCalculus' && !isAdvancedCalcMenuOpen && displayOutcome?.kind === 'success'
       ? getAdvancedCalcProvenanceBadge(displayOutcome.resultOrigin as AdvancedCalcResultOrigin | undefined)
       : undefined;
+  const advancedCalcResultBadges =
+    currentMode === 'advancedCalculus' && !isAdvancedCalcMenuOpen && displayOutcome?.kind === 'success'
+      ? ['Advanced Calc']
+      : [];
   const calculusStrategyBadge =
     displayOutcome?.kind === 'success'
       ? getCalculusStrategyBadge(displayOutcome.calculusStrategy)
@@ -5885,17 +6044,15 @@ export default function App() {
       || calculateOutcomeLatex.includes('\\frac{d}')
       || calculateOutcomeLatex.includes('\\frac{\\mathrm{d}}')
     );
+  const calculateCalculusProvenanceBadge =
+    isCalculateCalculusOutcome && displayOutcome?.kind === 'success'
+      ? getCalculusProvenanceLabel(displayOutcome.resultOrigin)
+      : undefined;
   const calculateResultBadges =
     isCalculateCalculusOutcome
       ? [
           'Calculus',
-          ...(
-            displayOutcome?.kind === 'success' && displayOutcome.resultOrigin === 'numeric-fallback'
-              ? ['Numeric fallback']
-              : displayOutcome?.kind === 'success' && displayOutcome.resultOrigin === 'rule-based-symbolic'
-                ? ['Rule-based symbolic']
-                : []
-          ),
+          ...(calculateCalculusProvenanceBadge ? [calculateCalculusProvenanceBadge] : []),
         ]
       : [];
   const trigonometryResultBadges =
@@ -5931,7 +6088,11 @@ export default function App() {
   const displayResultBadges = [
     ...calculateResultBadges.map((badge) => ({
       label: badge,
-      className: badge === 'Numeric fallback' ? 'equation-origin-badge' : 'equation-badge',
+      className: badge === 'Calculus' ? 'equation-badge' : 'equation-origin-badge',
+    })),
+    ...advancedCalcResultBadges.map((badge) => ({
+      label: badge,
+      className: 'equation-badge',
     })),
     ...trigonometryResultBadges.map((badge) => ({
       label: badge,

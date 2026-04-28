@@ -69,19 +69,41 @@ describe('guide content', () => {
   it('routes calculus examples into the calculate workbench', () => {
     const derivativeArticle = getGuideArticle('calculus-derivatives')
     const integralArticle = getGuideArticle('calculus-integrals-limits')
+    const functionPowerExample = derivativeArticle?.examples.find((example) => example.id === 'calc-derivative-function-power')
+    const exactDefiniteExample = integralArticle?.examples.find((example) => example.id === 'calc-integral-definite-exact')
+    const unsafeDefiniteExample = integralArticle?.examples.find((example) => example.id === 'calc-integral-definite-unsafe')
+    const limitExample = integralArticle?.examples.find((example) => example.id === 'calc-limit')
+    const directionalLimitExample = integralArticle?.examples.find((example) => example.id === 'calc-limit-directional-pole')
 
     expect(derivativeArticle?.examples[0]?.launch.kind).toBe('load-expression')
     if (derivativeArticle?.examples[0]?.launch.kind !== 'load-expression') {
       throw new Error('Expected calculus derivative example to load into a tool')
     }
     expect(derivativeArticle.examples[0].launch.calculateScreen).toBe('derivative')
+    expect(functionPowerExample?.launch.kind).toBe('load-expression')
+    if (functionPowerExample?.launch.kind !== 'load-expression') {
+      throw new Error('Expected function-power derivative example to load into a tool')
+    }
+    expect(functionPowerExample.launch.calculateSeed?.bodyLatex).toContain('\\sin^2')
 
-    expect(integralArticle?.examples[2]?.launch.kind).toBe('load-expression')
-    if (integralArticle?.examples[2]?.launch.kind !== 'load-expression') {
+    expect(exactDefiniteExample?.launch.kind).toBe('load-expression')
+    if (exactDefiniteExample?.launch.kind !== 'load-expression') {
+      throw new Error('Expected exact definite-integral example to load into a tool')
+    }
+    expect(exactDefiniteExample.launch.calculateSeed?.kind).toBe('definite')
+    expect(unsafeDefiniteExample?.expected).toContain('controlled real-domain')
+
+    expect(limitExample?.launch.kind).toBe('load-expression')
+    if (limitExample?.launch.kind !== 'load-expression') {
       throw new Error('Expected calculus limit example to load into a tool')
     }
-    expect(integralArticle.examples[2].launch.calculateScreen).toBe('limit')
-    expect(integralArticle.examples[2].launch.calculateSeed?.targetKind).toBe('finite')
+    expect(limitExample.launch.calculateScreen).toBe('limit')
+    expect(limitExample.launch.calculateSeed?.targetKind).toBe('finite')
+    expect(directionalLimitExample?.launch.kind).toBe('load-expression')
+    if (directionalLimitExample?.launch.kind !== 'load-expression') {
+      throw new Error('Expected directional limit example to load into a tool')
+    }
+    expect(directionalLimitExample.launch.calculateSeed?.direction).toBe('right')
   })
 
   it('keeps advanced calculus mode guidance active', () => {
@@ -90,6 +112,10 @@ describe('guide content', () => {
     expect(modeRef).toBeDefined()
     expect(modeRef?.summary).toContain('single-variable calculus')
     expect(modeRef?.articleIds).toContain('advanced-partials')
+    expect(getGuideArticle('advanced-integrals')?.summary).toContain('shared integral backend')
+    expect(getGuideArticle('advanced-limits')?.summary).toContain('shared finite/infinite limit backend')
+    expect(getGuideArticle('advanced-series')?.examples[0]?.launch.advancedCalcScreen).toBe('maclaurin')
+    expect(getGuideArticle('advanced-partials')?.examples[0]?.launch.advancedCalcScreen).toBe('partialDerivative')
   })
 
   it('exposes trig guide examples that target the new mode', () => {

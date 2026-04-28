@@ -397,30 +397,35 @@ Recommended verification:
 
 ### `CALC-POLISH1` - Calculus Readback, Guide, And UX Polish
 
+Status: completed on 2026-04-28.
+
 Purpose:
 - turn the new calculus capability into a clean user-facing v1 experience
 
-Scope:
-- align basic `Calculus` and `Advanced Calc` wording
-- update Guide examples only for shipped behavior
-- ensure history/replay preserves the right calculus context
-- ensure visible stop reasons match the bounded roadmap
+Scope shipped:
+- optional typed replay context for guided Basic Calculus history entries
+- optional typed replay context for Advanced Calc history entries across integrals, limits, series, partials, ODE, and numeric IVP
+- legacy history compatibility through LaTeX inference fallback
+- normalized calculus area/provenance/strategy chip wording across Calculate, Basic Calculus, and Advanced Calc surfaces
+- Guide examples refreshed to shipped behavior covered by recent calculus milestones and `MATH-GOLDEN0`
+- browser replay smoke for guided Calculus plus Advanced Calc
 
 Out of scope:
 - no new math surface
 - no launcher redesign
 - no Playground visibility
 
-Exit criteria:
-- calculus feels coherent across the app
-- shipped examples do not overpromise
-- failure states teach the next action without pretending to be a full CAS
+Exit criteria met:
+- calculus feels more coherent across Calculate, guided Calculus, and Advanced Calc
+- shipped examples avoid overpromising beyond current behavior
+- replay preserves typed calculus context without breaking old history entries
 
-Recommended verification:
-- focused UI tests
-- guide/content tests
-- history/replay tests if replay context changes
-- memory protocol check
+Verification:
+- `npm run test:golden`
+- focused history/guide/calculus unit tests
+- `npm run test:ui -- src/AppMain.ui.test.tsx`
+- `npx playwright test e2e/calc-audit0-smoke.spec.ts --project=chromium`
+- lint, build, Rust check, and memory protocol
 
 ## Later Candidates
 
@@ -444,8 +449,8 @@ These are intentionally not first in the lane:
 10. `CALC-INT1`
 11. `CALC-POLISH1`
 
-`CALC-COMP2` remains a parked derivative-polish label only. It should not interrupt the active calculus lane unless a specific derivative readback/domain issue blocks the next selected milestone. After `CALC-INT1`, the default next calculus milestone is `CALC-POLISH1` unless a concrete integration/domain blocker is found first.
+`CALC-COMP2` remains a parked derivative-polish label only. It should not interrupt the active calculus lane unless a specific derivative readback/domain issue blocks the next selected milestone. `CALC-POLISH1` has closed the immediate post-`CALC-INT1` calculus UX/replay follow-through.
 
-As of 2026-04-27, public-release clean-base work temporarily has priority over new calculus breadth. The preferred near-term project order is `REL1`, `PILLARS0`, and `MATH-GOLDEN0` before returning to `CALC-POLISH1`, unless public app usage exposes an urgent calculus UX blocker.
+As of 2026-04-28, public-release clean-base work plus the immediate calculus polish follow-through are complete. The next default move is to strengthen the incubation system before `FRICAS-CTX0`, unless public app usage exposes an urgent docs, triage, security, or calculus UX blocker.
 
 The order can change after `CALC-CORE2`, but the principle should not: audit first, consolidate only where needed, then ship bounded calculus capability only through trustworthy existing exact algebra foundations. When a calculus milestone reveals that an algebra or derivative substrate is not ready, pause calculus and address that prerequisite explicitly.

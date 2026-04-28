@@ -421,7 +421,7 @@ const GUIDE_ARTICLE_DRAFTS: GuideArticleDraft[] = [
     concepts: [
       'd/dx returns a derivative expression.',
       'd/dx| evaluates the derivative at one numeric point.',
-      'Calcwiz supports addition, subtraction, product, quotient, chain, log, ln, trig, and affine-inner derivative rules inside the symbolic engine.',
+      'Calcwiz supports addition, subtraction, product, quotient, chain, log, ln, trig, function-power, general-power, and known inverse-trig derivative rules inside the symbolic engine.',
       'First-order partial derivatives in x, y, and z are supported for explicit multivariable expressions.',
       'Functions are inserted as structured notation, not plain text.',
     ],
@@ -433,6 +433,28 @@ const GUIDE_ARTICLE_DRAFTS: GuideArticleDraft[] = [
     bestModes: ['calculate', 'equation', 'table'],
     symbols: ['symbol-derivative', 'symbol-derivative-point', 'symbol-sin', 'symbol-cos', 'symbol-tan', 'symbol-log', 'symbol-ln'],
     examples: [
+      {
+        id: 'calc-derivative-function-power',
+        title: 'Differentiate nested function powers',
+        explanation: 'Function-power notation such as sin^2(cos^3(x)) stays readable while the derivative core applies the chain rule.',
+        steps: [
+          'Open Calculus > Derivative.',
+          'Enter sin^2(cos^3(x)) as the body.',
+          'Press EXE or F1 and read the Function power and Chain rule badges.',
+        ],
+        expected: 'The expression opens in Calculate > Derivative and returns a symbolic derivative with chain-rule factors.',
+        launch: {
+          kind: 'load-expression',
+          targetMode: 'calculate',
+          calculateScreen: 'derivative',
+          calculateSeed: {
+            bodyLatex: '\\sin^2\\left(\\cos^3\\left(x\\right)\\right)',
+          },
+          latex: '\\frac{d}{dx}\\sin^2\\left(\\cos^3\\left(x\\right)\\right)',
+          label: 'Open in Derivative Tool',
+        },
+        copyLatex: '\\frac{d}{dx}\\sin^2\\left(\\cos^3\\left(x\\right)\\right)',
+      },
       {
         id: 'calc-derivative',
         title: 'Differentiate a polynomial',
@@ -454,6 +476,27 @@ const GUIDE_ARTICLE_DRAFTS: GuideArticleDraft[] = [
           label: 'Open in Derivative Tool',
         },
         copyLatex: '\\frac{d}{dx}\\left(x^3+2x\\right)',
+      },
+      {
+        id: 'calc-derivative-general-power',
+        title: 'Differentiate a variable exponent',
+        explanation: 'General-power derivatives stay bounded but can handle supported forms such as cos^(2x)(x).',
+        steps: [
+          'Open Calculus > Derivative.',
+          'Enter cos^(2x)(x) as the body.',
+          'Press EXE or F1 and read the General power badge.',
+        ],
+        expected: 'The expression opens in Calculate > Derivative and returns a symbolic derivative containing ln(cos(x)).',
+        launch: {
+          kind: 'load-expression',
+          targetMode: 'calculate',
+          calculateScreen: 'derivative',
+          calculateSeed: {
+            bodyLatex: '\\cos^{2x}\\left(x\\right)',
+          },
+          latex: '\\frac{d}{dx}\\left(\\cos^{2x}\\left(x\\right)\\right)',
+          label: 'Open in Derivative Tool',
+        },
       },
       {
         id: 'calc-derivative-point',
@@ -513,7 +556,7 @@ const GUIDE_ARTICLE_DRAFTS: GuideArticleDraft[] = [
     id: 'calculus-integrals-limits',
     domainId: 'calculus',
     title: 'Integrals and Limits',
-    summary: 'Use symbolic antiderivatives when available, plus stronger finite and infinite-target limit handling.',
+    summary: 'Use symbolic antiderivatives when available, safe definite-integral evaluation, and stronger finite/infinite limit handling.',
     whatItIs: [
       'The core Calculus page is the approachable workflow for indefinite integrals, definite integrals, and common limits.',
       'It is meant for everyday single-variable work in x before you move to Advanced Calc.',
@@ -531,9 +574,10 @@ const GUIDE_ARTICLE_DRAFTS: GuideArticleDraft[] = [
     concepts: [
       'The ∫ symbol is for indefinite integrals and stays symbolic-only in this milestone.',
       'Some antiderivatives are handled by app-owned symbolic rules when the engine leaves them unresolved.',
-      'The ∫ab template is for definite integrals with numeric bounds and may fall back numerically.',
-      'The limit workbench now supports finite targets and ±∞ in this milestone.',
-      'Core limits can stabilize removable singularities and supported one-sided mismatch cases before numeric fallback.',
+      'The ∫ab template is for definite integrals with numeric bounds; exact antiderivatives are trusted only after interval-safety checks.',
+      'Unsafe definite integrals stop before numeric fallback when the real-domain check finds a clear hazard.',
+      'The limit workbench supports finite targets, typed one-sided targets such as 0^+ and 0^-, and ±∞ end behavior.',
+      'Core limits can stabilize removable singularities, local equivalent forms, and supported one-sided pole cases before numeric fallback.',
     ],
     whereToFindIt: [
       'Menu > Calculus > Calculus',
@@ -545,23 +589,47 @@ const GUIDE_ARTICLE_DRAFTS: GuideArticleDraft[] = [
     examples: [
       {
         id: 'calc-integral-indefinite',
-        title: 'Rule-based indefinite integral',
-        explanation: 'Simple single-variable antiderivatives can now succeed through the app-owned rule layer.',
+        title: 'U-substitution antiderivative',
+        explanation: 'Simple composition antiderivatives can now succeed through the app-owned u-substitution rule layer.',
         steps: [
           'Open Calculus > Integral.',
-          'Leave the tool on Indefinite and enter sin(2x+1) as the integrand.',
-          'Press EXE or F1 to request a symbolic antiderivative.',
+          'Leave the tool on Indefinite and enter 2x ln(x^2+1) as the integrand.',
+          'Press EXE or F1 and read the Rule-based symbolic and U-substitution badges.',
         ],
-        expected: 'The integral opens in Calculate > Integral and returns a symbolic antiderivative.',
+        expected: 'The integral opens in Calculate > Integral and returns a verified rule-based antiderivative.',
         launch: {
           kind: 'load-expression',
           targetMode: 'calculate',
           calculateScreen: 'integral',
           calculateSeed: {
             kind: 'indefinite',
-            bodyLatex: '\\sin(2x+1)',
+            bodyLatex: '2x\\ln\\left(x^2+1\\right)',
           },
-          latex: '\\int \\sin(2x+1) \\, dx',
+          latex: '\\int 2x\\ln\\left(x^2+1\\right) \\, dx',
+          label: 'Open in Integral Tool',
+        },
+      },
+      {
+        id: 'calc-integral-definite-exact',
+        title: 'Exact definite integral',
+        explanation: 'When the antiderivative is verified and the interval is safe, a definite integral can stay symbolic.',
+        steps: [
+          'Open Calculus > Integral and switch to Definite.',
+          'Enter 2x as the body with lower bound 0 and upper bound 1.',
+          'Press EXE or F1 and read the Integral Method and Interval Safety details.',
+        ],
+        expected: 'The expression opens in Calculate > Integral and resolves exactly to 1.',
+        launch: {
+          kind: 'load-expression',
+          targetMode: 'calculate',
+          calculateScreen: 'integral',
+          calculateSeed: {
+            kind: 'definite',
+            bodyLatex: '2x',
+            lower: '0',
+            upper: '1',
+          },
+          latex: '\\int_0^1 2x \\, dx',
           label: 'Open in Integral Tool',
         },
       },
@@ -590,6 +658,30 @@ const GUIDE_ARTICLE_DRAFTS: GuideArticleDraft[] = [
         },
       },
       {
+        id: 'calc-integral-definite-unsafe',
+        title: 'Unsafe definite-integral stop',
+        explanation: 'Clear real-domain hazards stop before numeric fallback so singular integrals do not look trustworthy.',
+        steps: [
+          'Open Calculus > Integral and switch to Definite.',
+          'Enter 1/x as the body with lower bound -1 and upper bound 1.',
+          'Press EXE or F1 and read the Interval Safety stop reason.',
+        ],
+        expected: 'The expression opens in Calculate > Integral and stops with a controlled real-domain message.',
+        launch: {
+          kind: 'load-expression',
+          targetMode: 'calculate',
+          calculateScreen: 'integral',
+          calculateSeed: {
+            kind: 'definite',
+            bodyLatex: '\\frac{1}{x}',
+            lower: '-1',
+            upper: '1',
+          },
+          latex: '\\int_{-1}^1 \\frac{1}{x} \\, dx',
+          label: 'Open in Integral Tool',
+        },
+      },
+      {
         id: 'calc-limit',
         title: 'Finite removable-singularity limit',
         explanation: 'Finite targets still work, including common removable-singularity style limits.',
@@ -610,6 +702,30 @@ const GUIDE_ARTICLE_DRAFTS: GuideArticleDraft[] = [
             targetKind: 'finite',
           },
           latex: '\\lim_{x\\to 0}\\left(\\frac{\\sin(x)}{x}\\right)',
+          label: 'Open in Limit Tool',
+        },
+      },
+      {
+        id: 'calc-limit-directional-pole',
+        title: 'One-sided pole limit',
+        explanation: 'Typed directional targets distinguish x approaching from the right or left.',
+        steps: [
+          'Open Calculus > Limit.',
+          'Enter 1/x, set the target to 0, and choose Right.',
+          'Press EXE or F1 to return +infinity for the right-hand limit.',
+        ],
+        expected: 'The expression opens in Calculate > Limit with a one-sided finite target.',
+        launch: {
+          kind: 'load-expression',
+          targetMode: 'calculate',
+          calculateScreen: 'limit',
+          calculateSeed: {
+            bodyLatex: '\\frac{1}{x}',
+            target: '0',
+            direction: 'right',
+            targetKind: 'finite',
+          },
+          latex: '\\lim_{x\\to 0^+}\\left(\\frac{1}{x}\\right)',
           label: 'Open in Limit Tool',
         },
       },
@@ -738,10 +854,10 @@ const GUIDE_ARTICLE_DRAFTS: GuideArticleDraft[] = [
     id: 'advanced-integrals',
     domainId: 'advancedCalculus',
     title: 'Advanced Integrals',
-    summary: 'Use Advanced Calc for harder antiderivatives, stronger symbolic rules, and improper integral workflows.',
+    summary: 'Use Advanced Calc for the same shared integral backend plus Advanced-only definite and improper workflows.',
     whatItIs: [
       'Advanced Integrals is the heavier-duty single-variable integral workspace in Advanced Calc.',
-      'It covers harder symbolic antiderivatives and supported improper integral workflows that go beyond the core Calculus page.',
+      'It uses the shared symbolic integral backend where behavior overlaps with core Calculus, and keeps improper workflows in Advanced Calc.',
     ],
     whatItMeans: [
       'An antiderivative is a function whose derivative gives back the original integrand.',
@@ -752,10 +868,10 @@ const GUIDE_ARTICLE_DRAFTS: GuideArticleDraft[] = [
       'Open Advanced Calc > Integrals, then choose Indefinite, Definite, or Improper.',
       'Use Indefinite when you want a symbolic antiderivative only.',
       'Use Definite or Improper when numeric fallback is acceptable and you need a bounded or infinite-bound accumulated value.',
-      'Try Advanced Calc when the core Calculus page cannot resolve a nested integrand, a supported substitution pattern, or a supported integration-by-parts pattern.',
+      'Use Advanced Calc when you want the dedicated integral workspace, definite/improper controls, or richer guide context.',
     ],
     concepts: [
-      'Indefinite integrals remain symbolic-only, but Advanced Calc tries a wider rule engine before failing.',
+      'Indefinite integrals remain symbolic-only and use the same shared rule engine as core Calculus for overlapping cases.',
       'Definite and improper integrals may fall back numerically when exact symbolic evaluation is unavailable.',
       'Improper integral bounds can include finite values and infinity-bound transforms.',
       'Supported symbolic strategies include substitution, integration by parts, inverse-trig primitives, and narrow trig-substitution families.',
@@ -771,7 +887,7 @@ const GUIDE_ARTICLE_DRAFTS: GuideArticleDraft[] = [
       {
         id: 'advanced-int-arctan',
         title: 'Inverse-trig antiderivative',
-        explanation: 'Advanced Calc can resolve some inverse-trig primitives that the simpler Calculus page may leave unresolved.',
+        explanation: 'The shared integral backend resolves inverse-trig primitives here and in core Calculus.',
         steps: [
           'Open Advanced Calc > Integrals > Indefinite.',
           'Enter 1/(1+x^2) as the integrand.',
@@ -828,10 +944,10 @@ const GUIDE_ARTICLE_DRAFTS: GuideArticleDraft[] = [
     id: 'advanced-limits',
     domainId: 'advancedCalculus',
     title: 'Advanced Limits',
-    summary: "Use Advanced Calc for stronger finite and infinite-target limits, including capped L'Hopital on supported ratio forms.",
+    summary: "Use Advanced Calc for the shared finite/infinite limit backend with dedicated target and direction controls.",
     whatItIs: [
       'Advanced Limits is the stronger single-variable limit workspace for harder finite and infinite-target cases.',
-      'It sits above the core Calculus limit tool and adds more symbolic and heuristic handling before numeric fallback.',
+      'It shares the same finite and infinite limit backend as core Calculus while giving you dedicated Advanced Calc controls.',
     ],
     whatItMeans: [
       'A removable singularity is a point where the formula looks broken even though the nearby behavior approaches a finite value.',
@@ -843,11 +959,11 @@ const GUIDE_ARTICLE_DRAFTS: GuideArticleDraft[] = [
       'Open Advanced Calc > Limits, then choose Finite Target or Infinite Target.',
       'Use left, right, or two-sided analysis only on finite targets.',
       'Read the provenance badge and warnings together to tell whether the answer was symbolic, heuristic, or numeric fallback.',
-      "Use Advanced Calc for supported 0/0 or infinity-over-infinity cases before expecting a general theorem-prover style limit engine.",
+      'Use Advanced Calc for dedicated finite/infinite target controls before expecting a general theorem-prover style limit engine.',
     ],
     concepts: [
       'Advanced Calc handles finite targets, +∞, and -∞.',
-      "Supported finite ratio forms can use a capped symbolic L'Hopital pass before numeric fallback.",
+      'Supported finite ratio forms can use local-order, rational, or capped heuristic handling before numeric fallback.',
       'Infinite-target heuristics cover common rational end behavior and some growth comparisons.',
       'Logarithm and exponential dominance are handled only in a narrow supported heuristic set.',
     ],
@@ -2194,4 +2310,3 @@ export function getDomainTitle(domainId: GuideArticle['domainId']) {
 export function guideArticleIsActive(article: GuideArticle, enabledCapabilities: readonly CapabilityId[]) {
   return enabledCapabilities.includes(GUIDE_DOMAIN_CAPABILITY[article.domainId]);
 }
-

@@ -10,6 +10,7 @@ import {
   openTrigEquationSolve,
   renderAppMain,
   setMathFieldLatex,
+  setVisibleSecondaryMathFieldLatex,
 } from './test/renderAppMain';
 
 function setViewportWidth(width: number) {
@@ -19,6 +20,21 @@ function setViewportWidth(width: number) {
     value: width,
   });
   fireEvent(window, new Event('resize'));
+}
+
+async function openCalculusTool(user: Awaited<ReturnType<typeof renderAppMain>>['user'], toolLabel: string) {
+  await openLauncherApp(user, 'Calculus', 'Calculus');
+  await user.click(await screen.findByRole('button', { name: new RegExp(toolLabel, 'i') }));
+}
+
+async function openAdvancedCalcTool(
+  user: Awaited<ReturnType<typeof renderAppMain>>['user'],
+  ...toolLabels: string[]
+) {
+  await openLauncherApp(user, 'Calculus', 'Advanced Calc');
+  for (const toolLabel of toolLabels) {
+    await user.click(await screen.findByRole('button', { name: new RegExp(toolLabel, 'i') }));
+  }
 }
 
 describe('AppMain UI automation flows', () => {
@@ -79,6 +95,47 @@ describe('AppMain UI automation flows', () => {
     await user.click(screen.getByTestId('settings-toggle'));
     await screen.findByTestId('settings-panel');
     expect(screen.queryByTestId('history-panel')).not.toBeInTheDocument();
+  });
+
+  it('replays guided Calculus history into the same tool state', async () => {
+    const { user } = await renderAppMain();
+
+    await openCalculusTool(user, 'Integral');
+    setVisibleSecondaryMathFieldLatex('2x');
+    await user.click(screen.getByTestId('keypad-execute'));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expect(screen.getByTestId('display-outcome-root')).toHaveTextContent('Calculus');
+    expect(screen.getByTestId('display-outcome-root')).toHaveTextContent('Rule-based symbolic');
+
+    await user.click(screen.getByTestId('history-toggle'));
+    await user.click((await screen.findAllByTestId('history-entry'))[0]);
+
+    await waitFor(() => {
+      const field = document.querySelector('math-field.secondary-mathfield');
+      expect(field).toHaveAttribute('data-value', '2x');
+    });
+    expect(screen.getAllByText('Integral').length).toBeGreaterThan(0);
+  });
+
+  it('replays Advanced Calc history into the same tool state', async () => {
+    const { user } = await renderAppMain();
+
+    await openAdvancedCalcTool(user, 'Series', 'Maclaurin');
+    setVisibleSecondaryMathFieldLatex('\\sin(x)');
+    await user.click(screen.getByTestId('keypad-execute'));
+
+    await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
+    expect(screen.getByTestId('display-outcome-root')).toHaveTextContent('Advanced Calc');
+
+    await user.click(screen.getByTestId('history-toggle'));
+    await user.click((await screen.findAllByTestId('history-entry'))[0]);
+
+    await waitFor(() => {
+      const field = document.querySelector('math-field.secondary-mathfield');
+      expect(field).toHaveAttribute('data-value', '\\sin(x)');
+    });
+    expect(screen.getByText('Maclaurin Input')).toBeInTheDocument();
   });
 
   it('applies display settings live and keeps quick toggles in sync', async () => {

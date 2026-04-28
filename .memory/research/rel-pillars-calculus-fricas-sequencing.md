@@ -19,8 +19,8 @@ Preferred clean-base order:
 1. `REL1` - first Linux preview release pipeline. Completed.
 2. `PILLARS0` - minimal public-quality Calcwiz pillars baseline. Completed.
 3. `MATH-GOLDEN0` - golden math regression corpus for shipped behavior. Completed.
-4. `DOCS0` / `TRIAGE0` / `SEC0` as public traffic pressure requires.
-5. `CALC-POLISH1` - calculus readback, Guide, history/replay, and UX consistency for the calculus core already established.
+4. `CALC-POLISH1` - calculus readback, Guide, history/replay, and UX consistency for the calculus core already established. Completed.
+5. `DOCS0` / `TRIAGE0` / `SEC0` as public traffic pressure requires.
 
 The broader `REL/PILLARS` roadmap remains the public-release hardening lane:
 
@@ -34,7 +34,7 @@ The broader `REL/PILLARS` roadmap remains the public-release hardening lane:
 - `SEC0`
 - `UX-REL0`
 
-Not every item must block the first preview binary. `REL1`, `PILLARS0`, and `MATH-GOLDEN0` are complete; the next default move is `CALC-POLISH1` unless public traffic makes `DOCS0`, `TRIAGE0`, `SEC0`, or another release-hardening slice more urgent.
+Not every item must block the first preview binary. `REL1`, `PILLARS0`, `MATH-GOLDEN0`, and `CALC-POLISH1` are complete; the next default move is incubation-system strengthening before `FRICAS-CTX0`, unless public traffic makes `DOCS0`, `TRIAGE0`, `SEC0`, or another release-hardening slice more urgent.
 
 ## What Remains From The Calculus Core Roadmap
 
@@ -51,10 +51,11 @@ Completed calculus foundation:
 - `CALC-LIM3`
 - `domain-range-CORE1`
 - `CALC-INT1`
+- `CALC-POLISH1`
 
 Immediate remaining calculus follow-through:
 
-- `CALC-POLISH1`: align Basic Calculus / Advanced Calc wording, update Guide examples only for shipped behavior, preserve history/replay context, and make stop reasons match the bounded roadmap.
+- None currently locked. Future calculus work should be selected only after public-release pressure and the incubation-system strengthening lane are reviewed.
 
 Parked or later calculus candidates:
 

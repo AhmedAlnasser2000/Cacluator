@@ -5,12 +5,12 @@ import {
   useRef,
 } from 'react';
 import type {
-  InlineShortcutDefinitions,
   MathfieldElement,
   VirtualKeyboardLayout,
 } from 'mathlive';
 import { canonicalizeMathInput } from '../lib/input-canonicalization';
 import type { ModeId } from '../types/calculator';
+import { buildInlineShortcutOverrides } from './math-editor-shortcuts';
 
 type MathEditorProps = {
   value: string;
@@ -32,26 +32,6 @@ function configureVirtualKeyboard(layouts: readonly VirtualKeyboardLayout[] | un
 
   window.mathVirtualKeyboard.layouts = layouts;
   window.mathVirtualKeyboard.editToolbar = 'default';
-}
-
-function buildInlineShortcutOverrides(
-  existing: InlineShortcutDefinitions | undefined,
-): InlineShortcutDefinitions {
-  return {
-    ...(existing ?? {}),
-    sin: '\\sin',
-    cos: '\\cos',
-    tan: '\\tan',
-    int: '\\int #?\\,dx',
-    asin: '\\arcsin',
-    acos: '\\arccos',
-    atan: '\\arctan',
-    ln: '\\ln',
-    log: '\\log',
-    sqrt: '\\sqrt{#?}',
-    abs: '\\left|#?\\right|',
-    pi: '\\pi',
-  };
 }
 
 export const MathEditor = forwardRef<MathfieldElement, MathEditorProps>(
@@ -88,21 +68,7 @@ export const MathEditor = forwardRef<MathfieldElement, MathEditorProps>(
 
       const handleInput = () => {
         const rawLatex = field.getValue('latex');
-        const canonicalized = modeId
-          ? canonicalizeMathInput(rawLatex, {
-              mode: modeId,
-              screenHint,
-              liveAssist: true,
-            })
-          : {
-              ok: true as const,
-              canonicalLatex: rawLatex,
-            };
-        const nextLatex = canonicalized.ok ? canonicalized.canonicalLatex : rawLatex;
-        if (nextLatex !== rawLatex) {
-          field.setValue(nextLatex);
-        }
-        onChange(nextLatex);
+        onChange(rawLatex);
       };
 
       const handleFocus = () => {

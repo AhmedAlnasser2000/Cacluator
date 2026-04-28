@@ -9,7 +9,7 @@
 - Near-term product direction is now to pause broad algebra expansion and advance bounded calculus milestones on top of the shared calculus evaluation and verification boundary, with every post-`CALC-CORE1` calculus capability gated by explicit algebra/core dependency readiness.
 - Public tracked memory should use stable placeholders for exact local paths, private operator names, and local SSH target aliases; exact local mappings belong only in ignored scratchpads.
 - Public release posture: protect `main`, require PR review and `ci-linux`, keep Linux preview releases manual/tag-triggered, and keep Playground/external compute out of first public artifacts.
-- Current sequencing note: the `REL/PILLARS` clean-base lane now has `REL1`, `PILLARS0`, and `MATH-GOLDEN0`; the next default milestone is `CALC-POLISH1` unless public traffic requires `DOCS0`, `TRIAGE0`, `SEC0`, or another release-hardening slice first.
+- Current sequencing note: the `REL/PILLARS` clean-base lane now has `REL1`, `PILLARS0`, and `MATH-GOLDEN0`; `CALC-POLISH1` has closed the immediate calculus UX/replay follow-through. The next default move is incubation-system strengthening before `FRICAS-CTX0`, unless public traffic requires `DOCS0`, `TRIAGE0`, `SEC0`, or another release-hardening slice first.
 - FriCAS context research is captured as a future isolated `FRICAS-CTX0` lane only, but the incubation system should be strengthened before that lane starts; no direct dependency, no submodule, no code copying by default, and any translated idea must pass through Playground/incubation before stable adoption.
 - Source preservation posture: new external roadmaps, research files, and ChatGPT discussion exports that need as-is retention belong in `.memory/sources/` as verbatim snapshots with metadata kept separately in `.memory/sources/INDEX.md`.
 
@@ -55,10 +55,11 @@
 - Post `domain-range-CORE1` shared substrate; equation, calculus, and future definite-integral trust work now have a bounded real-domain/range core for constraints, range proofs, one-sided domain checks, and interval-safety readiness.
 - Post `CALC-INT1` definite-integral trust pass; Calculate, Basic Calculus, and Advanced Calc finite definite integrals now share exact verified antiderivative evaluation, interval-safety gates, numeric fallback honesty, and method/safety detail notes.
 - Post `REL0` public repository guardrail foundation; CI/release workflows, CODEOWNERS, contribution/security docs, issue/PR templates, README preview-release notes, and first Linux preview checklist are now in place without product math changes.
-- Post sequencing capture for `REL/PILLARS`, remaining calculus follow-through, and future FriCAS context research; the next clean-base priority is `REL1`, then `PILLARS0` / `MATH-GOLDEN0`, before returning to `CALC-POLISH1`, strengthening incubation, and only then starting `FRICAS-CTX0`.
+- Post sequencing capture for `REL/PILLARS`, calculus follow-through, and future FriCAS context research; `REL1`, `PILLARS0`, `MATH-GOLDEN0`, and `CALC-POLISH1` are now complete, so incubation-system strengthening is the next default prerequisite before `FRICAS-CTX0` unless public release pressure changes the order.
 - Post `REL1 + SRC0` foundation pass; first Linux preview release proof is hardened and `.memory/sources/` now preserves external source snapshots before interpretation.
 - Post `PILLARS0` baseline pass; public project pillars are documented and guarded by `npm run test:pillars`, with `MATH-GOLDEN0` still the next clean-base correctness milestone.
 - Post `MATH-GOLDEN0` correctness baseline; shipped math behavior now has a small typed golden corpus wired into CI/release gates.
+- Post `CALC-POLISH1` calculus readback/replay polish; Calculate guided Calculus and Advanced Calc history entries now capture optional typed replay context, replay uses typed seeds before legacy inference, calculus chips/provenance wording are normalized across result surfaces, and Guide examples now match shipped golden/calculus behavior.
 
 ## Stable Architecture Snapshot
 - Desktop-first calculator with Tauri shell and React/TypeScript frontend.
@@ -100,6 +101,25 @@
   - Playground still does not have schema validation, automation, or product integration infrastructure; those remain explicitly out of scope
 
 ## Most Recent Completed Milestone
+- Completed `CALC-POLISH1` as the calculus readback, result-surface, Guide, and replay consistency pass:
+  - added optional typed calculus replay context to history entries for guided `Calculate > Calculus` screens and Advanced Calc tools
+  - preserved old history compatibility by keeping schema fields optional and replaying legacy entries through the existing LaTeX inference fallback
+  - captured and replayed guided derivative, derivative-at-point, integral, and limit state, plus Advanced Calc integrals, limits, series, partials, ODE, and numeric IVP tool state
+  - normalized calculus result chips so Calculate, Basic Calculus, and Advanced Calc consistently surface calculus area, provenance, and existing derivative/integration strategy labels
+  - refreshed Guide calculus examples to shipped behavior already covered by recent calculus milestones and `MATH-GOLDEN0`
+  - added history schema tests, Guide content tests, AppMain replay UI tests, and Playwright smoke coverage for guided and Advanced replay
+  - preserved boundaries: no math capability, solver behavior, new result origins, new strategy values, proof/status exposure, broad UI redesign, or Playground/FriCAS work was added
+  - next recommended step is to strengthen the incubation system before `FRICAS-CTX0`, unless public release traffic requires a docs/triage/security hardening slice first
+  - primary_agent: `codex`
+  - primary_agent_model: `gpt-5.5`
+- Regression checks:
+  - `npm run test:golden` passed locally on 2026-04-28
+  - `npm run test:unit -- src/lib/history-schema.test.ts src/lib/guide/content.test.ts src/lib/calculus-strategy.test.ts src/lib/calculus-workbench.test.ts` passed locally on 2026-04-28
+  - `npm run test:ui -- src/AppMain.ui.test.tsx` passed locally on 2026-04-28
+  - `npx playwright test e2e/calc-audit0-smoke.spec.ts --project=chromium` passed locally on 2026-04-28
+  - `npm run lint` passed locally on 2026-04-28
+  - `npm run build` passed locally on 2026-04-28
+  - `cargo check --manifest-path src-tauri/Cargo.toml` passed locally on 2026-04-28
 - Completed `MATH-GOLDEN0` as the shipped-behavior golden math corpus:
   - added a typed 24-case corpus under `src/lib/__golden__/`
   - added `npm run test:golden` and wired it into `npm run test:gate`, `ci-linux`, and `Release Linux`

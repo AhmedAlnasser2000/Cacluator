@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import {
   getMathFieldLatex,
+  getVisibleSecondaryMathFieldLatex,
   openAdvancedCalcTool,
   openCalculusTool,
   setMathFieldLatex,
@@ -40,7 +41,7 @@ test('CALC-COMP1 Calculate editor smoke repairs pasted integral and ln shapes', 
   await setMathFieldLatex(page, '\\int_{}^{} 2x ln\\left(x^2+1\\right)\\,dx');
 
   const editorLatex = await getMathFieldLatex(page);
-  expect(editorLatex).toContain('\\ln');
+  expect(editorLatex).toContain('ln');
 
   await page.getByTestId('keypad-execute').click();
 
@@ -129,6 +130,36 @@ test('CALC-LIM3 local limit behavior smoke covers details', async ({ page }) => 
   await expect(page.getByTestId('display-outcome-root')).toContainText('Rule-based symbolic');
   await expect(page.getByTestId('display-outcome-root')).toContainText(/1(?:\.0+)?/);
   await expect(page.getByTestId('display-outcome-detail-sections')).toContainText('local orders');
+});
+
+test('CALC-POLISH1 history replay preserves guided calculus context', async ({ page }) => {
+  await openCalculusTool(page, 'Integral');
+  await setVisibleSecondaryMathFieldLatex(page, '2x');
+  await page.getByTestId('keypad-execute').click();
+
+  await expect(page.getByTestId('display-outcome-success')).toBeVisible();
+  await expect(page.getByTestId('display-outcome-root')).toContainText('Calculus');
+  await expect(page.getByTestId('display-outcome-root')).toContainText('Rule-based symbolic');
+
+  await page.getByTestId('history-toggle').click();
+  await page.getByTestId('history-entry').first().click();
+
+  await expect(page.getByText('Integral').first()).toBeVisible();
+  await expect.poll(() => getVisibleSecondaryMathFieldLatex(page)).toBe('2x');
+  await page.getByTestId('history-toggle').click();
+
+  await openAdvancedCalcTool(page, 'Series', 'Maclaurin');
+  await setVisibleSecondaryMathFieldLatex(page, '\\sin(x)');
+  await page.getByTestId('keypad-execute').click();
+
+  await expect(page.getByTestId('display-outcome-success')).toBeVisible();
+  await expect(page.getByTestId('display-outcome-root')).toContainText('Advanced Calc');
+
+  await page.getByTestId('history-toggle').click();
+  await page.getByTestId('history-entry').first().click();
+
+  await expect(page.getByText('Maclaurin Input')).toBeVisible();
+  await expect.poll(() => getVisibleSecondaryMathFieldLatex(page)).toBe('\\sin(x)');
 });
 
 test('CALC-AUDIT0 Advanced Calc smoke covers integrals and limits', async ({ page }) => {

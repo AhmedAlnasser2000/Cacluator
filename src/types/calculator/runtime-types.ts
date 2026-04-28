@@ -833,6 +833,26 @@ export type HistoryEntry = {
   resolvedInputLatex?: string;
   resultLatex?: string;
   approxText?: string;
+  calculateScreen?: CalculateScreen;
+  calculateSeed?: Partial<
+    DerivativeWorkbenchState
+    & DerivativePointWorkbenchState
+    & IntegralWorkbenchState
+    & LimitWorkbenchState
+  >;
+  advancedCalcScreen?: AdvancedCalcScreen;
+  advancedCalcSeed?: Partial<
+    AdvancedIndefiniteIntegralState
+    & AdvancedDefiniteIntegralState
+    & AdvancedImproperIntegralState
+    & AdvancedFiniteLimitState
+    & AdvancedInfiniteLimitState
+    & SeriesState
+    & PartialDerivativeWorkbenchState
+    & FirstOrderOdeState
+    & SecondOrderOdeState
+    & NumericIvpState
+  >;
   geometryScreen?: GeometryScreen;
   trigScreen?: TrigScreen;
   statisticsScreen?: StatisticsScreen;

@@ -49,6 +49,7 @@ export function HistoryPanel({
                 key={entry.id}
                 type="button"
                 className="history-entry"
+                data-testid="history-entry"
                 onClick={() => onReplay(entry)}
               >
                 <span className="history-meta">{modeLabels[entry.mode]}</span>
