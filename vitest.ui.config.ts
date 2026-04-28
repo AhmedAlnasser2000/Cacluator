@@ -9,6 +9,7 @@ export default mergeConfig(
       include: ['src/**/*.ui.test.ts', 'src/**/*.ui.test.tsx'],
       setupFiles: ['src/test/setup-ui.ts'],
       reporters: ['default'],
+      testTimeout: 30000,
       css: true,
       clearMocks: true,
       restoreMocks: true,

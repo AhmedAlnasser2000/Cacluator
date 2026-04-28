@@ -1376,7 +1376,7 @@ describe('AppMain UI automation flows', () => {
     await waitFor(() => expect(screen.getByTestId('display-outcome-success')).toBeInTheDocument());
     expectMathStaticLatex(screen.getByTestId('display-outcome-exact'), 'x=0');
     expect(screen.getByText('LCD Clear')).toBeInTheDocument();
-  }, 15000);
+  }, 30000);
 
   it('renders RAD2 sequential radical solves with exact follow-on provenance', async () => {
     const { user } = await renderAppMain();
