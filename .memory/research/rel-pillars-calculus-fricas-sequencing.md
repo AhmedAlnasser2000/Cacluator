@@ -21,7 +21,8 @@ Preferred clean-base order:
 3. `MATH-GOLDEN0` - golden math regression corpus for shipped behavior. Completed.
 4. `CALC-POLISH1` - calculus readback, Guide, history/replay, and UX consistency for the calculus core already established. Completed.
 5. `INCUBATION-LABS0` - one-way generated Labs catalog and dev-only read-only experiment viewer. Completed.
-6. `DOCS0` / `TRIAGE0` / `SEC0` as public traffic pressure requires.
+6. `INCUBATION-SOURCES0` - controlled research-context source mirror registry. Completed.
+7. `DOCS0` / `TRIAGE0` / `SEC0` as public traffic pressure requires.
 
 The broader `REL/PILLARS` roadmap remains the public-release hardening lane:
 
@@ -35,7 +36,7 @@ The broader `REL/PILLARS` roadmap remains the public-release hardening lane:
 - `SEC0`
 - `UX-REL0`
 
-Not every item must block the first preview binary. `REL1`, `PILLARS0`, `MATH-GOLDEN0`, `CALC-POLISH1`, and `INCUBATION-LABS0` are complete. The next default move is either a record/evidence-quality incubation strengthening slice or isolated `FRICAS-CTX0` planning, unless public traffic makes `DOCS0`, `TRIAGE0`, `SEC0`, or another release-hardening slice more urgent.
+Not every item must block the first preview binary. `REL1`, `PILLARS0`, `MATH-GOLDEN0`, `CALC-POLISH1`, `INCUBATION-LABS0`, and `INCUBATION-SOURCES0` are complete. The next default move is isolated `FRICAS-CTX0` planning or a small record/evidence-quality incubation slice if the first context mirror needs stronger review mechanics, unless public traffic makes `DOCS0`, `TRIAGE0`, `SEC0`, or another release-hardening slice more urgent.
 
 ## What Remains From The Calculus Core Roadmap
 
@@ -90,8 +91,19 @@ Hard boundaries:
 
 Preferred mirror shape:
 
-- Keep the FriCAS research mirror outside the main Calcwiz repo, for example as a sibling `fricas-context-lab` repository.
+- Keep all Calcwiz research-context clones under the controlled, ignored `playground/sources/mirrors/<mirror-id>/` paths.
+- Commit only source mirror metadata under `playground/sources/metadata/`.
 - Bring back only distilled research artifacts, benchmark/correctness corpora, and bounded experiment specs.
+- Keep external clones out of Calcwiz git history and do not add source mirrors as submodules.
+
+Registered context mirrors after `INCUBATION-SOURCES0`:
+
+- FriCAS
+- SymPy
+- Maxima
+- SageMath
+- Giac / XCAS
+- SymEngine
 
 Candidate Calcwiz artifacts later:
 
@@ -149,6 +161,7 @@ Near-term priority:
 2. complete the remaining calculus polish surface from the established calculus core
 3. strengthen the Playground/incubation system itself before asking it to carry a large external-context lane
 4. use the completed `INCUBATION-LABS0` one-way catalog/viewer pattern as the safe visual bridge for incubation status
-5. then start FriCAS context research as an isolated, non-product comparative study
+5. use the completed `INCUBATION-SOURCES0` registry as the only controlled place for local context mirrors
+6. then start FriCAS context research as an isolated, non-product comparative study
 
-FriCAS should not be the pressure test for an unobserved incubation system. `INCUBATION-LABS0` now proves the one-way visual catalog pattern; before or during `FRICAS-CTX0`, consider one more record/evidence-quality slice if the FriCAS lane needs stronger review discipline, corpus handling, or graduation/retirement mechanics.
+FriCAS should not be the pressure test for an unobserved incubation system. `INCUBATION-LABS0` now proves the one-way visual catalog pattern, and `INCUBATION-SOURCES0` now proves controlled source-mirror registration without cloning repos into git history. Before or during `FRICAS-CTX0`, consider one more record/evidence-quality slice only if the FriCAS lane needs stronger review discipline, corpus handling, or graduation/retirement mechanics.

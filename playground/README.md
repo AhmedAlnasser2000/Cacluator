@@ -22,6 +22,16 @@ Stable product code under `src/` must never import from `playground/`.
 
 That one-way rule is enforced in ESLint for TypeScript product code.
 
+## Source mirror rule
+
+External CAS/math repositories used for research context belong in `playground/sources/`.
+
+- committed metadata lives under `playground/sources/metadata/`
+- local clones live only under ignored `playground/sources/mirrors/<mirror-id>/`
+- source mirrors are context only, not product dependencies
+- useful ideas must be translated into Calcwiz-native bounded experiments before any stable adoption
+- direct code copying is forbidden by default and requires an explicit stop-and-review note before it is even considered
+
 ## Graduation rule
 
 Successful experiments do not become product features by direct reuse.
